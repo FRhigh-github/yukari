@@ -1,26 +1,31 @@
-
 import { createClient } from '@/lib/supabase/server'
 
-// 関数に async が付いている＝サーバー側で動くコンポーネント。
-// ブラウザに届く前に、サーバーでデータを取ってから画面を作れる。
+// await を使うので async を付ける
 export default async function Home() {
   const supabase = await createClient()
 
-  // 今ログインしている人の情報を取ってくる。
-  // ログインしていなければ user は null になる。
-  const { data: { user } } = await supabase.auth.getUser()
+  // posts テーブルから全部の列を取ってくる
+  // data には「オブジェクトの配列」が入る
+  const { data: posts, error } = await supabase
+    .from('posts')
+    .select('*')
+
+  // エラーが出たらターミナルに表示する
+  if (error) {
+    console.error('取得失敗:', error)
+  }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4">
-      <h1 className="text-2xl">ゆかり</h1>
+    <main className="p-6">
+      <h1 className="mb-4 text-xl">投稿一覧</h1>
 
-      {/* {条件 ? Aを表示 : Bを表示} という書き方。
-          JSXの中でif文の代わりに使う頻出パターン。 */}
-      {user ? (
-        <p>ログイン中: {user.email}</p>
-      ) : (
-        <a href="/login" className="underline">ログインする</a>
-      )}
+      {/* posts は配列。.map() で1件ずつ並べる */}
+      {posts?.map((post) => (
+        <div key={post.id} className="mb-2 rounded border p-3">
+          <p>{post.title}</p>
+          <p>{post.body}</p>
+        </div>
+      ))}
     </main>
   )
 }
