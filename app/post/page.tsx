@@ -15,6 +15,7 @@ export default function PostPage() {
   const handleSubmit = async () => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
 
     // posts に1行追加。左が列名、右が入れる値
     await supabase.from('posts').insert({
