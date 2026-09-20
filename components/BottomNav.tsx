@@ -1,6 +1,7 @@
 "use client"; // 「今どのURLにいるか」をブラウザに聞くので必要
 
 import Link from "next/link";
+import { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 
 // 下タブを出さない画面。ここに URL を足せば、その画面ではタブが消えます。
@@ -31,6 +32,41 @@ const TABS = [
   },
 ];
 
+// ▼ アイコン1つぶん
+//
+// useLinkStatus は「今このリンクの移動中かどうか」を教えてくれます。
+// これを使うと、次の画面ができあがるのを待たずに、
+// 押した瞬間からアイコンを選択中の見た目にできます。
+// 反応が無いと「押せていない」と感じるので、これが効きます。
+//
+// ※ useLinkStatus は <Link> の中でしか使えないので、部品を分けています。
+type TabIconProps = {
+  path: React.ReactNode;
+  isCurrent: boolean;
+};
+
+function TabIcon({ path, isCurrent }: TabIconProps) {
+  const { pending } = useLinkStatus();
+  const isActive = isCurrent || pending;
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      // 選ばれているタブだけ、中を塗りつぶします
+      fill={isActive ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={isActive ? "text-stone-900" : "text-stone-500"}
+    >
+      {path}
+    </svg>
+  );
+}
+
 export default function BottomNav() {
   const pathname = usePathname(); // 例: '/post' のような文字列が入る
 
@@ -55,23 +91,11 @@ export default function BottomNav() {
               // 文字は出さないので、代わりに aria-label で名前を持たせます。
               // h-11 w-11 = 44px。押せる範囲を iOS の基準に合わせています。
               aria-label={tab.label}
-              className={`flex h-11 w-11 items-center justify-center ${
-                isActive ? "text-stone-900" : "text-stone-500"
-              }`}
+              // active:scale-90 = 指で押しているあいだ、少し縮みます。
+              // 押せたことがその場で分かるので、待ち時間が気になりにくくなります。
+              className="flex h-11 w-11 items-center justify-center transition-transform active:scale-90"
             >
-              <svg
-                viewBox="0 0 24 24"
-                width="24"
-                height="24"
-                // 選ばれているタブだけ、中を塗りつぶします
-                fill={isActive ? "currentColor" : "none"}
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                {tab.path}
-              </svg>
+              <TabIcon path={tab.path} isCurrent={isActive} />
             </Link>
           );
         })}
