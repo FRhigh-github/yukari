@@ -1,22 +1,19 @@
 // app/draw/page.tsx
 //
-// このファイルは、お絵かきの部品(DrawingPad)を置くだけの、短いページです。
-// 「ページ」は画面全体の枠(見出しや余白)を担当し、
-// 「部品」はお絵かきそのものを担当する、という役割分担です。
-//
+// お絵かきの部品(DrawingPad)を置くだけの、短いページです。
+// ブラウザ側で動かす処理は、すべて DrawingPad の中にあるので、
 // ここには "use client" が要りません。
-// ブラウザ側で動かす必要がある処理は、すべて DrawingPad の中にあるからです。
 
 // ▼ import の書き方(相対パス)
-// "../components/DrawingPad" は、ファイルの場所の書き方です。
+// 引用符の中の文字は、ファイルの場所と名前を表します。
 //   .. : 1つ上のフォルダへ
-// このファイルは app/draw/ の中にあります。
-// 部品は app/components/ の中にあります。
-// なので、次のようにたどります。
+// このファイルは app/draw/ の中、部品は app/components/ の中なので、
 //   app/draw/ → (..)app/ → components/DrawingPad
-// 前回は "../../components/DrawingPad" でした。
-// ".." が1つ多いのは、部品を app の外に置く前提だったからです。
-// 今回は app の中に置いたので、".." は1つです。
+// とたどります。
+//
+// ▼ 大文字と小文字は、ファイル名と完全に同じにします。
+// "drawingpad" と "DrawingPad" は、別の名前として扱われます。
+// ファイル名が DrawingPad.tsx なら、ここも DrawingPad と書きます(拡張子は書きません)。
 import DrawingPad from "../components/DrawingPad";
 
 export default function DrawPage() {

@@ -1,170 +1,376 @@
-// components/DrawingPad.tsx
-//
-// ▼ このファイルは「お絵かきの部品」です。
-// これまで app/draw/page.tsx に書いていた、描く・消す・全消しの処理を、
-// 別ファイルの部品として取り出しました。
-//
-// ▼ なぜ部品に切り出すのか？
-// 最終的には、投稿へのリアクションを描く画面など、
-// 別の場所でも同じお絵かきを使いたいからです。
-// page.tsx に全部書いたままだと、他の画面で使うたびにコピーが必要になります。
-// 部品にしておけば、必要な場所で <DrawingPad /> と書くだけで使えます。
-// (C言語で、同じ処理を関数にして、あちこちから呼ぶのと同じ考え方です)
-
-// ▼ "use client" は、page.tsx ではなく、こちらのファイルに書きます。
-// useRef や useState、クリックなどの操作は、ブラウザ側でしか動かないので、
-// それらを使うこの部品に「ブラウザ側で動かす」と宣言します。
+// app/components/DrawingPad.tsx
 "use client";
 
-import { useRef, useState } from "react";
-import type { PointerEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-// ▼ props(プロップス)とは？
-// 部品を使う側から、部品に渡す「引数」のことです。
-// 今回は、canvasの横幅と縦幅を、使う側が決められるようにします。
-//
-// ▼ type の書き方
-// 「渡してもらう値の形」を決める書き方で、C言語の構造体(typedef struct)に近いです。
-// 「width は数値、height は数値」と決めておくと、
-// 文字を渡してしまった、渡し忘れた、といった間違いを、書いた時点で教えてくれます。
+const COMMUNITY_ID = "dfda40cd-2953-45b0-8620-26f03b9d7c58";
+const TEMPLATE_ID = "4f640157-e719-4bb5-9eea-78c54f7ccf6c";
+
+type Tool = "pen" | "eraser";
+type Point = { x: number; y: number };
 type DrawingPadProps = {
   width: number;
   height: number;
 };
 
-// ▼ 関数の引数に { width, height } と書く理由
-// 部品には、渡された値が1つの箱(オブジェクト)にまとまって届きます。
-// { width, height } と書くと、その箱から width と height を取り出して、
-// すぐ使える変数として受け取れます。
-// (props.width, props.height と毎回書かなくて済みます)
+// 筆の設定(これまでと同じ)
+const setupBrush = (ctx: CanvasRenderingContext2D, tool: Tool) => {
+  ctx.lineCap = "round";
+
+  if (tool === "eraser") {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.lineWidth = 24;
+    ctx.strokeStyle = "black";
+    ctx.fillStyle = "black";
+  } else {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "black";
+    ctx.fillStyle = "black";
+  }
+};
+
+// 点を1つ描く(これまでと同じ)
+const drawDot = (ctx: CanvasRenderingContext2D, tool: Tool, pos: Point) => {
+  setupBrush(ctx, tool);
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+  ctx.fill();
+};
+
+// 2点をつなぐ線を描く(これまでと同じ)
+const drawSegment = (
+  ctx: CanvasRenderingContext2D,
+  tool: Tool,
+  from: Point,
+  to: Point,
+) => {
+  setupBrush(ctx, tool);
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+  ctx.stroke();
+};
+
+// 画面上の座標を、canvasの中の座標に直す(これまでと同じ)
+const toCanvasPoint = (
+  canvas: HTMLCanvasElement,
+  clientX: number,
+  clientY: number,
+): Point => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / canvas.clientWidth;
+  const scaleY = canvas.height / canvas.clientHeight;
+
+  return {
+    x: (clientX - rect.left - canvas.clientLeft) * scaleX,
+    y: (clientY - rect.top - canvas.clientTop) * scaleY,
+  };
+};
+
 export default function DrawingPad({ width, height }: DrawingPadProps) {
-  // canvasタグを入れておく入れ物(これまでと同じ)
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  // 「いま描いている最中か」というフラグ(これまでと同じ)
   const isDrawingRef = useRef(false);
+  const lastPosRef = useRef<Point>({ x: 0, y: 0 });
 
-  // 「1つ前の位置」を覚えておく入れ物(これまでと同じ)
-  const lastPosRef = useRef({ x: 0, y: 0 });
+  // ▼ toolRef について
+  // 今回、イベントの処理を useEffect の中に移しました。
+  // useEffect の中の関数は、作られた時点の値を覚えてしまうので、
+  // ペンから消しゴムに切り替えても、古いままになってしまいます。
+  // useRef は「いつでも今の値が読める入れ物」なので、
+  // 道具の切り替えは、こちら経由で伝えます。
+  const toolRef = useRef<Tool>("pen");
 
-  // いま「ペン」か「消しゴム」か(これまでと同じ)
-  const [tool, setTool] = useState<"pen" | "eraser">("pen");
+  const pointerWorksRef = useRef(false);
+  const moveCountRef = useRef(0);
 
-  // 筆箱(ctx)を取り出す関数(これまでと同じ)
-  const getContext = () => {
+  // ▼ 確認用の数え上げ
+  // 画面全体で指を認識した回数と、canvasで認識した回数を分けて数えます。
+  // 画面は反応しているのに canvas が 0 なら、canvasに指が届いていません。
+  const pageTouchCountRef = useRef(0);
+  const canvasTouchCountRef = useRef(0);
+
+  const [tool, setTool] = useState<Tool>("pen");
+  const [hasDrawn, setHasDrawn] = useState(false);
+  const [isSent, setIsSent] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
+  const [debugText, setDebugText] = useState("まだ触っていません");
+
+  // 道具が変わったら、入れ物にも反映する
+  useEffect(() => {
+    toolRef.current = tool;
+  }, [tool]);
+
+  // ▼ 今回の変更の中心
+  // これまでは、Reactの onPointerDown などに処理を渡していました。
+  // Reactはイベントを、いったん画面全体でまとめて受け取ってから、
+  // それぞれの部品に配る仕組みです。
+  // その配る途中で止まっている可能性があるので、
+  // canvas そのものに、直接くっつける形に変えました。
+  // addEventListener が、その「直接くっつける」命令です。
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null) {
+      return;
+    }
+
+    const getCtx = () => canvas.getContext("2d");
+
+    // 描き始め
+    const start = (clientX: number, clientY: number, source: string) => {
+      const ctx = getCtx();
+      if (ctx === null) {
+        setDebugText("ctx が取れません");
+        return;
+      }
+
+      const pos = toCanvasPoint(canvas, clientX, clientY);
+      isDrawingRef.current = true;
+      lastPosRef.current = pos;
+      moveCountRef.current = 0;
+      setHasDrawn(true);
+      drawDot(ctx, toolRef.current, pos);
+
+      setDebugText(
+        source +
+          " 開始 / 位置:" +
+          Math.round(pos.x) +
+          "," +
+          Math.round(pos.y) +
+          " / 画面:" +
+          pageTouchCountRef.current +
+          " canvas:" +
+          canvasTouchCountRef.current,
+      );
+    };
+
+    // 動かしているあいだ
+    const move = (clientX: number, clientY: number) => {
+      if (!isDrawingRef.current) {
+        return;
+      }
+      const ctx = getCtx();
+      if (ctx === null) {
+        return;
+      }
+      const pos = toCanvasPoint(canvas, clientX, clientY);
+      moveCountRef.current += 1;
+      drawSegment(ctx, toolRef.current, lastPosRef.current, pos);
+      lastPosRef.current = pos;
+    };
+
+    // 描き終わり
+    const end = () => {
+      if (isDrawingRef.current) {
+        setDebugText(
+          "動いた回数:" +
+            moveCountRef.current +
+            " / 画面:" +
+            pageTouchCountRef.current +
+            " canvas:" +
+            canvasTouchCountRef.current,
+        );
+      }
+      isDrawingRef.current = false;
+    };
+
+    // ▼ globalThis.PointerEvent について
+    // React の PointerEvent と、ブラウザ本来の PointerEvent は別ものです。
+    // 直接くっつける今回は、ブラウザ本来のほうを使うので、
+    // globalThis. を付けて、そちらだと明示しています。
+    const onPointerDown = (event: globalThis.PointerEvent) => {
+      pointerWorksRef.current = true;
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch {
+        // 失敗しても続行
+      }
+      start(event.clientX, event.clientY, "pointer(" + event.pointerType + ")");
+    };
+
+    const onPointerMove = (event: globalThis.PointerEvent) => {
+      move(event.clientX, event.clientY);
+    };
+
+    const onTouchStart = (event: globalThis.TouchEvent) => {
+      canvasTouchCountRef.current += 1;
+      event.preventDefault();
+      if (pointerWorksRef.current) {
+        return; // ポインターが動いているなら、そちらに任せる
+      }
+      const touch = event.touches[0];
+      if (touch === undefined) {
+        return;
+      }
+      start(touch.clientX, touch.clientY, "touch");
+    };
+
+    const onTouchMove = (event: globalThis.TouchEvent) => {
+      event.preventDefault();
+      if (pointerWorksRef.current) {
+        return;
+      }
+      const touch = event.touches[0];
+      if (touch === undefined) {
+        return;
+      }
+      move(touch.clientX, touch.clientY);
+    };
+
+    const onTouchEnd = () => {
+      if (pointerWorksRef.current) {
+        return;
+      }
+      end();
+    };
+
+    // ▼ 画面全体の反応を数える(確認用)
+    // canvas に届かなくても、画面のどこかを触れば、ここは増えます。
+    const onPageTouch = () => {
+      pageTouchCountRef.current += 1;
+      if (canvasTouchCountRef.current === 0) {
+        setDebugText(
+          "画面は反応:" +
+            pageTouchCountRef.current +
+            " / canvas:0（canvasに届いていません）",
+        );
+      }
+    };
+
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", end);
+    canvas.addEventListener("touchstart", onTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+    canvas.addEventListener("touchend", onTouchEnd);
+    canvas.addEventListener("touchcancel", onTouchEnd);
+    document.addEventListener("touchstart", onPageTouch, { passive: true });
+
+    // 画面が消えるときに、付けたものを全部外します
+    return () => {
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", end);
+      canvas.removeEventListener("pointercancel", end);
+      canvas.removeEventListener("touchstart", onTouchStart);
+      canvas.removeEventListener("touchmove", onTouchMove);
+      canvas.removeEventListener("touchend", onTouchEnd);
+      canvas.removeEventListener("touchcancel", onTouchEnd);
+      document.removeEventListener("touchstart", onPageTouch);
+    };
+  }, [isSent]);
+
+  const handleClear = () => {
+    const canvas = canvasRef.current;
+    if (canvas === null) {
+      return;
+    }
+    const ctx = canvas.getContext("2d");
+    if (ctx === null) {
+      return;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasDrawn(false);
+  };
+
+  const makePngBlob = async () => {
     const canvas = canvasRef.current;
     if (canvas === null) {
       return null;
     }
-    return canvas.getContext("2d");
+
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
+
+    const exportCtx = exportCanvas.getContext("2d");
+    if (exportCtx === null) {
+      return null;
+    }
+
+    exportCtx.fillStyle = "white";
+    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    exportCtx.drawImage(canvas, 0, 0);
+
+    return await new Promise<Blob | null>((resolve) => {
+      exportCanvas.toBlob(resolve, "image/png");
+    });
   };
 
-  // 筆の設定をまとめた関数(これまでと同じ)
-  const setupBrush = (ctx: CanvasRenderingContext2D) => {
-    ctx.lineCap = "round";
+  const handleSend = async () => {
+    setIsSending(true);
+    setErrorText(null);
 
-    if (tool === "eraser") {
-      // 描いた部分を透明に「くり抜く」(消しゴムの動き)
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.lineWidth = 24;
-      ctx.strokeStyle = "black";
-      ctx.fillStyle = "black";
-    } else {
-      // 上に重ねて描く(普通の描き方)
-      ctx.globalCompositeOperation = "source-over";
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = "black";
-      ctx.fillStyle = "black";
+    try {
+      const supabase = createClient();
+
+      const userResult = await supabase.auth.getUser();
+      const user = userResult.data.user;
+      if (user === null) {
+        throw new Error("ログインしていません。/login からログインしてください");
+      }
+
+      const blob = await makePngBlob();
+      if (blob === null) {
+        throw new Error("画像への変換に失敗しました");
+      }
+
+      const path = user.id + "/" + crypto.randomUUID() + ".png";
+      const uploadResult = await supabase.storage
+        .from("drawings")
+        .upload(path, blob, { contentType: "image/png" });
+      if (uploadResult.error !== null) {
+        throw new Error("画像の保存: " + uploadResult.error.message);
+      }
+
+      const insertResult = await supabase.from("card_sends").insert({
+        template_id: TEMPLATE_ID,
+        from_user: user.id,
+        to_user: user.id,
+        community_id: COMMUNITY_ID,
+        drawing_url: path,
+      });
+      if (insertResult.error !== null) {
+        throw new Error("card_sends への保存: " + insertResult.error.message);
+      }
+
+      setIsSent(true);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "不明なエラーが起きました";
+      setErrorText(message);
+    } finally {
+      setIsSending(false);
     }
   };
 
-  // ポインターの位置を「canvasの中の座標」に直す関数(これまでと同じ)
-  const getPosition = (event: PointerEvent<HTMLCanvasElement>) => {
-    const canvas = event.currentTarget;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / canvas.clientWidth;
-    const scaleY = canvas.height / canvas.clientHeight;
-
-    return {
-      x: (event.clientX - rect.left - canvas.clientLeft) * scaleX,
-      y: (event.clientY - rect.top - canvas.clientTop) * scaleY,
-    };
-  };
-
-  // ① 画面に触れた(またはボタンを押した)とき(これまでと同じ)
-  const handlePointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
-    const ctx = getContext();
-    if (ctx === null) {
-      return;
-    }
-
-    const pos = getPosition(event);
-
-    isDrawingRef.current = true;
-    lastPosRef.current = pos;
-
-    event.currentTarget.setPointerCapture(event.pointerId);
-
-    setupBrush(ctx);
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, ctx.lineWidth / 2, 0, Math.PI * 2);
-    ctx.fill();
-  };
-
-  // ② 触れたまま動かしたとき(これまでと同じ)
-  const handlePointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current) {
-      return;
-    }
-
-    const ctx = getContext();
-    if (ctx === null) {
-      return;
-    }
-
-    const pos = getPosition(event);
-    const last = lastPosRef.current;
-
-    setupBrush(ctx);
-    ctx.beginPath();
-    ctx.moveTo(last.x, last.y);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-
-    lastPosRef.current = pos;
-  };
-
-  // ③ 描き終わったとき(これまでと同じ)
-  const stopDrawing = () => {
-    isDrawingRef.current = false;
-  };
-
-  // ④ 全消しボタンが押されたとき(これまでと同じ)
-  const handleClear = () => {
-    const ctx = getContext();
-    if (ctx === null) {
-      return;
-    }
-    const canvas = ctx.canvas;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  };
-
-  // ボタンの見た目を返す関数(これまでと同じ)
-  const buttonStyle = (isActive: boolean) => ({
-    padding: "8px 16px",
+  const buttonStyle = (isActive: boolean, isDisabled = false) => ({
+    padding: "10px 16px",
     fontSize: "16px",
     border: "1px solid #888",
     borderRadius: "6px",
     backgroundColor: isActive ? "#222" : "white",
     color: isActive ? "white" : "black",
+    opacity: isDisabled ? 0.4 : 1,
+    cursor: isDisabled ? "not-allowed" : "pointer",
+    touchAction: "manipulation" as const,
   });
 
-  // ▼ 返す画面の一番外側は <div> にしました。
-  // これまでの <main> と <h1>(ページ全体の枠と見出し)は、
-  // 部品ではなく、使う側(page.tsx)の役目なので、ここには含めません。
-  // この部品は「ボタン3つ + canvas」だけを返します。
+  if (isSent) {
+    return (
+      <div>
+        <p>送信しました。</p>
+      </div>
+    );
+  }
+
+  // ▼ canvas から on... の指定が全部消えています。
+  // 処理は上の useEffect で、直接くっつけているからです。
   return (
-    <div>
+    <div style={{ overscrollBehavior: "none" }}>
       <div
         style={{
           display: "flex",
@@ -198,13 +404,6 @@ export default function DrawingPad({ width, height }: DrawingPadProps) {
 
       <canvas
         ref={canvasRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={stopDrawing}
-        onPointerCancel={stopDrawing}
-        // ▼ ここが今回の変更点です。
-        // これまでは width={600} height={400} と数字を直接書いていました。
-        // 今回は、部品を使う側から渡された width と height を使います。
         width={width}
         height={height}
         style={{
@@ -214,8 +413,29 @@ export default function DrawingPad({ width, height }: DrawingPadProps) {
           maxWidth: "100%",
           height: "auto",
           touchAction: "none",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
         }}
       />
+
+      <p style={{ fontSize: "12px", marginTop: "8px" }}>{debugText}</p>
+
+      <button
+        type="button"
+        onClick={handleSend}
+        disabled={!hasDrawn || isSending}
+        style={{
+          ...buttonStyle(true, !hasDrawn || isSending),
+          marginTop: "8px",
+        }}
+      >
+        {isSending ? "送信中..." : "送信する"}
+      </button>
+
+      {errorText !== null && (
+        <p style={{ color: "red", marginTop: "12px" }}>{errorText}</p>
+      )}
     </div>
   );
 }
