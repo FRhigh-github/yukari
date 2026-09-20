@@ -207,23 +207,8 @@ export default function PostPage() {
         </div>
       </form>
 
-      {/* 投稿一覧 */}
-      <div className="mt-8 space-y-4">
-        <h2 className="font-bold text-gray-700 text-sm px-1">投稿一覧</h2>
-        {posts.map((post) => (
-          <div key={post.id} className="bg-white p-4 rounded-2xl shadow-sm space-y-2">
-            <h3 className="font-bold text-gray-800">{post.title}</h3>
-            {post.body && <p className="text-gray-600 text-sm">{post.body}</p>}
-            {post.imageUrl && (
-              <img
-                src={post.imageUrl}
-                alt={post.title}
-                className="w-full h-auto rounded-xl mt-2"
-              />
-            )}
-          </div>
-        ))}
-      </div>
+      
+      
     </div>
   );
 }
