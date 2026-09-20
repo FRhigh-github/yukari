@@ -33,7 +33,7 @@ export default function PostPage() {
       <textarea value={text} onChange={(e) => setText(e.target.value)} />
 
       {/* handleSubmit() と書かない。開いた瞬間に実行されてしまう */}
-      <button onClick={handleSubmit}>報告する</button>
+      <button onClick={handleSubmit}>報告</button>
     </main>
   )
 }
