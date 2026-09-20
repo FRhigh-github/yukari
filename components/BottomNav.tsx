@@ -38,7 +38,9 @@ export default function BottomNav() {
   if (HIDE_NAV.includes(pathname)) return null;
 
   return (
-    <nav className="flex border-t border-amber-200 bg-amber-50">
+    // pb-[env(safe-area-inset-bottom)] = iPhone 下端の横棒に
+    // タブが重ならないよう、その高さぶん余白を足します
+    <nav className="flex border-t border-amber-200 bg-amber-50 pb-[env(safe-area-inset-bottom)]">
       {TABS.map((tab) => {
         const isActive = pathname === tab.href;
 

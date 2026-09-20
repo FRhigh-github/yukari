@@ -21,7 +21,22 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ▼ ページ全体が動かないようにする
+   スマホのブラウザは、画面の端まで来てもさらに引っぱると
+   ページごと ぷるんと動きます（ラバーバンドと呼ばれます）。
+   body を position: fixed で画面に貼り付けると、これが起きなくなります。
+   スクロールは、中の main（layout.tsx）だけが受け持ちます。 */
+html,
 body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-ios);
@@ -29,7 +44,6 @@ body {
   /* iOS の標準の本文サイズ */
   font-size: 17px;
 
-  /* 長押ししたときに、文字が青く選択されるのを防ぎます。
-     アプリっぽさが出ます。 */
+  /* 長押ししたときに、文字が青く選択されるのを防ぎます */
   -webkit-tap-highlight-color: transparent;
 }
