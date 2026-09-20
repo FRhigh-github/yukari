@@ -17,7 +17,7 @@ export default async function Home() {
 
   return (
     <main className="p-6">
-      <h1 className="mb-4 text-xl">投稿一覧</h1>
+      <h1 className="mb-4 text-xl">あ</h1>
 
       {/* posts は配列。.map() で1件ずつ並べる */}
       {posts?.map((post) => (
