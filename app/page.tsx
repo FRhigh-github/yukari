@@ -1,47 +1,66 @@
-import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { getHomeData } from "@/lib/home";
+import MemberCircles from "@/components/MemberCircles";
+import CommunitySwitcher from "@/components/CommunitySwitcher";
 
-// await を使うので async を付ける
-export default async function Home() {
-  const supabase = await createClient();
+// 画面の真ん中に、文と案内ボタンを1つ出すだけの小さな部品
+function Notice({ text, href, label }: { text: string; href: string; label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-4 py-20">
+      <p className="text-sm text-stone-500">{text}</p>
+      <Link
+        href={href}
+        className="rounded-full bg-stone-800 px-6 py-3 text-sm font-bold text-white"
+      >
+        {label}
+      </Link>
+    </div>
+  );
+}
 
-  // posts テーブルから全部の列を取ってくる
-  // data には「オブジェクトの配列」が入る
-  const { data: posts, error } = await supabase
-    .from("posts")
-    .select("*, profiles(display_name, avatar_url)")
-    .order("created_at", { ascending: false });
+// searchParams = URL の ? より後ろ。/?c=xxxx の xxxx を受け取ります。
+export default async function Home({ searchParams }: PageProps<"/">) {
+  const { c } = await searchParams;
 
-  // エラーが出たらターミナルに表示する
-  if (error) {  
-    console.error("取得失敗:", error);
+  // ?c=a&c=b のように2回書かれると配列になるので、文字列のときだけ使います
+  const selectedId = typeof c === "string" ? c : null;
+
+  const { user, communities, members } = await getHomeData(selectedId);
+
+  if (user === null) {
+    return <Notice text="ログインしてください" href="/login" label="ログインへ" />;
   }
 
   return (
-    <main className="p-6">
-      <h1 className="mb-4 text-xl">い</h1>
+    <div className="relative">
+      <header className="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+        <CommunitySwitcher communities={communities} selectedId={selectedId} />
+        <span className="text-sm text-stone-400">🔔</span>
+      </header>
 
-      {/* posts は配列。.map() で1件ずつ並べる */}
-      {posts?.map((post) => (
-        <article
-          key={post.id}
-          className="mb-3 rounded-2xl bg-white p-4 shadow-sm"
+      {members.length === 0 ? (
+        <Notice
+          text="まだコミュニティに入っていません"
+          href="/join"
+          label="招待コードで参加する"
+        />
+      ) : (
+        <div className="px-3 pb-24">
+          <MemberCircles members={members} />
+        </div>
+      )}
+
+      {/* sticky bottom-5 = スクロールしても画面の下に残ります。
+          pointer-events-none / auto = ボタン以外は押せない扱いにして、
+          透明な帯がマルにかぶさるのを防いでいます。 */}
+      <div className="pointer-events-none sticky bottom-5 flex justify-end px-5">
+        <Link
+          href="/post"
+          className="pointer-events-auto rounded-full bg-stone-400 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
         >
-          {/* 上段: 投稿者と日付 */}
-          <div className="mb-2 flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-amber-200" />
-            <span className="text-sm font-medium text-stone-700">
-              {post.profiles?.display_name}
-            </span>
-            <span className="ml-auto text-xs text-stone-400">
-              {new Date(post.created_at).toLocaleDateString("ja-JP")}
-            </span>
-          </div>
-
-          {/* 本文 */}
-          <h2 className="mb-1 font-bold text-stone-800">{post.title}</h2>
-          <p className="text-sm leading-relaxed text-stone-600">{post.body}</p>
-        </article>
-      ))}
-    </main>
+          ステキな報告をする
+        </Link>
+      </div>
+    </div>
   );
 }

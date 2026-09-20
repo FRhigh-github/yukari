@@ -1,28 +1,43 @@
-// app/draw/page.tsx
-//
-// お絵かきの部品(DrawingPad)を置くだけの、短いページです。
-// ブラウザ側で動かす処理は、すべて DrawingPad の中にあるので、
-// ここには "use client" が要りません。
+// お祝いの手書きを描く画面。/draw?post=xxx の形で来ます。
 
-// ▼ import の書き方(相対パス)
-// 引用符の中の文字は、ファイルの場所と名前を表します。
-//   .. : 1つ上のフォルダへ
-// このファイルは app/draw/ の中、部品は app/components/ の中なので、
-//   app/draw/ → (..)app/ → components/DrawingPad
-// とたどります。
-//
-// ▼ 大文字と小文字は、ファイル名と完全に同じにします。
-// "drawingpad" と "DrawingPad" は、別の名前として扱われます。
-// ファイル名が DrawingPad.tsx なら、ここも DrawingPad と書きます(拡張子は書きません)。
-import DrawingPad from "../components/DrawingPad";
+import { createClient } from "@/lib/supabase/server";
+import DrawingPad from "@/components/DrawingPad";
 
-export default function DrawPage() {
+// searchParams = URL の ? より後ろ。await で中身が届くのを待ちます。
+export default async function DrawPage({ searchParams }: PageProps<"/draw">) {
+  const { post: postId } = await searchParams;
+
+  const supabase = await createClient();
+
+  // ?post=a&post=b と2回書かれると配列になるので、文字列のときだけ使います
+  const hasPostId = typeof postId === "string";
+
+  const { data: post } = hasPostId
+    ? await supabase
+        .from("posts")
+        .select("id, title, image_url, author_id")
+        .eq("id", postId)
+        .single()
+    : { data: null };
+
+  // 名前は別に取ります。まとめて取ると「1件」か「配列」か分かりにくいためです。
+  const { data: author } = post
+    ? await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", post.author_id)
+        .single()
+    : { data: null };
+
+  // 画像の URL を作る（1時間だけ見られる URL）
+  const { data: signed } = post?.image_url
+    ? await supabase.storage.from("posts").createSignedUrl(post.image_url, 3600)
+    : { data: null };
+
   return (
-    <main style={{ padding: "16px" }}>
-      <h1>お絵かき</h1>
-
-      {/* 部品を置く。width と height は、部品に渡す値(props)です */}
-      <DrawingPad width={600} height={400} />
-    </main>
+    <DrawingPad
+      authorName={author?.display_name ?? null}
+      postImageUrl={signed?.signedUrl ?? null}
+    />
   );
 }

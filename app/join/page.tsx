@@ -9,7 +9,7 @@ export default function JoinPage() {
   const handleJoin = async () => {
     const supabase = createClient();
 
-    const { data, error } = await supabase.rpc("join_community", {
+    const { error } = await supabase.rpc("join_community", {
       code: code,
     });
 
@@ -39,9 +39,10 @@ export default function JoinPage() {
         onClick={handleJoin}
         className="rounded-lg bg-orange-500 px-4 py-2 text-white"
       >
-        <p className="mt-3 text-sm text-stone-600">{message}</p>
         参加する
       </button>
+
+      <p className="mt-3 text-sm text-stone-600">{message}</p>
     </main>
   );
 }
