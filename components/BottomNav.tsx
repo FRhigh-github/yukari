@@ -38,37 +38,44 @@ export default function BottomNav() {
   if (HIDE_NAV.includes(pathname)) return null;
 
   return (
-    // pb-[env(safe-area-inset-bottom)] = iPhone 下端の横棒に
-    // タブが重ならないよう、その高さぶん余白を足します
-    <nav className="flex border-t border-amber-200 bg-amber-50 pb-[env(safe-area-inset-bottom)]">
-      {TABS.map((tab) => {
-        const isActive = pathname === tab.href;
+    // 外側の枠。ここで画面の端からの距離を作ります。
+    // pb の env(safe-area-inset-bottom) は、iPhone 下端の横棒のぶんの余白です。
+    <div className="shrink-0 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2">
+      {/* こちらが浮いて見える本体。
+          rounded-2xl で角を丸め、shadow-lg で影を落とすと、
+          画面から少し持ち上がっているように見えます。 */}
+      <nav className="flex items-center justify-around rounded-2xl bg-stone-200 px-2 py-1.5 shadow-lg">
+        {TABS.map((tab) => {
+          const isActive = pathname === tab.href;
 
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] ${
-              isActive ? "font-bold text-orange-600" : "text-stone-500"
-            }`}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              width="24"
-              height="24"
-              // 選ばれているタブだけ、中を塗りつぶします
-              fill={isActive ? "currentColor" : "none"}
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              // 文字は出さないので、代わりに aria-label で名前を持たせます。
+              // h-11 w-11 = 44px。押せる範囲を iOS の基準に合わせています。
+              aria-label={tab.label}
+              className={`flex h-11 w-11 items-center justify-center ${
+                isActive ? "text-stone-900" : "text-stone-500"
+              }`}
             >
-              {tab.path}
-            </svg>
-            {tab.label}
-          </Link>
-        );
-      })}
-    </nav>
+              <svg
+                viewBox="0 0 24 24"
+                width="24"
+                height="24"
+                // 選ばれているタブだけ、中を塗りつぶします
+                fill={isActive ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {tab.path}
+              </svg>
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
   );
 }
