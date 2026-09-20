@@ -304,7 +304,7 @@ export default function DrawingPad({
 
   if (isSent) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+      <div className="flex h-full flex-col items-center justify-center gap-4">
         <p className="text-lg font-bold text-stone-800">送信しました。</p>
         <Link
           href="/"
@@ -317,7 +317,7 @@ export default function DrawingPad({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-stone-400">
+    <div className="flex h-full flex-col bg-stone-400">
       {/* 上半分：反応する相手のご報告 */}
       <div className="px-4 pb-4 pt-5">
         <div className="mb-2 flex items-center gap-2">

@@ -32,8 +32,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   }
 
   return (
-    <div className="relative">
-      <header className="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+    // h-full = 親（layout の main）からもらった高さいっぱい。
+    // 縦に伸ばさず、この中で収める形にします。
+    <div className="relative flex h-full flex-col">
+      {/* shrink-0 = 場所が足りなくてもこのバーは縮めない */}
+      <header className="flex shrink-0 items-center justify-between border-b border-stone-100 px-5 py-3">
         <CommunitySwitcher communities={communities} selectedId={selectedId} />
         <span className="text-sm text-stone-400">🔔</span>
       </header>
@@ -45,22 +48,18 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           label="招待コードで参加する"
         />
       ) : (
-        <div className="px-3 pb-24">
+        // flex-1 = 残りの高さを全部つかう。マルはこの中に割り振られます。
+        <div className="flex-1 px-3">
           <MemberCircles members={members} />
         </div>
       )}
 
-      {/* sticky bottom-5 = スクロールしても画面の下に残ります。
-          pointer-events-none / auto = ボタン以外は押せない扱いにして、
-          透明な帯がマルにかぶさるのを防いでいます。 */}
-      <div className="pointer-events-none sticky bottom-5 flex justify-end px-5">
-        <Link
-          href="/post"
-          className="pointer-events-auto rounded-full bg-stone-400 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
-        >
-          ステキな報告をする
-        </Link>
-      </div>
+      <Link
+        href="/post"
+        className="absolute bottom-4 right-4 rounded-full bg-stone-400 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
+      >
+        ステキな報告をする
+      </Link>
     </div>
   );
 }

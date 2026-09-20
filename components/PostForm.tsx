@@ -65,7 +65,7 @@ export default function PostForm({ communities }: PostFormProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-300 p-4 pb-20">
+    <div className="min-h-full bg-gray-300 p-4">
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* コミュニティ選択 */}
         <div className="relative">

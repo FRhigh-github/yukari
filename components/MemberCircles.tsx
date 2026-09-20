@@ -9,46 +9,46 @@ type MemberCirclesProps = {
   members: Member[];
 };
 
-// 置き場所は表で持たず、計算で出します。表だと人数が増えたときに
-// あふれたぶんが同じ場所に重なるためです。
-// 考え方は「2人ずつ横に並べて、下へ積んでいく」。
-// 左右を行ごとに少しずらして、揃いすぎないようにしています。
+// 「2人ずつ横に並べて、下へ積む」形です。
+// 位置は px ではなく % で指定して、画面の高さぶんに割り振ります。
+// こうすると人数が増えても縦に伸びず、1画面に収まります。
 
-const ROW_HEIGHT = 120;   // 1行あたりの高さ(px)
-const TOP_MARGIN = 45;    // 一番上の余白(px)
-
-// 左右の位置(%)。row が偶数の行と奇数の行で、少しずらします。
+// 左右の位置(%)。行ごとに少しずらして、揃いすぎないようにしています。
 const getLeft = (index: number) => {
   const row = Math.floor(index / 2);
   const isLeftSide = index % 2 === 0;
 
   if (isLeftSide) {
-    return row % 2 === 0 ? 27 : 35;
+    return row % 2 === 0 ? 28 : 36;
   }
-  return row % 2 === 0 ? 71 : 63;
+  return row % 2 === 0 ? 72 : 64;
 };
 
-const getTop = (index: number) => {
+// 上からの位置(%)。行の「まん中」に置きたいので、0.5 を足しています。
+// 例: 3行なら 16.7% / 50% / 83.3% になります。
+const getTop = (index: number, rowCount: number) => {
   const row = Math.floor(index / 2);
-  return TOP_MARGIN + row * ROW_HEIGHT;
+  return ((row + 0.5) / rowCount) * 100;
 };
 
 export default function MemberCircles({ members }: MemberCirclesProps) {
-  // 人数から高さを出します。これが無いと下のマルがはみ出して見えなくなります。
   const rowCount = Math.ceil(members.length / 2);
-  const areaHeight = TOP_MARGIN + rowCount * ROW_HEIGHT + 60;
 
   return (
+    // h-full = 親からもらった高さいっぱい。
     // relative = 中の要素を「この箱の中での位置」で置けるようにする指定
-    <div className="relative w-full" style={{ height: `${areaHeight}px` }}>
+    <div className="relative h-full w-full">
       {members.map((member, index) => (
         <Link
           key={member.id}
           href={`/members/${member.id}`}
           // absolute = 上の relative の箱の中で、位置を指定して置く
-          // -translate-x-1/2 = マルの中心が、指定した場所に来るようにずらす
-          className="absolute flex w-16 -translate-x-1/2 flex-col items-center gap-1"
-          style={{ left: `${getLeft(index)}%`, top: `${getTop(index)}px` }}
+          // -translate-x-1/2 -translate-y-1/2 = マルの中心を、指定した場所に合わせる
+          className="absolute flex w-16 -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
+          style={{
+            left: `${getLeft(index)}%`,
+            top: `${getTop(index, rowCount)}%`,
+          }}
         >
           {/* 外側の輪。光らせるかどうかを、ここで切り替えます */}
           <div
