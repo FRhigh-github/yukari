@@ -38,14 +38,22 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {/* shrink-0 = 場所が足りなくてもこのバーは縮めない */}
       <header className="flex shrink-0 items-center justify-between border-b border-stone-100 px-5 py-3">
         <CommunitySwitcher communities={communities} selectedId={selectedId} />
-        <span className="text-sm text-stone-400">🔔</span>
+
+        {/* コミュニティの管理画面へ（作る・参加する・招待コードを見る） */}
+        <Link
+          href="/communities"
+          aria-label="コミュニティの設定"
+          className="text-lg text-stone-400"
+        >
+          ⚙
+        </Link>
       </header>
 
       {members.length === 0 ? (
         <Notice
           text="まだコミュニティに入っていません"
-          href="/join"
-          label="招待コードで参加する"
+          href="/communities"
+          label="コミュニティに参加する"
         />
       ) : (
         // flex-1 = 残りの高さを全部つかう。マルはこの中に割り振られます。
