@@ -21,7 +21,8 @@ const TABS = [
     path: <path d="M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5" />,
   },
   {
-    href: "/capsules",
+    // 手紙を書く画面は app/letter にあるので、そちらへ向ける
+    href: "/letter",
     label: "未来への手紙",
     path: <path d="M3 5h18v14H3zM3 7l9 6 9-6" />,
   },
