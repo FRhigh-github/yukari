@@ -102,7 +102,10 @@ export default function MemberCircles({
 
       {/* ▼ 自分（中心） */}
       {me ? (
-        <div className="absolute left-1/2 top-1/2 flex w-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1">
+        <Link
+          href={`/members/${currentUserId}`}
+          className="absolute left-1/2 top-1/2 flex w-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
+        >
           <div className="rounded-full bg-white p-[3px] shadow-md">
             <div
               className="h-14 w-14 rounded-full bg-stone-300 bg-cover bg-center"
@@ -114,7 +117,7 @@ export default function MemberCircles({
             />
           </div>
           <span className="text-[10px] font-bold text-stone-600">自分</span>
-        </div>
+        </Link>
       ) : null}
 
       {/* ▼ まわりのメンバー */}

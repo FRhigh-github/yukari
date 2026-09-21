@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { shrinkImage } from "@/lib/image";
 import type { Community } from "@/components/CommunitySwitcher";
 
 type PostFormProps = {
@@ -16,6 +17,7 @@ export default function PostForm({ communities }: PostFormProps) {
   const [body, setBody] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
   // 最初から1つ目を選んだ状態にしておきます
   const [communityId, setCommunityId] = useState(communities[0]?.id ?? "");
 
@@ -35,6 +37,8 @@ export default function PostForm({ communities }: PostFormProps) {
       return;
     }
 
+    setIsSending(true);
+
     const supabase = createClient();
     const { data } = await supabase.auth.getUser();
     if (!data.user) {
@@ -42,13 +46,23 @@ export default function PostForm({ communities }: PostFormProps) {
       return;
     }
 
-    // 先に画像を保管庫へ預けて、その置き場所を受け取ります
+    // 写真を小さくしてから預けます。
+    //
+    // 置き場所の名前は、こちらで作った id にします。
+    // ファイル名をそのまま使うと、日本語や空白が入っていたときに
+    // 保管庫が受け付けてくれません
+    //（スマホのスクショは「スクリーンショット 2026-09-21 ....png」のような名前です）。
+    const shrunk = await shrinkImage(imageFile);
+
     const upload = await supabase.storage
       .from("posts")
-      .upload(`${Date.now()}_${imageFile.name}`, imageFile);
+      .upload(`${crypto.randomUUID()}.jpg`, shrunk, {
+        contentType: "image/jpeg",
+      });
 
     if (upload.error) {
       setError("画像のアップロードに失敗しました: " + upload.error.message);
+      setIsSending(false);
       return;
     }
 
@@ -62,6 +76,7 @@ export default function PostForm({ communities }: PostFormProps) {
 
     if (insertError) {
       setError("投稿の保存に失敗しました: " + insertError.message);
+      setIsSending(false);
       return;
     }
 
@@ -142,9 +157,10 @@ export default function PostForm({ communities }: PostFormProps) {
         <div className="flex justify-end pt-2">
           <button
             type="submit"
-            className="flex items-center gap-2 rounded-full bg-neutral-800 px-6 py-2.5 font-bold text-white shadow-md"
+            disabled={isSending}
+            className="flex items-center gap-2 rounded-full bg-neutral-800 px-6 py-2.5 font-bold text-white shadow-md disabled:opacity-40"
           >
-            <span>ご報告</span>
+            <span>{isSending ? "送信中..." : "ご報告"}</span>
             <svg className="h-4 w-4 rotate-45" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
             </svg>

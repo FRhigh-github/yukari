@@ -31,6 +31,10 @@ export default function PostCard({
         <img
           src={imageUrl}
           alt=""
+          // loading="lazy" = 画面に出てくるまで読み込まない。
+          // 下のほうの投稿の写真まで最初に全部読むと、そのぶん待たされます。
+          loading="lazy"
+          decoding="async"
           className="mb-3 mt-2 w-full rounded-xl bg-stone-100 object-cover"
         />
       ) : null}
