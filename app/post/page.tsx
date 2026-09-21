@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< Updated upstream
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -8,17 +9,30 @@ type Community = {
   name: string;
 };
 
+=======
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+const DUMMY_COMMUNITY_ID = "00000000-0000-0000-0000-000000000000";
+
+// 表示で使う投稿データの型（C言語の構造体のようなものです）
+>>>>>>> Stashed changes
 type PostItem = {
   id: string;
   title: string;
   body: string | null;
+<<<<<<< Updated upstream
   imageUrl: string | null;
+=======
+  imageUrl: string | null; // 署名付きURLを入れる変数
+>>>>>>> Stashed changes
 };
 
 export default function PostPage() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+<<<<<<< Updated upstream
   const [posts, setPosts] = useState<PostItem[]>([]);
 
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -42,11 +56,23 @@ export default function PostPage() {
 
   const fetchPosts = async () => {
     const supabase = createClient();
+=======
+
+  // 取得した投稿一覧を覚えておく配列
+  const [posts, setPosts] = useState<PostItem[]>([]);
+
+  // 投稿一覧を取得する関数
+  const fetchPosts = async () => {
+    const supabase = createClient();
+
+    // 1. posts テーブルから投稿データを取得
+>>>>>>> Stashed changes
     const { data, error } = await supabase
       .from("posts")
       .select("*")
       .order("created_at", { ascending: false });
 
+<<<<<<< Updated upstream
     if (error || !data) return;
 
     const postList: PostItem[] = [];
@@ -58,6 +84,30 @@ export default function PostPage() {
           .createSignedUrl(post.image_url, 3600);
         if (urlData) signedUrl = urlData.signedUrl;
       }
+=======
+    if (error || !data) {
+      alert("投稿の取得に失敗しました: " + error?.message);
+      return;
+    }
+
+    // 2. 各投稿の画像に対して「署名付きURL」を発行する
+    const postList: PostItem[] = [];
+
+    for (const post of data) {
+      let signedUrl: string | null = null;
+
+      // 画像パス（image_url）が保存されていれば、閲覧用URLを発行する
+      if (post.image_url) {
+        const { data: urlData } = await supabase.storage
+          .from("posts")
+          .createSignedUrl(post.image_url, 3600); // 3600秒（1時間）有効
+
+        if (urlData) {
+          signedUrl = urlData.signedUrl;
+        }
+      }
+
+>>>>>>> Stashed changes
       postList.push({
         id: post.id,
         title: post.title,
@@ -65,6 +115,7 @@ export default function PostPage() {
         imageUrl: signedUrl,
       });
     }
+<<<<<<< Updated upstream
     setPosts(postList);
   };
 
@@ -76,6 +127,18 @@ export default function PostPage() {
     }
 
     const supabase = createClient();
+=======
+
+    setPosts(postList);
+  };
+
+  // 送信処理
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const supabase = createClient();
+
+>>>>>>> Stashed changes
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       alert("ログインしていません");
@@ -83,6 +146,10 @@ export default function PostPage() {
     }
 
     let imagePath: string | null = null;
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
     if (imageFile) {
       const filePath = `${Date.now()}_${imageFile.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -101,7 +168,11 @@ export default function PostPage() {
       body: body,
       image_url: imagePath,
       author_id: user.id,
+<<<<<<< Updated upstream
       community_id: selectedCommunityId,
+=======
+      community_id: DUMMY_COMMUNITY_ID,
+>>>>>>> Stashed changes
     });
 
     if (insertError) {
@@ -113,10 +184,16 @@ export default function PostPage() {
     setTitle("");
     setBody("");
     setImageFile(null);
+<<<<<<< Updated upstream
+=======
+
+    // 投稿成功後、最新の一覧を取得して更新する
+>>>>>>> Stashed changes
     fetchPosts();
   };
 
   return (
+<<<<<<< Updated upstream
     <div className="min-h-screen bg-gray-300 p-4 pb-20 max-w-sm mx-auto flex flex-col justify-between">
       <form onSubmit={handleSubmit} className="space-y-3">
         
@@ -147,12 +224,47 @@ export default function PostPage() {
             type="file"
             accept="image/*"
             className="hidden"
+=======
+    <div className="max-w-md mx-auto p-6 space-y-6">
+      <h1 className="text-xl font-bold">新しい報告を投稿する</h1>
+
+      {/* 投稿フォーム */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">タイトル</label>
+          <input
+            type="text"
+            className="w-full border p-2 rounded"
+            placeholder="例：今日の進捗"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">本文</label>
+          <textarea
+            className="w-full border p-2 rounded h-24"
+            placeholder="報告内容を入力してください"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">画像</label>
+          <input
+            type="file"
+            accept="image/*"
+>>>>>>> Stashed changes
             onChange={(e) => {
               if (e.target.files && e.target.files[0]) {
                 setImageFile(e.target.files[0]);
               }
             }}
           />
+<<<<<<< Updated upstream
           {imageFile ? (
             /* 選択済み画像のプレビュー表示 */
             <img
@@ -209,6 +321,44 @@ export default function PostPage() {
 
       
       
+=======
+        </div>
+
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 rounded font-bold"
+        >
+          送信する
+        </button>
+      </form>
+
+      <hr className="my-6" />
+
+      {/* 一覧読み込みボタン */}
+      <button
+        onClick={fetchPosts}
+        className="w-full bg-gray-200 text-gray-800 py-2 rounded font-medium"
+      >
+        投稿一覧を読み込む / 更新
+      </button>
+
+      {/* 投稿一覧の表示（.map を使用） */}
+      <div className="space-y-4">
+        {posts.map((post) => (
+          <div key={post.id} className="border p-4 rounded shadow-sm space-y-2">
+            <h2 className="font-bold text-lg">{post.title}</h2>
+            {post.body && <p className="text-gray-700">{post.body}</p>}
+            {post.imageUrl && (
+              <img
+                src={post.imageUrl}
+                alt={post.title}
+                className="w-full h-auto rounded border"
+              />
+            )}
+          </div>
+        ))}
+      </div>
+>>>>>>> Stashed changes
     </div>
   );
 }
