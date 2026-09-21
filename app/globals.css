@@ -47,3 +47,18 @@ body {
   /* 長押ししたときに、文字が青く選択されるのを防ぎます */
   -webkit-tap-highlight-color: transparent;
 }
+
+/* ▼ スクロールバーを消す
+   スクロールはできるけれど、棒は出さない、という指定です。
+   アプリらしく見せるためで、スマホは元から出ないので
+   主にPCで見たときの見た目が変わります。
+
+   scrollbar-width は Firefox 向け、
+   ::-webkit-scrollbar は Chrome / Safari 向けです。 */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}

@@ -1,87 +1,87 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import CardTemplate, { type CardKind } from "@/components/CardTemplate";
+import CardTemplate, {
+  CARD_KINDS,
+  type CardKind,
+} from "@/components/CardTemplate";
+import HorizontalScroller from "@/components/HorizontalScroller";
 
-export default async function CardsPage() {
+// カードのタブは、いきなり「背景えらび」から始まります。
+//
+// DBのテーブル名は card_templates ですが、画面では「背景」と呼んでいます。
+// 完成品を選ぶのではなく、土台を選んで、その上に自分で置いていく形だからです。
+// 種類は上の並びで絞り込みます（/cards?kind=newyear）。
+export default async function CardsPage({
+  searchParams,
+}: PageProps<"/cards">) {
+  const { kind } = await searchParams;
+  const selectedKind = typeof kind === "string" ? kind : null;
+
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // RLS のおかげで、自分が送ったものと受け取ったものだけが返ります。
-  // ここでは「受け取ったもの」に絞ります。
-  const { data: cards } = user
-    ? await supabase
-        .from("card_sends")
-        .select("id, message, sent_at, from_user, template_id")
-        .eq("to_user", user.id)
-        .order("sent_at", { ascending: false })
-    : { data: null };
-
-  // 送り主の名前と、テンプレートの見た目をまとめて取ります
-  const [{ data: senders }, { data: templates }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, display_name")
-      .in("id", cards?.map((card) => card.from_user) ?? []),
-    supabase
-      .from("card_templates")
-      .select("id, kind, name")
-      .in("id", cards?.map((card) => card.template_id) ?? []),
-  ]);
+  const query = supabase.from("card_templates").select("id, kind, name");
+  const { data: templates } = await (selectedKind
+    ? query.eq("kind", selectedKind)
+    : query);
 
   return (
-    <main className="relative min-h-full p-6">
-      <h1 className="mb-4 text-xl font-bold text-stone-800">届いたカード</h1>
+    <main className="p-5">
+      <h1 className="text-xl font-bold text-stone-800">メッセージカード</h1>
+      <p className="mb-3 mt-1 text-xs text-stone-500">背景をえらんでください</p>
 
-      {cards?.length === 0 || cards === null ? (
-        <p className="text-sm text-stone-500">まだ届いていません。</p>
-      ) : (
-        <ul className="space-y-3 pb-24">
-          {cards.map((card) => {
-            const template = templates?.find(
-              (item) => item.id === card.template_id,
-            );
-            const sender = senders?.find((item) => item.id === card.from_user);
+      {/* 種類の絞り込み。左右のボタンで送れます */}
+      <HorizontalScroller className="mb-4">
+        <KindChip label="全て" href="/cards" isActive={selectedKind === null} />
+        {CARD_KINDS.map((item) => (
+          <KindChip
+            key={item.kind}
+            label={item.label}
+            href={`/cards?kind=${item.kind}`}
+            isActive={selectedKind === item.kind}
+          />
+        ))}
+      </HorizontalScroller>
 
-            return (
-              <li
-                key={card.id}
-                className="flex gap-3 rounded-2xl bg-white p-3 shadow-sm"
-              >
-                {template ? (
-                  <CardTemplate
-                    kind={template.kind as CardKind}
-                    name={template.name}
-                    className="h-24 w-20 shrink-0"
-                  />
-                ) : null}
+      {/* 大きさは全部そろえます。
+          aspect-[2/3] = 縦横の比。実際のカードと同じ形です。 */}
+      <div className="grid grid-cols-2 gap-3 pb-6">
+        {templates?.map((template) => (
+          <Link
+            key={template.id}
+            href={`/cards/new?template=${template.id}`}
+            className="block"
+          >
+            <CardTemplate
+              kind={template.kind as CardKind}
+              name={template.name}
+              className="aspect-[2/3] w-full"
+            />
+          </Link>
+        ))}
+      </div>
 
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-stone-400">
-                    {new Date(card.sent_at).toLocaleDateString("ja-JP")}
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-stone-800">
-                    {sender?.display_name ?? "名無し"} さんから
-                  </p>
-                  <p className="mt-1 text-sm leading-relaxed text-stone-600">
-                    {card.message}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {/* 送る画面への入口。ご報告の「ステキな報告をする」と同じ位置です */}
-      <Link
-        href="/cards/send"
-        className="fixed bottom-24 left-1/2 ml-[7rem] -translate-x-1/2 rounded-full bg-stone-700 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
-      >
-        カードを送る
-      </Link>
+      {templates?.length === 0 ? (
+        <p className="text-sm text-stone-500">背景がありません。</p>
+      ) : null}
     </main>
+  );
+}
+
+type KindChipProps = {
+  label: string;
+  href: string;
+  isActive: boolean;
+};
+
+function KindChip({ label, href, isActive }: KindChipProps) {
+  return (
+    <Link
+      href={href}
+      className={`shrink-0 rounded-full px-4 py-2 text-xs ${
+        isActive ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-600"
+      }`}
+    >
+      {label}
+    </Link>
   );
 }
