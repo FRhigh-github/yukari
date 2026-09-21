@@ -26,9 +26,10 @@ export default function CommunityJoinForm() {
       return;
     }
 
-    setCode("");
-    setMessage("参加しました");
-    // 一覧を取り直して、増えたコミュニティを表示させます
+    // 参加できたら、そのままホームへ戻します。
+    // 「参加しました」とだけ出して同じ画面に残ると、
+    // 次に何をすればいいのか分からなくなるためです。
+    router.push("/");
     router.refresh();
   };
 

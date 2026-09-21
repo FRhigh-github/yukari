@@ -12,34 +12,27 @@ export default async function CardInboxPage({
 
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // RLS のおかげで、自分が関わったカードだけが返ります。
-  // 届いたぶんは to_user、送ったぶんは from_user で絞ります。
-  const { data: cards } = user
-    ? await supabase
-        .from("card_sends")
-        .select("id, message, sent_at, from_user, to_user, template_id, drawing_url")
-        .eq(isSent ? "from_user" : "to_user", user.id)
-        .order("sent_at", { ascending: false })
-    : { data: null };
-
-  // 送り主の名前と、背景の見た目をまとめて取ります
-  const [{ data: senders }, { data: backgrounds }] = await Promise.all([
+  // ▼ 1回目：本人確認と、カードの取得を同時に出します。
+  //
+  //   前は「本人確認 → その id でカードを絞る」と2段階でしたが、
+  //   RLS が「自分が関わったカードしか返さない」ので、
+  //   先に全部もらって、届いた／送ったの仕分けはこちらでやります。
+  const [userResult, { data: allCards }] = await Promise.all([
+    supabase.auth.getUser(),
     supabase
-      .from("profiles")
-      .select("id, display_name")
-      .in(
-        "id",
-        cards?.map((card) => (isSent ? card.to_user : card.from_user)) ?? [],
-      ),
-    supabase
-      .from("card_templates")
-      .select("id, kind, name")
-      .in("id", cards?.map((card) => card.template_id) ?? []),
+      .from("card_sends")
+      .select("id, message, sent_at, from_user, to_user, template_id, drawing_url")
+      .order("sent_at", { ascending: false }),
   ]);
+
+  const user = userResult.data.user;
+
+  const cards =
+    user === null
+      ? null
+      : (allCards?.filter((card) =>
+          isSent ? card.from_user === user.id : card.to_user === user.id,
+        ) ?? null);
 
   // カードの絵は cards という保管庫に入っています。
   // 非公開なので、見るには期限付きの URL を発行してもらいます（1時間）。
@@ -48,10 +41,24 @@ export default async function CardInboxPage({
       ?.map((card) => card.drawing_url)
       .filter((path): path is string => path !== null) ?? [];
 
-  const { data: drawingUrls } =
-    drawingPaths.length > 0
-      ? await supabase.storage.from("cards").createSignedUrls(drawingPaths, 3600)
-      : { data: null };
+  // ▼ 2回目：この3つは、カードが分かればどれも同時に出せます
+  const [{ data: senders }, { data: backgrounds }, { data: drawingUrls }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in(
+          "id",
+          cards?.map((card) => (isSent ? card.to_user : card.from_user)) ?? [],
+        ),
+      supabase
+        .from("card_templates")
+        .select("id, kind, name")
+        .in("id", cards?.map((card) => card.template_id) ?? []),
+      drawingPaths.length > 0
+        ? supabase.storage.from("cards").createSignedUrls(drawingPaths, 3600)
+        : Promise.resolve({ data: null }),
+    ]);
 
   const findDrawingUrl = (path: string | null) =>
     path === null
@@ -59,7 +66,7 @@ export default async function CardInboxPage({
       : (drawingUrls?.find((item) => item.path === path)?.signedUrl ?? null);
 
   return (
-    <main className="relative min-h-full p-5">
+    <main className="relative min-h-full p-5 pb-24">
       <Link href="/" className="text-sm text-stone-500">
         ← 戻る
       </Link>

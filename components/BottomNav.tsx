@@ -5,7 +5,9 @@ import { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 
 // 下タブを出さない画面。ここに URL を足せば、その画面ではタブが消えます。
-const HIDE_NAV = ["/login", "/draw"];
+// /cards/new は下に道具の棚があるので、重ねると送信ボタンが隠れます。
+// 作っている最中の画面なので、/draw と同じくタブは出しません。
+const HIDE_NAV = ["/login", "/draw", "/cards/new"];
 
 // アイコンは形（svg の中身）だけを持たせています。
 // 4つとも同じ大きさ・同じ線の太さなので、囲いの部分は下で1回だけ書きます。
@@ -77,11 +79,19 @@ export default function BottomNav() {
   return (
     // 外側の枠。ここで画面の端からの距離を作ります。
     // pb の env(safe-area-inset-bottom) は、iPhone 下端の横棒のぶんの余白です。
-    <div className="shrink-0 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2">
+    //
+    // absolute で中身の上に重ねています。
+    // 並べて置くと後ろに何も無いので、すりガラスにしても透けません。
+    // pointer-events-none/auto = 枠の余白部分を押しても反応しないようにする指定。
+    // 重ねたぶん、バーの外側で中身が押せなくなるのを防ぎます。
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2">
       {/* こちらが浮いて見える本体。
           rounded-2xl で角を丸め、shadow-lg で影を落とすと、
           画面から少し持ち上がっているように見えます。 */}
-      <nav className="flex items-center justify-around rounded-2xl bg-stone-200 px-2 py-1.5 shadow-lg">
+      {/* backdrop-blur = 後ろにあるものをぼかす指定。
+          bg-stone-200/70 の「/70」は 70% の濃さ、という意味です。
+          この2つで、後ろが透けるすりガラスになります。 */}
+      <nav className="pointer-events-auto flex items-center justify-around rounded-2xl bg-stone-200/70 px-2 py-1.5 shadow-lg backdrop-blur-xl">
         {TABS.map((tab) => {
           const isActive = pathname === tab.href;
 

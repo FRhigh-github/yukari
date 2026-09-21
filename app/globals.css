@@ -62,3 +62,10 @@ body {
 *::-webkit-scrollbar {
   display: none;
 }
+
+/* ▼ 一度見たあとのオープニングを、描かれる前に隠します。
+   目印（data-opening-seen）は layout.tsx の小さな処理が付けます。
+   JavaScript が動き出すのを待たないので、ちらつきません。 */
+html[data-opening-seen] .opening-overlay {
+  display: none;
+}

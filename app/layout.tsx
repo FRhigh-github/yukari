@@ -34,7 +34,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ja" className="h-full antialiased">
+    // suppressHydrationWarning = この札に目印を足しても怒らないでね、という指定。
+    // 下の小さな処理が data-opening-seen を付けるので、
+    // サーバーが作ったHTMLとは中身が変わります。ここだけは想定どおりです。
+    <html lang="ja" className="h-full antialiased" suppressHydrationWarning>
       <head>
         {/* preconnect = その相手との接続だけ、先に始めておく指定。
             アイコンは外部から読むので、画像のURLが分かってから
@@ -42,6 +45,34 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             スマホの回線ほど、この待ち時間が大きくなります。 */}
         <link rel="preconnect" href="https://lh3.googleusercontent.com" />
         <link rel="preconnect" href="https://i.pravatar.cc" />
+
+        {/* 投稿の写真とカードの絵は Supabase に置いてあります。
+            ここへの接続も先に始めておきます。
+            URLが分かってから繋ぎ始めると、そのぶん写真が遅れて出ます。 */}
+        {process.env.NEXT_PUBLIC_SUPABASE_URL ? (
+          <link
+            rel="preconnect"
+            href={process.env.NEXT_PUBLIC_SUPABASE_URL}
+            crossOrigin=""
+          />
+        ) : null}
+
+        {/* 読み込み中に出す結び目です。
+            <yukari-loader> という自前のタグを使えるようにする部品で、
+            中身は public/yukari-loader.js にそのまま置いてあります。
+            ここで一度読んでおくと、loading のたびに取りに行かずにすみます。 */}
+        <script src="/yukari-loader.js" async />
+
+        {/* ▼ オープニングを出すかどうかを、いちばん最初に決めるための小さな処理です。
+            React が動き出すのを待つと、その一瞬だけ紐が見えてしまいます
+            （読み込み直したときに、毎回ちらっと出る）。
+            ここは HTML を読みながらすぐ実行されるので、描かれる前に間に合います。
+            目印を html に付けておくと、globals.css がそれを見て隠します。 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(sessionStorage.getItem('yukari-opening-seen'))document.documentElement.dataset.openingSeen='1'}catch(e){}`,
+          }}
+        />
       </head>
       {/* 外側の灰色。PCで見たとき、アプリの外にあたる部分です */}
       <body className="min-h-full bg-stone-200">

@@ -13,6 +13,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 // 元は9.65秒。起動のたびに長いので、少し早送りで流します。
 // 数字を大きくするほど速くなります。
@@ -25,12 +26,20 @@ const DURATION = 9.65;
 const SEEN_KEY = "yukari-opening-seen";
 
 export default function OpeningAnimation() {
+  const router = useRouter();
+
   const svgRef = useRef<SVGSVGElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
-  // 最初は出しません。見たかどうかはブラウザ側でしか分からないので、
-  // 画面が出てから決めます。
-  const [isShown, setIsShown] = useState(false);
+  // ▼ 最初から「出す」で始めます。
+  //
+  //   前は false で始めて、画面が出てから出すか決めていました。
+  //   その結果、JSが動き出すまでの間（＝サーバーがホームを作っている間）が
+  //   白いままで、待たされているように見えていました。
+  //
+  //   最初のHTMLに入れておけば、その待ち時間ごと紐で隠せます。
+  //   一度見たあとは、下の useEffect がすぐ消します。
+  const [isShown, setIsShown] = useState(true);
   const [isFading, setIsFading] = useState(false);
   // 紐と文字が描き終わったか。終わっても自動では消さず、タップを待ちます。
   const [isDone, setIsDone] = useState(false);
@@ -40,12 +49,22 @@ export default function OpeningAnimation() {
     // 画面が出たあと（＝この中）でしか読めません。
     // そのため、ここで一度だけ状態を変えるのは避けられません。
     try {
+      // 一度見ていたら、すぐ片づけます（2回目以降は出しません）
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (sessionStorage.getItem(SEEN_KEY) === null) setIsShown(true);
+      if (sessionStorage.getItem(SEEN_KEY) !== null) setIsShown(false);
     } catch {
-      // 使えない環境では、出さないでおきます
+      // 使えない環境では、そのまま出しておきます
     }
-  }, []);
+
+    // ▼ 紐を結んでいる間に、下のタブの行き先を用意しておきます。
+    //
+    //   オープニングが出ている数秒は、画面が塞がっていて何もできません。
+    //   その裏でDBに聞いておけば、はじめてタブを押したときにも待ちません。
+    //   ※ 押されるかどうか分からないので、取りに行くだけで表示はしません。
+    for (const path of ["/cards", "/letter", "/profile", "/cards/inbox"]) {
+      router.prefetch(path);
+    }
+  }, [router]);
 
   const finish = () => {
     try {
@@ -68,6 +87,14 @@ export default function OpeningAnimation() {
     const cords = svg.querySelector("#cords");
     const defs = svg.querySelector("#rope-defs");
     if (cords === null || defs === null) return;
+
+    // ▼ 作る前に、中を空にします。
+    //
+    //   開発モードの React は、この処理を2回動かします（書き間違いを見つけるため）。
+    //   空にしないと紐の部品が二重にでき、同じ名前の型が2つできてしまいます。
+    //   そうなると先にできた空のほうが使われて、紐が見えなくなります。
+    cords.replaceChildren();
+    defs.replaceChildren();
 
     // 動きを減らす設定の人には、完成形だけ見せてすぐ終わります
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -419,6 +446,9 @@ export default function OpeningAnimation() {
     return () => {
       cancelAnimationFrame(request);
       removeEventListener("resize", onResize);
+      // 作ったものを片づけます。残すと、次に作るぶんと重なります。
+      cords.replaceChildren();
+      defs.replaceChildren();
     };
   }, [isShown]);
 
@@ -433,7 +463,8 @@ export default function OpeningAnimation() {
       //   紐は画面の外から入ってくるので、これが無いと
       //   アプリの枠を越えて、外の灰色の上まで描かれてしまいます。
       // z-[100] で、下タブより手前に出します。
-      className={`absolute inset-0 z-[100] grid place-items-center overflow-hidden bg-[#faf9f6] transition-opacity duration-400 ${
+      // opening-overlay = 一度見たあとに隠すための目印（globals.css）
+      className={`opening-overlay absolute inset-0 z-[100] grid place-items-center overflow-hidden bg-[#faf9f6] transition-opacity duration-400 ${
         isFading ? "opacity-0" : "opacity-100"
       }`}
     >

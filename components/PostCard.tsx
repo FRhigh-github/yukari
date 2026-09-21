@@ -10,6 +10,8 @@ type PostCardProps = {
   createdAt: string;
   imageUrl: string | null;
   reactions: Reaction[];
+  // 一番上の1件かどうか。写真をすぐ読むかの判断に使います。
+  isFirst?: boolean;
 };
 
 export default function PostCard({
@@ -19,6 +21,7 @@ export default function PostCard({
   createdAt,
   imageUrl,
   reactions,
+  isFirst = false,
 }: PostCardProps) {
   return (
     <article className="mb-3 rounded-2xl bg-white p-4 shadow-sm">
@@ -31,9 +34,12 @@ export default function PostCard({
         <img
           src={imageUrl}
           alt=""
-          // loading="lazy" = 画面に出てくるまで読み込まない。
-          // 下のほうの投稿の写真まで最初に全部読むと、そのぶん待たされます。
-          loading="lazy"
+          // ▼ 一番上の写真だけは、すぐ読みにいきます。
+          //   開いた時点で見えているのに後回しにすると、
+          //   文字だけ先に出て、写真が遅れて出てくることになります。
+          //   下のほうの写真は lazy のまま（画面に出てから読みます）。
+          loading={isFirst ? "eager" : "lazy"}
+          fetchPriority={isFirst ? "high" : "auto"}
           decoding="async"
           className="mb-3 mt-2 w-full rounded-xl bg-stone-100 object-cover"
         />

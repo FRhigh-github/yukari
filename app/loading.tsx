@@ -1,22 +1,13 @@
-// データが届くまでの間、これが表示されます。
+// ▼ 何も描かない「待ち画面」です。
 //
-// 見た目の埋め合わせだけでなく、速さにも効きます。
-// loading.tsx があるページは、Next.js が
-// 「この部分だけ先に読み込んでおく」ことができるようになるためです。
+// 空なのに意味があります。
+// loading.tsx が置いてあるページだけ、Next.js は
+// 「先に骨組みだけ出して、中身は届きしだい流し込む」ことができます。
+// これが無いと、押してから中身がDBから届くまで画面が動きません。
+//
+// 結び目のローダーを出すと、一瞬だけ見えて消える点滅になったので、
+// 白いままにしてあります。中身が届いた瞬間に、そのまま置き換わります。
 
 export default function Loading() {
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b border-stone-100 px-5 py-3">
-        <div className="h-4 w-32 rounded bg-stone-200" />
-      </div>
-
-      {/* animate-pulse = ゆっくり点滅させて、読み込み中だと伝えます */}
-      <div className="flex flex-1 animate-pulse flex-wrap content-start justify-around gap-y-10 px-8 pt-10">
-        {[0, 1, 2, 3, 4, 5].map((index) => (
-          <div key={index} className="h-12 w-12 rounded-full bg-stone-200" />
-        ))}
-      </div>
-    </div>
-  );
+  return <div className="h-full bg-white" />;
 }

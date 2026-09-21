@@ -80,7 +80,9 @@ export default function CommunitySettings({
       return;
     }
 
-    router.push("/communities");
+    // 退出したので、もうこのコミュニティのホームには戻れません。
+    // ホームへ送ると、残っているコミュニティが選び直されます。
+    router.push("/");
     router.refresh();
   };
 

@@ -10,7 +10,10 @@ export type Member = {
   hasNews: boolean;
 };
 
-// selectedId = 今選んでいるコミュニティ。「すべて」なら null。
+// selectedId = URL の ?c= で指定されたコミュニティ。
+// 指定がなければ、持っているものの一番上を自動で選びます。
+// 「すべて」をやめたのは、別のコミュニティの人が同じ相関図に混ざると
+// 今どこを見ているのか分からなくなるためです。
 export async function getHomeData(selectedId: string | null) {
   const supabase = await createClient();
 
@@ -28,12 +31,22 @@ export async function getHomeData(selectedId: string | null) {
   const user = userResult.data.user;
 
   if (user === null) {
-    return { user: null, communities: [], members: [] };
+    return { user: null, communities: [], members: [], currentId: null };
   }
 
-  const targetIds = selectedId
-    ? [selectedId]
-    : (communities?.map((community) => community.id) ?? []);
+  // 指定された id が自分の持ちものに無いときは、無視して一番上に戻します。
+  // （他の人のURLをそのまま開いたときなど）
+  const list = communities ?? [];
+  const currentId =
+    list.find((community) => community.id === selectedId)?.id ??
+    list[0]?.id ??
+    null;
+
+  if (currentId === null) {
+    return { user, communities: list, members: [], currentId: null };
+  }
+
+  const targetIds = [currentId];
 
   // ▼ 待ち時間を短くする工夫
   //
@@ -44,6 +57,9 @@ export async function getHomeData(selectedId: string | null) {
   // 下の2つはどちらも targetIds しか使わないので、同時に出せます。
   // in(...) = 並べた値のどれかに一致するものを取る
   const [{ data: memberships }, { data: recentPosts }] = await Promise.all([
+    // ※ profiles を一緒に持ってくる書き方も試しましたが、DBが応じませんでした。
+    //   memberships.user_id が profiles ではなく auth.users を指しているためです。
+    //   減らすなら、DB側に関数を作る形になります。
     supabase.from("memberships").select("user_id").in("community_id", targetIds),
     // 「最近」は、このコミュニティの新しい投稿20件ぶん、ということにします
     supabase
@@ -79,5 +95,5 @@ export async function getHomeData(selectedId: string | null) {
   // 光る人を先に並べる
   members.sort((a, b) => (a.hasNews === b.hasNews ? 0 : a.hasNews ? -1 : 1));
 
-  return { user, communities: communities ?? [], members };
+  return { user, communities: list, members, currentId };
 }

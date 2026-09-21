@@ -24,9 +24,9 @@ export default async function CommunityPage({
 
   if (community === null) {
     return (
-      <main className="p-6">
-        <Link href="/communities" className="text-sm text-stone-500">
-          ← 戻る
+      <main className="p-6 pb-24">
+        <Link href="/" className="text-sm text-stone-500">
+          ← ホーム
         </Link>
         <p className="mt-4 text-sm text-stone-500">
           このコミュニティは見つかりませんでした。
@@ -53,10 +53,13 @@ export default async function CommunityPage({
     "owner";
 
   return (
-    <main className="space-y-8 p-6">
+    <main className="space-y-8 p-6 pb-24">
       <div>
-        <Link href="/communities" className="text-sm text-stone-500">
-          ← 戻る
+        {/* この画面には、ホームの ⚙ から来ます。
+            なので戻り先も、そのコミュニティを開いたホームにします。
+            ?c= を付けておくと、見ていた班のまま戻れます。 */}
+        <Link href={`/?c=${community.id}`} className="text-sm text-stone-500">
+          ← ホーム
         </Link>
         <h1 className="mt-2 text-xl font-bold text-stone-800">
           {community.name}

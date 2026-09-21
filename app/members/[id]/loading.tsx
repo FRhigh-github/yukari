@@ -9,7 +9,7 @@
 
 export default function Loading() {
   return (
-    <main className="p-6">
+    <main className="p-6 pb-24">
       <div className="h-4 w-12 rounded bg-stone-200" />
       <div className="mb-4 mt-3 h-6 w-48 rounded bg-stone-200" />
 

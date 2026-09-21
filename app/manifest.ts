@@ -15,14 +15,17 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "大切な人に、ご報告を届けるアプリ",
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
+    // オープニングと同じ生成り色。立ち上がりの一瞬もこの色になります
+    background_color: "#faf8f3",
     theme_color: "#ffffff",
     orientation: "portrait",
     icons: [
       {
-        src: "/favicon.ico",
+        // app/icon.svg に置いたあわじ結び。
+        // svg は大きさを持たないので、どの端末でもきれいに出ます。
+        src: "/icon.svg",
         sizes: "any",
-        type: "image/x-icon",
+        type: "image/svg+xml",
       },
     ],
   };

@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import { renderCardToBlob, type CardItem } from "@/lib/cardCanvas";
-import CardTemplate, { type CardKind } from "@/components/CardTemplate";
+import CardTemplate, {
+  CARD_KINDS,
+  type CardKind,
+} from "@/components/CardTemplate";
 import HorizontalScroller from "@/components/HorizontalScroller";
 
 export type Recipient = {
@@ -15,25 +18,14 @@ export type Recipient = {
   communityName: string;
 };
 
-export type Background = {
-  id: string;
-  kind: CardKind;
-  name: string;
-};
-
 type CardComposerProps = {
-  backgrounds: Background[];
-  initialBackgroundId: string;
-  recipients: Recipient[];
+  // 最初に開いておく背景の種類
+  initialKind: CardKind;
 };
 
 type Tab = "background" | "text" | "image";
 
-export default function CardComposer({
-  backgrounds,
-  initialBackgroundId,
-  recipients,
-}: CardComposerProps) {
+export default function CardComposer({ initialKind }: CardComposerProps) {
   const router = useRouter();
 
   // カードの枠。指の位置を「カードの中での割合」に直すのに使います
@@ -41,19 +33,23 @@ export default function CardComposer({
   // 動かしている最中のものの id。null なら誰も動かしていません
   const draggingRef = useRef<string | null>(null);
 
-  const [backgroundId, setBackgroundId] = useState(initialBackgroundId);
+  const [kind, setKind] = useState<CardKind>(initialKind);
   const [items, setItems] = useState<CardItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("background");
 
-  const [target, setTarget] = useState(
-    recipients[0] ? `${recipients[0].userId}|${recipients[0].communityId}` : "",
-  );
+  // ▼ 送る相手は、この画面を開いた時点では取りに行きません。
+  //   選ぶのは最後なので、先に取ると、絵を描き始めるまで待たされます。
+  //   null = まだ取っていない、という意味です。
+  const [recipients, setRecipients] = useState<Recipient[] | null>(null);
+  const [isPicking, setIsPicking] = useState(false);
+
+  const [target, setTarget] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const background =
-    backgrounds.find((item) => item.id === backgroundId) ?? backgrounds[0];
+    CARD_KINDS.find((item) => item.kind === kind) ?? CARD_KINDS[0];
 
   const selected = items.find((item) => item.id === selectedId);
 
@@ -139,6 +135,52 @@ export default function CardComposer({
     setSelectedId(null);
   };
 
+  // ▼「送る」を押したときに、はじめて相手を取りに行きます。
+  //   一度取ったら覚えておくので、2回目からは待ちません。
+  const openPicker = async () => {
+    setIsPicking(true);
+    if (recipients !== null) return;
+
+    const supabase = createClient();
+
+    const [{ data: userData }, { data: communities }] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from("communities").select("id, name"),
+    ]);
+
+    if (!userData.user) {
+      router.push("/login");
+      return;
+    }
+
+    // 送れる相手＝自分と同じコミュニティにいる人（自分は除く）
+    const { data: memberships } = await supabase
+      .from("memberships")
+      .select("user_id, community_id")
+      .in("community_id", communities?.map((item) => item.id) ?? [])
+      .neq("user_id", userData.user.id);
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", memberships?.map((item) => item.user_id) ?? []);
+
+    const list: Recipient[] =
+      memberships?.map((membership) => ({
+        userId: membership.user_id,
+        communityId: membership.community_id,
+        displayName:
+          profiles?.find((profile) => profile.id === membership.user_id)
+            ?.display_name ?? null,
+        communityName:
+          communities?.find((item) => item.id === membership.community_id)
+            ?.name ?? "",
+      })) ?? [];
+
+    setRecipients(list);
+    setTarget(list[0] ? `${list[0].userId}|${list[0].communityId}` : "");
+  };
+
   const handleSend = async () => {
     setError(null);
 
@@ -169,10 +211,20 @@ export default function CardComposer({
 
       const [toUser, communityId] = target.split("|");
 
+      // ▼ card_sends.template_id は、DB側でまだ card_templates と結ばれています。
+      //   画面では使わなくなったので、送るときだけ種類から1件引いてきます。
+      //   （画面を開くときに引かないので、待ち時間には影響しません）
+      const { data: template } = await supabase
+        .from("card_templates")
+        .select("id")
+        .eq("kind", background.kind)
+        .limit(1)
+        .maybeSingle();
+
       // drawing_data には、置いたものの一覧をそのまま残します。
       // 画像だけだと後から直せませんが、これがあれば作り直せます。
       const { error: insertError } = await supabase.from("card_sends").insert({
-        template_id: background.id,
+        template_id: template?.id ?? null,
         from_user: data.user.id,
         to_user: toUser,
         community_id: communityId,
@@ -205,7 +257,7 @@ export default function CardComposer({
         >
           <CardTemplate
             kind={background.kind}
-            name={background.name}
+            name={background.label}
             plain
             className="absolute inset-0 h-full w-full"
           />
@@ -260,18 +312,18 @@ export default function CardComposer({
         <div className="space-y-3 p-4">
           {tab === "background" ? (
             <HorizontalScroller>
-              {backgrounds.map((item) => (
+              {CARD_KINDS.map((item) => (
                 <button
-                  key={item.id}
+                  key={item.kind}
                   type="button"
-                  onClick={() => setBackgroundId(item.id)}
-                  className={`shrink-0 rounded-lg ${
-                    item.id === backgroundId ? "ring-2 ring-orange-400" : ""
+                  onClick={() => setKind(item.kind)}
+                  className={`shrink-0 cursor-pointer rounded-lg ${
+                    item.kind === kind ? "ring-2 ring-orange-400" : ""
                   }`}
                 >
                   <CardTemplate
                     kind={item.kind}
-                    name={item.name}
+                    name={item.label}
                     className="h-16 w-12"
                     plain
                   />
@@ -344,34 +396,55 @@ export default function CardComposer({
             </div>
           ) : null}
 
-          <select
-            value={target}
-            onChange={(event) => setTarget(event.target.value)}
-            className="w-full rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-700 focus:outline-none"
-          >
-            {recipients.length === 0 ? (
-              <option value="">送れる相手がいません</option>
-            ) : null}
-            {recipients.map((recipient) => (
-              <option
-                key={`${recipient.userId}|${recipient.communityId}`}
-                value={`${recipient.userId}|${recipient.communityId}`}
+          {/* ▼ 相手えらびは、押してから出します。
+              まだ押していない間は、DBに聞きに行きません。 */}
+          {isPicking ? (
+            <div className="space-y-2">
+              {recipients === null ? (
+                <p className="py-3 text-center text-xs text-stone-400">
+                  相手をさがしています…
+                </p>
+              ) : (
+                <select
+                  value={target}
+                  onChange={(event) => setTarget(event.target.value)}
+                  className="w-full cursor-pointer rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-700 focus:outline-none"
+                >
+                  {recipients.length === 0 ? (
+                    <option value="">送れる相手がいません</option>
+                  ) : null}
+                  {recipients.map((recipient) => (
+                    <option
+                      key={`${recipient.userId}|${recipient.communityId}`}
+                      value={`${recipient.userId}|${recipient.communityId}`}
+                    >
+                      {recipient.displayName ?? "名無し"}（
+                      {recipient.communityName}）
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={isSending || recipients === null || target === ""}
+                className="w-full cursor-pointer rounded-full bg-stone-800 py-3 text-sm font-bold text-white disabled:opacity-40"
               >
-                {recipient.displayName ?? "名無し"}（{recipient.communityName}）
-              </option>
-            ))}
-          </select>
+                {isSending ? "送信中..." : "この人に送る"}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={openPicker}
+              className="w-full cursor-pointer rounded-full bg-stone-800 py-3 text-sm font-bold text-white"
+            >
+              カードを送る
+            </button>
+          )}
 
           {error ? <p className="text-xs text-red-600">{error}</p> : null}
-
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={isSending || recipients.length === 0}
-            className="w-full rounded-full bg-stone-800 py-3 text-sm font-bold text-white disabled:opacity-40"
-          >
-            {isSending ? "送信中..." : "カードを送る"}
-          </button>
         </div>
       </div>
     </div>

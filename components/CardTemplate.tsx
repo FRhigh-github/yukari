@@ -5,6 +5,13 @@ import { cardBackgroundUrl, TEXT_COLORS, type CardKind } from "@/lib/cardBackgro
 
 export type { CardKind };
 
+// ▼ 背景の一覧です。
+//
+// 前はこれを card_templates テーブルからも読んでいましたが、
+// 絵を描いているのは lib/cardBackground.ts のコードなので、
+// DBは同じ内容をもう一度持っているだけでした。
+// 背景を増やすのにSQLとコードの両方を直す必要があり、
+// 画面を開くたびに1往復ぶん待つことにもなっていたので、こちらに寄せました。
 export const CARD_KINDS: { kind: CardKind; label: string }[] = [
   { kind: "summer", label: "暑中見舞い" },
   { kind: "newyear", label: "年賀状" },

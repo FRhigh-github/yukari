@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getHomeData } from "@/lib/home";
 import MemberCircles from "@/components/MemberCircles";
 import CommunitySwitcher from "@/components/CommunitySwitcher";
+import PullToRefresh from "@/components/PullToRefresh";
 
 // 画面の真ん中に、文と案内ボタンを1つ出すだけの小さな部品
 function Notice({ text, href, label }: { text: string; href: string; label: string }) {
@@ -25,7 +26,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   // ?c=a&c=b のように2回書かれると配列になるので、文字列のときだけ使います
   const selectedId = typeof c === "string" ? c : null;
 
-  const { user, communities, members } = await getHomeData(selectedId);
+  // currentId = 実際に見ているコミュニティ。
+  // ?c= が無いときは、getHomeData が一番上を選んで返してくれます。
+  const { user, communities, members, currentId } =
+    await getHomeData(selectedId);
 
   if (user === null) {
     return <Notice text="ログインしてください" href="/login" label="ログインへ" />;
@@ -38,7 +42,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {/* shrink-0 = 場所が足りなくてもこのバーは縮めない */}
       <header className="flex shrink-0 items-center justify-between border-b border-stone-100 px-5 py-3">
         {/* 作る・参加する・設定への入口も、この中にまとめてあります */}
-        <CommunitySwitcher communities={communities} selectedId={selectedId} />
+        <CommunitySwitcher communities={communities} selectedId={currentId} />
 
         <span className="text-sm text-stone-400">🔔</span>
       </header>
@@ -46,21 +50,26 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {members.length === 0 ? (
         <Notice
           text="まだコミュニティに入っていません"
-          href="/communities"
+          href="/communities/join"
           label="コミュニティに参加する"
         />
       ) : (
         // flex-1 = 残りの高さを全部つかう。マルはこの中に割り振られます。
-        <div className="flex-1 px-3">
-          <MemberCircles members={members} currentUserId={user.id} />
+        // 上から引っぱると、中身を取り直せます。
+        <div className="min-h-0 flex-1 px-3">
+          <PullToRefresh>
+            <MemberCircles members={members} currentUserId={user.id} />
+          </PullToRefresh>
         </div>
       )}
 
-      {/* 左下：届いたカードを見る手紙ボックス */}
+      {/* 左下：届いたカードを見る手紙ボックス
+          bottom-[5.5rem] = 下タブ（約76px）の上に置くための高さ。
+          bottom-4 のままだと、重ねた下タブの後ろに隠れてしまいます。 */}
       <Link
         href="/cards/inbox"
         aria-label="届いたカード"
-        className="absolute bottom-4 left-4 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg"
+        className="absolute bottom-[5.5rem] left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg"
       >
         <svg
           viewBox="0 0 24 24"
@@ -83,7 +92,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {/* 右下：ご報告を書く */}
       <Link
         href="/post"
-        className="absolute bottom-4 right-4 rounded-full bg-stone-400 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
+        className="absolute bottom-[5.5rem] right-4 z-30 rounded-full bg-stone-400 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
       >
         ステキな報告をする
       </Link>
