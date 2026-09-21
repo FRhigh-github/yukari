@@ -1,56 +1,134 @@
-// ホーム画面に、メンバーのマルを散らして置く部品です。
-// 最近ご報告をした人のマルは、まわりが光ります。
-// マルを押すと、その人のご報告を見る画面へ移動します。
+// ホーム画面のマルを、自分を中心にした同心円に並べる部品です。
+//
+// 中心 = 自分。内側の輪 = 最近ご報告があった人。外側 = それ以外。
+// 中心からの距離が、そのまま「疎遠さ」になります。
 
 import Link from "next/link";
 import type { Member } from "@/lib/home";
 
 type MemberCirclesProps = {
   members: Member[];
+  currentUserId: string;
 };
 
-// 「2人ずつ横に並べて、下へ積む」形です。
-// 位置は px ではなく % で指定して、画面の高さぶんに割り振ります。
-// こうすると人数が増えても縦に伸びず、1画面に収まります。
+// 輪の設定。中心からの距離(px)と、その輪に入る人数の上限です。
+//
+// 横は画面幅(384px)に収める必要があるので、狭くしてあります。
+// 反対に縦は余っているので、大きめにして縦長の輪にしています。
+// 数字を変えれば、そのまま配置が変わります。
+//
+// ※ radiusY は「一番下に来る人の位置」ではありません。
+//   人が真下にちょうど来るとは限らないためです。
+//   たとえば6人だと、一番下の人でも radiusY の 0.87倍あたりに止まります。
+//   なので、見た目より大きめの数字を入れる必要があります。
+const RINGS = [
+  { radiusX: 70, radiusY: 150, capacity: 6 },
+  { radiusX: 130, radiusY: 320, capacity: 12 },
+  // 最後の輪は、あふれた人を全部引き受けます
+  { radiusX: 145, radiusY: 330, capacity: Infinity },
+];
 
-// 左右の位置(%)。行ごとに少しずらして、揃いすぎないようにしています。
-const getLeft = (index: number) => {
-  const row = Math.floor(index / 2);
-  const isLeftSide = index % 2 === 0;
+type Placed = {
+  member: Member;
+  x: number;
+  y: number;
+};
 
-  if (isLeftSide) {
-    return row % 2 === 0 ? 28 : 36;
+// 誰をどこに置くかを計算します。
+// 内側から順に埋めていき、いっぱいになったら次の輪へ移ります。
+const placeMembers = (members: Member[]): Placed[] => {
+  const placed: Placed[] = [];
+  let placedCount = 0;
+
+  for (const [ringIndex, ring] of RINGS.entries()) {
+    const rest = members.length - placedCount;
+    if (rest <= 0) break;
+
+    const count = Math.min(ring.capacity, rest);
+
+    // 輪ごとに半目盛りずらします。
+    // そろえると内側と外側が真上で重なって、1本の列に見えてしまうためです。
+    const offset = ringIndex % 2 === 0 ? 0 : 0.5;
+
+    for (let i = 0; i < count; i++) {
+      // 1周(360度)を人数で割って、等間隔に配ります。
+      // Math.PI * 2 が1周ぶん。-Math.PI / 2 は「真上から始める」ための引き算です。
+      const angle = ((i + offset) / count) * Math.PI * 2 - Math.PI / 2;
+
+      placed.push({
+        member: members[placedCount + i],
+        // cos が横、sin が縦の位置を出してくれます
+        x: Math.round(Math.cos(angle) * ring.radiusX),
+        y: Math.round(Math.sin(angle) * ring.radiusY),
+      });
+    }
+
+    placedCount += count;
   }
-  return row % 2 === 0 ? 72 : 64;
+
+  return placed;
 };
 
-// 上からの位置(%)。行の「まん中」に置きたいので、0.5 を足しています。
-// 例: 3行なら 16.7% / 50% / 83.3% になります。
-const getTop = (index: number, rowCount: number) => {
-  const row = Math.floor(index / 2);
-  return ((row + 0.5) / rowCount) * 100;
-};
+export default function MemberCircles({
+  members,
+  currentUserId,
+}: MemberCirclesProps) {
+  // 自分は中心に置くので、輪に並べる人たちとは分けます
+  const me = members.find((member) => member.id === currentUserId);
+  const others = members.filter((member) => member.id !== currentUserId);
 
-export default function MemberCircles({ members }: MemberCirclesProps) {
-  const rowCount = Math.ceil(members.length / 2);
+  // members は lib/home.ts で「報告がある人が先」に並べ替えてあるので、
+  // そのまま内側から詰めると、最近の人ほど中心に近くなります。
+  const placed = placeMembers(others);
 
   return (
-    // h-full = 親からもらった高さいっぱい。
-    // relative = 中の要素を「この箱の中での位置」で置けるようにする指定
-    <div className="relative h-full w-full">
-      {members.map((member, index) => (
+    <div className="relative h-full w-full overflow-hidden">
+      {/* ▼ 中心から伸びる線
+          線は div を1本の棒として使っています。
+          origin-left（回転の軸を左端にする）で、
+          中心を軸に回すと放射状の線になります。 */}
+      {placed.map(({ member, x, y }) => (
+        <div
+          key={`line-${member.id}`}
+          className="absolute left-1/2 top-1/2 h-px origin-left bg-stone-200"
+          style={{
+            // hypot = 直角三角形の斜辺の長さ。中心からの距離になります
+            width: `${Math.hypot(x, y)}px`,
+            // atan2 が角度（ラジアン）を返すので、度に直します
+            transform: `rotate(${(Math.atan2(y, x) * 180) / Math.PI}deg)`,
+          }}
+        />
+      ))}
+
+      {/* ▼ 自分（中心） */}
+      {me ? (
+        <div className="absolute left-1/2 top-1/2 flex w-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1">
+          <div className="rounded-full bg-white p-[3px] shadow-md">
+            <div
+              className="h-14 w-14 rounded-full bg-stone-300 bg-cover bg-center"
+              style={
+                me.avatarUrl
+                  ? { backgroundImage: `url("${encodeURI(me.avatarUrl)}")` }
+                  : undefined
+              }
+            />
+          </div>
+          <span className="text-[10px] font-bold text-stone-600">自分</span>
+        </div>
+      ) : null}
+
+      {/* ▼ まわりのメンバー */}
+      {placed.map(({ member, x, y }) => (
         <Link
           key={member.id}
           href={`/members/${member.id}`}
-          // absolute = 上の relative の箱の中で、位置を指定して置く
-          // -translate-x-1/2 -translate-y-1/2 = マルの中心を、指定した場所に合わせる
-          className="absolute flex w-16 -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
+          // 「中心へ移動」してから「計算したぶんずらす」の2段階です
+          className="absolute left-1/2 top-1/2 flex w-16 flex-col items-center gap-1"
           style={{
-            left: `${getLeft(index)}%`,
-            top: `${getTop(index, rowCount)}%`,
+            transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
           }}
         >
-          {/* 外側の輪。光らせるかどうかを、ここで切り替えます */}
+          {/* 外側の輪。報告がある人だけ光らせます */}
           <div
             className={`rounded-full p-[2.5px] ${
               member.hasNews

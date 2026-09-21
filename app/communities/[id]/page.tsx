@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import InviteCode from "@/components/InviteCode";
+import CommunitySettings from "@/components/CommunitySettings";
 
 export default async function CommunityPage({
   params,
@@ -8,11 +9,16 @@ export default async function CommunityPage({
   const { id } = await params;
   const supabase = await createClient();
 
+  // 自分が作成者かどうかの判定に使います
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   // メンバーでなければ、RLS が止めるので null が返ります。
   // maybeSingle() は「0件でもエラーにしない single()」です。
   const { data: community } = await supabase
     .from("communities")
-    .select("id, name, invite_code")
+    .select("id, name, invite_code, created_by")
     .eq("id", id)
     .maybeSingle();
 
@@ -59,7 +65,7 @@ export default async function CommunityPage({
 
       <section>
         <h2 className="mb-2 text-sm font-bold text-stone-600">招待コード</h2>
-        <InviteCode code={community.invite_code} />
+        <InviteCode code={community.invite_code} communityName={community.name} />
         <p className="mt-2 text-xs text-stone-400">
           このコードを渡すと、相手はこのコミュニティに参加できます。
         </p>
@@ -97,6 +103,12 @@ export default async function CommunityPage({
           ))}
         </ul>
       </section>
+
+      <CommunitySettings
+        communityId={community.id}
+        currentName={community.name}
+        isOwner={community.created_by === user?.id}
+      />
     </main>
   );
 }

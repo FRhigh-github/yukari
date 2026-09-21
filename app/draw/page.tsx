@@ -15,7 +15,7 @@ export default async function DrawPage({ searchParams }: PageProps<"/draw">) {
   const { data: post } = hasPostId
     ? await supabase
         .from("posts")
-        .select("id, title, image_url, author_id")
+        .select("id, title, image_url, author_id, community_id")
         .eq("id", postId)
         .single()
     : { data: null };
@@ -29,15 +29,26 @@ export default async function DrawPage({ searchParams }: PageProps<"/draw">) {
         .single()
     : { data: null };
 
-  // 画像の URL を作る（1時間だけ見られる URL）
-  const { data: signed } = post?.image_url
-    ? await supabase.storage.from("posts").createSignedUrl(post.image_url, 3600)
-    : { data: null };
+  // 保管庫に入れた画像は、見るのに期限付きの URL が要ります。
+  // ただしデバッグ用データは最初から URL なので、その場合はそのまま使います。
+  const imagePath = post?.image_url ?? null;
+  const isExternal = imagePath?.startsWith("http") ?? false;
+
+  const { data: signed } =
+    imagePath !== null && !isExternal
+      ? await supabase.storage.from("posts").createSignedUrl(imagePath, 3600)
+      : { data: null };
+
+  const postImageUrl = isExternal ? imagePath : (signed?.signedUrl ?? null);
 
   return (
     <DrawingPad
+      // 反応の相手＝報告を書いた人の画面が、元いた場所です
+      backHref={post ? `/members/${post.author_id}` : "/"}
+      postId={post?.id ?? null}
+      communityId={post?.community_id ?? null}
       authorName={author?.display_name ?? null}
-      postImageUrl={signed?.signedUrl ?? null}
+      postImageUrl={postImageUrl}
     />
   );
 }

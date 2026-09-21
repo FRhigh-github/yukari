@@ -15,13 +15,23 @@ export default function PostForm({ communities }: PostFormProps) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
   // 最初から1つ目を選んだ状態にしておきます
   const [communityId, setCommunityId] = useState(communities[0]?.id ?? "");
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setError(null);
+
     if (!communityId) {
-      alert("投稿先のコミュニティを選択してください");
+      setError("投稿先のコミュニティを選んでください");
+      return;
+    }
+
+    // 画像は必須です。文字だけの報告が並ぶと、一覧が寂しくなるためです。
+    // <input type="file"> には required が効かないので、ここで確かめます。
+    if (!imageFile) {
+      setError("写真を1枚えらんでください");
       return;
     }
 
@@ -32,30 +42,26 @@ export default function PostForm({ communities }: PostFormProps) {
       return;
     }
 
-    // 画像があれば、先に保管庫へ預けて、その置き場所を受け取ります
-    let imagePath: string | null = null;
-    if (imageFile) {
-      const upload = await supabase.storage
-        .from("posts")
-        .upload(`${Date.now()}_${imageFile.name}`, imageFile);
+    // 先に画像を保管庫へ預けて、その置き場所を受け取ります
+    const upload = await supabase.storage
+      .from("posts")
+      .upload(`${Date.now()}_${imageFile.name}`, imageFile);
 
-      if (upload.error) {
-        alert("画像のアップロードに失敗しました: " + upload.error.message);
-        return;
-      }
-      imagePath = upload.data.path;
+    if (upload.error) {
+      setError("画像のアップロードに失敗しました: " + upload.error.message);
+      return;
     }
 
-    const { error } = await supabase.from("posts").insert({
+    const { error: insertError } = await supabase.from("posts").insert({
       title,
       body,
-      image_url: imagePath,
+      image_url: upload.data.path,
       author_id: data.user.id,
       community_id: communityId,
     });
 
-    if (error) {
-      alert("投稿の保存に失敗しました: " + error.message);
+    if (insertError) {
+      setError("投稿の保存に失敗しました: " + insertError.message);
       return;
     }
 
@@ -108,7 +114,7 @@ export default function PostForm({ communities }: PostFormProps) {
               <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-black text-2xl font-light">
                 ＋
               </div>
-              <span className="text-sm font-medium">画像を添付</span>
+              <span className="text-sm font-medium">写真を選ぶ（必須）</span>
             </div>
           )}
         </label>
@@ -128,6 +134,10 @@ export default function PostForm({ communities }: PostFormProps) {
           onChange={(event) => setBody(event.target.value)}
           className="h-28 w-full resize-none rounded-2xl bg-white p-4 text-center text-gray-700 shadow-sm placeholder:text-gray-400 focus:outline-none"
         />
+
+        {error ? (
+          <p className="text-center text-xs text-red-600">{error}</p>
+        ) : null}
 
         <div className="flex justify-end pt-2">
           <button

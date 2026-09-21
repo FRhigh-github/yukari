@@ -1,19 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-// seed.sql で作った仮の id。本番のデータに差し替えるまでの暫定です。
-const COMMUNITY_ID = "22222222-2222-4222-8222-000000000001";
-const TEMPLATE_ID = "44444444-4444-4444-8444-000000000001";
 
 type Tool = "pen" | "eraser";
 type Point = { x: number; y: number };
 
 type DrawingPadProps = {
+  // どの報告への反応か。この2つが無いと保存できません。
+  postId: string | null;
+  communityId: string | null;
   authorName: string | null;
   postImageUrl: string | null;
+  // 送り終わったあと・やめたときに戻る先。元いた画面の住所です。
+  backHref: string;
 };
 
 const setupBrush = (ctx: CanvasRenderingContext2D, tool: Tool) => {
@@ -94,9 +96,13 @@ function ToolButton({ label, isActive, onClick, children }: ToolButtonProps) {
 }
 
 export default function DrawingPad({
+  postId,
+  communityId,
   authorName,
   postImageUrl,
+  backHref,
 }: DrawingPadProps) {
+  const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
   const lastPosRef = useRef<Point>({ x: 0, y: 0 });
@@ -108,7 +114,6 @@ export default function DrawingPad({
 
   const [tool, setTool] = useState<Tool>("pen");
   const [hasDrawn, setHasDrawn] = useState(false);
-  const [isSent, setIsSent] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
@@ -135,7 +140,7 @@ export default function DrawingPad({
     canvas.width = nextWidth;
     canvas.height = nextHeight;
     canvas.getContext("2d")?.scale(ratio, ratio);
-  }, [isSent]);
+  }, []);
 
   // 描く処理。canvas に直接くっつけています。
   // React 経由だと、途中で止まってスマホで描けないことがあったためです。
@@ -224,7 +229,7 @@ export default function DrawingPad({
       canvas.removeEventListener("touchend", onTouchEnd);
       canvas.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [isSent]);
+  }, []);
 
   const handleClear = () => {
     const canvas = canvasRef.current;
@@ -268,6 +273,10 @@ export default function DrawingPad({
         throw new Error("ログインしていません");
       }
 
+      if (postId === null || communityId === null) {
+        throw new Error("どの報告への反応か分かりません");
+      }
+
       const blob = await makePngBlob();
       if (blob === null) {
         throw new Error("画像への変換に失敗しました");
@@ -281,18 +290,22 @@ export default function DrawingPad({
         throw new Error("画像の保存: " + upload.error.message);
       }
 
-      const insert = await supabase.from("card_sends").insert({
-        template_id: TEMPLATE_ID,
+      // post_reactions = 報告への手書きリアクション。
+      // 年賀状などの card_sends とは別のテーブルです（schema.sql のコメント参照）。
+      const insert = await supabase.from("post_reactions").insert({
+        post_id: postId,
         from_user: data.user.id,
-        to_user: data.user.id,
-        community_id: COMMUNITY_ID,
+        community_id: communityId,
         drawing_url: path,
       });
       if (insert.error !== null) {
         throw new Error("保存に失敗: " + insert.error.message);
       }
 
-      setIsSent(true);
+      // 元いた画面へ戻ります。
+      // refresh() は、戻った先で反応を取り直させるための合図です。
+      router.push(backHref);
+      router.refresh();
     } catch (error) {
       setErrorText(
         error instanceof Error ? error.message : "不明なエラーが起きました",
@@ -302,25 +315,19 @@ export default function DrawingPad({
     }
   };
 
-  if (isSent) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-4">
-        <p className="text-lg font-bold text-stone-800">送信しました。</p>
-        <Link
-          href="/"
-          className="rounded-full bg-stone-800 px-6 py-3 text-sm font-bold text-white"
-        >
-          ホームに戻る
-        </Link>
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-full flex-col bg-stone-400">
       {/* 上半分：反応する相手のご報告 */}
       <div className="px-4 pb-4 pt-5">
         <div className="mb-2 flex items-center gap-2">
+          {/* やめるときの戻り道。44px 確保しています */}
+          <Link
+            href={backHref}
+            aria-label="やめる"
+            className="-ml-2 flex h-11 w-11 items-center justify-center text-xl text-white"
+          >
+            ×
+          </Link>
           <div className="h-7 w-7 rounded-full bg-stone-300" />
           <span className="text-sm text-white">{authorName ?? "ご報告"}</span>
         </div>

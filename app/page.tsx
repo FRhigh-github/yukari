@@ -37,16 +37,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     <div className="relative flex h-full flex-col">
       {/* shrink-0 = 場所が足りなくてもこのバーは縮めない */}
       <header className="flex shrink-0 items-center justify-between border-b border-stone-100 px-5 py-3">
+        {/* 作る・参加する・設定への入口も、この中にまとめてあります */}
         <CommunitySwitcher communities={communities} selectedId={selectedId} />
 
-        {/* コミュニティの管理画面へ（作る・参加する・招待コードを見る） */}
-        <Link
-          href="/communities"
-          aria-label="コミュニティの設定"
-          className="text-lg text-stone-400"
-        >
-          ⚙
-        </Link>
+        <span className="text-sm text-stone-400">🔔</span>
       </header>
 
       {members.length === 0 ? (
@@ -58,7 +52,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       ) : (
         // flex-1 = 残りの高さを全部つかう。マルはこの中に割り振られます。
         <div className="flex-1 px-3">
-          <MemberCircles members={members} />
+          <MemberCircles members={members} currentUserId={user.id} />
         </div>
       )}
 
