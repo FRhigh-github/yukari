@@ -3,24 +3,47 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* ▼ iOS のシステムフォント
+     -apple-system と BlinkMacSystemFont は
+     「その端末の標準フォントを使う」という意味の特別な指定です。
+     iPhone や Mac では San Francisco（Appleの標準書体）になります。
+     Hiragino Sans はヒラギノ角ゴ。日本語はこれが当たります。
+     Windows など、どれも無い端末では最後の sans-serif になります。 */
+  --font-ios: -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-ios);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ▼ ページ全体が動かないようにする
+   スマホのブラウザは、画面の端まで来てもさらに引っぱると
+   ページごと ぷるんと動きます（ラバーバンドと呼ばれます）。
+   body を position: fixed で画面に貼り付けると、これが起きなくなります。
+   スクロールは、中の main（layout.tsx）だけが受け持ちます。 */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
+  position: fixed;
+  inset: 0;
+
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-ios);
+
+  /* iOS の標準の本文サイズ */
+  font-size: 17px;
+
+  /* 長押ししたときに、文字が青く選択されるのを防ぎます */
+  -webkit-tap-highlight-color: transparent;
 }
