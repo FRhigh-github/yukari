@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 本番の速さを測るときの出力先（next.config.ts の distDir）
+/.next-prod/

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
+import OpeningAnimation from "@/components/OpeningAnimation";
 
 // フォントは globals.css で端末の標準フォントを指定しています。
 
@@ -34,13 +35,22 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ja" className="h-full antialiased">
+      <head>
+        {/* preconnect = その相手との接続だけ、先に始めておく指定。
+            アイコンは外部から読むので、画像のURLが分かってから
+            接続を始めると、そのぶん表示が遅れます。
+            スマホの回線ほど、この待ち時間が大きくなります。 */}
+        <link rel="preconnect" href="https://lh3.googleusercontent.com" />
+        <link rel="preconnect" href="https://i.pravatar.cc" />
+      </head>
       {/* 外側の灰色。PCで見たとき、アプリの外にあたる部分です */}
       <body className="min-h-full bg-stone-200">
         {/* アプリ本体。max-w-sm(384px) + mx-auto で、スマホ1台ぶんを真ん中に置きます。
             100dvh = 今この瞬間に見えている画面の高さ。
             スマホは上下のバーが出たり引っ込んだりするので、
             100vh だとはみ出します。dvh はそれに追従します。 */}
-        <div className="mx-auto flex h-full max-w-sm flex-col bg-white shadow-xl">
+        {/* relative = この枠の中を、位置指定の基準にする（オープニングがここに収まります） */}
+        <div className="relative mx-auto flex h-full max-w-sm flex-col bg-white shadow-xl">
           {/* 下タブは常に見えたまま、中身だけがスクロールします。
               min-h-0 = flex の中で overflow を効かせるために必要な指定。
               overscroll-contain = 中身を端まで送っても、外側に影響させない。
@@ -49,6 +59,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             {children}
           </main>
           <BottomNav />
+
+          {/* アプリを開いたときのアニメーション。
+              この枠いっぱいにかぶさるので、スマホの画面に収まります。 */}
+          <OpeningAnimation />
         </div>
       </body>
     </html>

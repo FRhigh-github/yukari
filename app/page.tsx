@@ -56,6 +56,31 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </div>
       )}
 
+      {/* 左下：届いたカードを見る手紙ボックス */}
+      <Link
+        href="/cards/inbox"
+        aria-label="届いたカード"
+        className="absolute bottom-4 left-4 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="22"
+          height="22"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-stone-600"
+        >
+          {/* 郵便受けの形。箱と、差し込み口と、旗 */}
+          <path d="M3 11h14a2 2 0 0 1 2 2v7H3z" />
+          <path d="M6 14h5" />
+          <path d="M19 13V5h-4" />
+        </svg>
+      </Link>
+
+      {/* 右下：ご報告を書く */}
       <Link
         href="/post"
         className="absolute bottom-4 right-4 rounded-full bg-stone-400 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
