@@ -11,6 +11,7 @@
 //   3. イベントがあれば events と event_date_options にも追加
 // します。
 //
+// 開封日は、紙の上の「○年○月○日の私たちへ」で選びます(その月の1日に開封されます)。
 // 「未来へ送る」を押すと封筒が出ます。
 // 封筒の画面で「○年○月○日の私たちへ」を入れると、上にスワイプして送れます。
 
@@ -858,10 +859,8 @@ export default function LetterPage() {
       {/* 紙(paperRef)を消さないよう、別の画面にせず上に重ねています */}
       {/* ===================================================== */}
       {showEnvelope && (
-        // 高さは画面いっぱい(inset-y-0)にして、下タブをこの間だけ隠します。
-        // 横幅は layout のスマホ1台ぶん(max-w-sm)に合わせ、PCでも横に広がらないようにします。
-        // left-1/2 と -translate-x-1/2 は、その幅のものを画面の真ん中に置く書き方です。
-        <div className="fixed inset-y-0 left-1/2 z-20 flex w-full max-w-sm -translate-x-1/2 items-center justify-center overflow-hidden bg-[#f3ede2]">
+        // 全画面で重ねるので、下タブもこの間は隠れます(不透明にして透けないようにする)
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#f3ede2]">
           <div className="flex w-full max-w-[430px] flex-col items-center gap-6 px-4">
             {/* 日付が入るまでは、スワイプできないことを伝える */}
             <p className={`text-sm ${canSwipe ? "text-stone-700" : "text-stone-400"}`}>
