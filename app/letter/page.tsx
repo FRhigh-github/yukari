@@ -11,7 +11,8 @@
 //   3. イベントがあれば events と event_date_options にも追加
 // します。
 //
-// ※ 封筒・スワイプの演出と、開封日の入力は、まだ作っていません。
+// 開封日は、紙の上の「○年○月の私たちへ」で選びます(その月の1日に開封されます)。
+// 「未来へ送る」を押すと封筒が出て、上にスワイプすると上の処理が始まります。
 
 // この画面はブラウザで動かします(ボタンや指の操作があるため)
 "use client";
@@ -33,8 +34,11 @@ const COMMUNITY_ID = "dfda40cd-2953-45b0-8620-26f03b9d7c58";
 // 画像を保存する Storage のバケット名(手書き機能と同じ場所)
 const BUCKET = "drawings";
 
-// 開封日を「送った日から何年後」にするか(開封日の入力を作るまでの仮の値)
-const OPEN_AFTER_YEARS = 1;
+// 開封日の年を、今年から何年先まで選べるようにするか
+const MAX_YEARS_AHEAD = 30;
+
+// 封筒を上に何px以上スワイプしたら「送る」とみなすか
+const SWIPE_SEND_DISTANCE = 120;
 
 // =====================================================
 // 見た目の設定(画面と PNG 画像で同じ値を使います)
@@ -177,6 +181,37 @@ export default function LetterPage() {
 
   // パネルで入力中のイベント(パネルを閉じているときは null)
   const [draft, setDraft] = useState<EventPlan | null>(null);
+
+  // ===== 開封日(何年何月の私たちへ) =====
+  // 封筒の画面で入力します。最初は空(""＝未入力)。
+  // select の値は文字で届くので、文字のまま持ち、使うときに Number() で数にします
+  const [openYear, setOpenYear] = useState("");
+  const [openMonth, setOpenMonth] = useState("");
+  const [openDay, setOpenDay] = useState("");
+
+  // 選べる年の一覧(今年〜30年先)
+  const thisYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: MAX_YEARS_AHEAD + 1 }, (_, i) => thisYear + i);
+
+  // 開封日。月は 0 始まりなので -1 します
+  const openDate = new Date(Number(openYear), Number(openMonth) - 1, Number(openDay));
+
+  // 3つ入力済みで、2月30日のような存在しない日でないか
+  // (存在しない日だと Date が翌月にずらすので、月が変わっていないかで見分けます)
+  const isDateValid =
+    openYear !== "" &&
+    openMonth !== "" &&
+    openDay !== "" &&
+    openDate.getMonth() === Number(openMonth) - 1;
+
+  // スワイプして送れるのは、未来の日付が入っているときだけ
+  const canSwipe = isDateValid && openDate > new Date();
+
+  // ===== 封筒のスワイプのための状態 =====
+  const [showEnvelope, setShowEnvelope] = useState(false); // 封筒を出しているか
+  const [swipeY, setSwipeY] = useState(0); // 上に何px動かしたか
+  // 指を置いた高さ(画面に出さないので useRef)。触っていないときは null
+  const swipeStartRef = useRef<number | null>(null);
 
   // ===== 送信のための状態 =====
   const [isSending, setIsSending] = useState(false); // 送信中かどうか
@@ -474,9 +509,8 @@ export default function LetterPage() {
       }
 
       // ----- 4. time_capsules に手紙を追加する -----
-      // 開封日(仮)：いまの日時から OPEN_AFTER_YEARS 年後
-      const openAt = new Date();
-      openAt.setFullYear(openAt.getFullYear() + OPEN_AFTER_YEARS);
+      // 開封日：封筒の画面で入れた年月日
+      const openAt = openDate;
 
       // body にはテキストの中身をつなげて入れます(なければ null)
       const bodyText = items
@@ -535,6 +569,57 @@ export default function LetterPage() {
       setErrorText(message);
     } finally {
       setIsSending(false);
+      // 失敗したときにエラーが見えるよう、封筒は閉じます(成功時は送信完了の画面になります)
+      setShowEnvelope(false);
+      setSwipeY(0);
+    }
+  }
+
+  // =====================================================
+  // 封筒とスワイプ
+  // =====================================================
+
+  // ----- 「未来へ送る」を押したとき:封筒を出す -----
+  function openEnvelope() {
+    if (!hasContent) {
+      setErrorText("手紙に何か書いてから送ってください");
+      return;
+    }
+    setErrorText(null);
+    setSelectedId(null);
+    setSwipeY(0);
+    setShowEnvelope(true);
+  }
+
+  // ----- 指を置いた -----
+  function handleSwipeStart(e: PointerEvent<HTMLDivElement>) {
+    // 日付が入るまでは、スワイプできません(未来の日付でないと、送ってすぐ開けられてしまうため)
+    if (isSending || !canSwipe) {
+      return;
+    }
+    e.currentTarget.setPointerCapture(e.pointerId);
+    swipeStartRef.current = e.clientY;
+  }
+
+  // ----- 指を動かしている間:上に動いたぶんだけ封筒を持ち上げる -----
+  function handleSwipeMove(e: PointerEvent<HTMLDivElement>) {
+    if (swipeStartRef.current === null) {
+      return;
+    }
+    // 下に動かしても 0 のまま(マイナスにならないようにする)
+    setSwipeY(Math.max(0, swipeStartRef.current - e.clientY));
+  }
+
+  // ----- 指を離した:十分上がっていたら送る。足りなければ元に戻す -----
+  function handleSwipeEnd() {
+    if (swipeStartRef.current === null) {
+      return;
+    }
+    swipeStartRef.current = null;
+    if (swipeY >= SWIPE_SEND_DISTANCE) {
+      handleSend();
+    } else {
+      setSwipeY(0);
     }
   }
 
@@ -542,6 +627,9 @@ export default function LetterPage() {
   function resetAll() {
     setItems([]);
     setEventPlan(null);
+    setOpenYear("");
+    setOpenMonth("");
+    setOpenDay("");
     setSelectedId(null);
     setErrorText(null);
     setIsSent(false);
@@ -741,12 +829,12 @@ export default function LetterPage() {
         {/* ===== 「未来へ送る」ボタン ===== */}
         <button
           type="button"
-          onClick={handleSend}
+          onClick={openEnvelope}
           // 送信中は押せないようにします(2回送ってしまうのを防ぐため)
           disabled={isSending}
           className="relative -mt-5 mr-2 flex items-center gap-2 self-end rounded-full bg-stone-700 px-4 py-2 text-sm text-white shadow disabled:opacity-60"
         >
-          {isSending ? "送信中…" : "未来へ送る"}
+          未来へ送る
           {SendIcon}
         </button>
 
@@ -755,6 +843,114 @@ export default function LetterPage() {
           <p className="mt-3 text-sm text-red-600">{errorText}</p>
         )}
       </div>
+
+      {/* ===================================================== */}
+      {/* 封筒(上にスワイプして送る) */}
+      {/* 紙(paperRef)を消さないよう、別の画面にせず上に重ねています */}
+      {/* ===================================================== */}
+      {showEnvelope && (
+        // 全画面で重ねるので、下タブもこの間は隠れます(不透明にして透けないようにする)
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#f3ede2]">
+          <div className="flex w-full max-w-[430px] flex-col items-center gap-6 px-4">
+            {/* 日付が入るまでは、スワイプできないことを伝える */}
+            <p className={`text-sm ${canSwipe ? "text-stone-700" : "text-stone-400"}`}>
+              {canSwipe ? "↑ スワイプして送信" : "未来の日付を入れるとスワイプできます"}
+            </p>
+
+            {/* 封筒本体。touchAction: none = 指の上下の動きで画面がスクロールしないようにする */}
+            <div
+              onPointerDown={handleSwipeStart}
+              onPointerMove={handleSwipeMove}
+              onPointerUp={handleSwipeEnd}
+              onPointerCancel={handleSwipeEnd}
+              style={{
+                transform: `translateY(${-swipeY}px)`,
+                opacity: 1 - Math.min(swipeY / (SWIPE_SEND_DISTANCE * 2), 0.5),
+                // 指で動かしている間は遅れず追いかけ、離したら元へなめらかに戻す
+                transition: swipeStartRef.current === null ? "transform 0.2s" : "none",
+                touchAction: "none",
+              }}
+              // 日付が未入力のあいだは薄くして、動かせないことを見た目でも伝える
+              className={`relative flex h-52 w-full select-none items-center justify-center rounded-xl bg-[#fdfbf5] shadow-lg ${
+                canSwipe ? "cursor-grab" : "opacity-60"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="#a8a29e" strokeWidth="0.6" className="absolute inset-0 h-full w-full" preserveAspectRatio="none">
+                <path d="M0 3l12 9 12-9" />
+              </svg>
+              {isSending && (
+                <span className="relative rounded-full bg-stone-700 px-4 py-2 text-sm text-white">
+                  送信中…
+                </span>
+              )}
+            </div>
+
+            {/* ===== 何年何月何日の私たちへ ===== */}
+            {/* 数を選ぶだけなので、select を3つ並べています(高さ h-11 = 44px) */}
+            <div className="flex flex-wrap items-center justify-center gap-1 text-sm">
+              <select
+                value={openYear}
+                onChange={(e) => setOpenYear(e.target.value)}
+                aria-label="開封する年"
+                className="h-11 rounded-lg bg-[#fdfbf5] px-2 shadow-sm"
+              >
+                <option value="">----</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+              年
+              <select
+                value={openMonth}
+                onChange={(e) => setOpenMonth(e.target.value)}
+                aria-label="開封する月"
+                className="h-11 rounded-lg bg-[#fdfbf5] px-2 shadow-sm"
+              >
+                <option value="">--</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              月
+              <select
+                value={openDay}
+                onChange={(e) => setOpenDay(e.target.value)}
+                aria-label="開封する日"
+                className="h-11 rounded-lg bg-[#fdfbf5] px-2 shadow-sm"
+              >
+                <option value="">--</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              日の私たちへ
+            </div>
+
+            {/* 入れた日付が過去・存在しない日のときの案内 */}
+            {isDateValid && !canSwipe && (
+              <p className="text-xs text-red-500">未来の日付を選んでください</p>
+            )}
+            {openYear !== "" && openMonth !== "" && openDay !== "" && !isDateValid && (
+              <p className="text-xs text-red-500">存在しない日付です</p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowEnvelope(false)}
+              disabled={isSending}
+              className="h-11 px-4 text-sm text-stone-500 disabled:opacity-40"
+            >
+              やめる
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ===================================================== */}
       {/* イベントのパネル(draft が null でないときだけ表示) */}
