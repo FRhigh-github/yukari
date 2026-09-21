@@ -34,6 +34,14 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ja" className="h-full antialiased">
+      <head>
+        {/* preconnect = その相手との接続だけ、先に始めておく指定。
+            アイコンは外部から読むので、画像のURLが分かってから
+            接続を始めると、そのぶん表示が遅れます。
+            スマホの回線ほど、この待ち時間が大きくなります。 */}
+        <link rel="preconnect" href="https://lh3.googleusercontent.com" />
+        <link rel="preconnect" href="https://i.pravatar.cc" />
+      </head>
       {/* 外側の灰色。PCで見たとき、アプリの外にあたる部分です */}
       <body className="min-h-full bg-stone-200">
         {/* アプリ本体。max-w-sm(384px) + mx-auto で、スマホ1台ぶんを真ん中に置きます。
