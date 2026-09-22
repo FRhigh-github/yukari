@@ -6,13 +6,28 @@
 
 import Link from "next/link";
 import CommunityCreateForm from "@/components/CommunityCreateForm";
+import HintOverlay from "@/components/HintOverlay";
+import { SHOW_HINTS } from "@/lib/tutorial";
 
-export default function NewCommunityPage() {
+export default async function NewCommunityPage({
+  searchParams,
+}: PageProps<"/communities/new">) {
+  // ?from=start = アカウントを作った直後に来た人
+  const { from } = await searchParams;
+  const isFirstTime = from === "start";
+
   return (
-    <main className="space-y-6 p-6 pb-24">
+    <main className="relative space-y-6 p-6 pb-24">
+      {SHOW_HINTS && isFirstTime ? (
+        <HintOverlay text="家族、友だち、部活。呼びたい人の顔ぶれで分けます。" />
+      ) : null}
+
       <div>
-        <Link href="/" className="text-sm text-stone-500">
-          ← ホーム
+        <Link
+          href={isFirstTime ? "/start" : "/"}
+          className="text-sm text-stone-500"
+        >
+          ← {isFirstTime ? "戻る" : "ホーム"}
         </Link>
         <h1 className="mt-2 text-xl font-bold text-stone-800">
           コミュニティを作る

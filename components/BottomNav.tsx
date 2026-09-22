@@ -11,6 +11,7 @@ const HIDE_NAV = [
   "/login",
   "/signup",
   "/setup",
+  "/start",
   "/recover",
   "/draw",
   "/cards/new",

@@ -101,7 +101,7 @@ export default function CommunitySwitcher({
                   onClick={() => setIsOpen(false)}
                   className="flex h-12 cursor-pointer items-center px-5 text-sm text-stone-600"
                 >
-                  ＋ 新しく作る
+                  ＋ コミュニティを新しく作る
                 </Link>
                 <Link
                   href="/communities/join"

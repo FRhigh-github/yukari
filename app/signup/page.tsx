@@ -14,6 +14,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import GoogleButton from "@/components/GoogleButton";
+import PasswordField from "@/components/PasswordField";
+import KnotMark from "@/components/KnotMark";
+import { toJapanese } from "@/lib/authMessage";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -32,7 +35,8 @@ export default function SignupPage() {
     const { data, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
-      setMessage(error.message);
+      // Supabase は英語で返してくるので、日本語に直して出します
+      setMessage(toJapanese(error.message));
       setIsSending(false);
       return;
     }
@@ -53,7 +57,9 @@ export default function SignupPage() {
 
   return (
     <main className="flex h-full flex-col justify-center gap-5 p-8">
-      <h1 className="text-2xl font-bold text-stone-800">はじめる</h1>
+      <KnotMark />
+
+      <h1 className="text-center text-xl font-bold text-stone-800">はじめる</h1>
 
       <form onSubmit={handleSignup} className="space-y-3">
         <Field label="メールアドレス">
@@ -67,14 +73,11 @@ export default function SignupPage() {
         </Field>
 
         <Field label="パスワード">
-          <input
-            required
-            type="password"
-            minLength={6}
+          <PasswordField
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={setPassword}
             placeholder="6文字以上"
-            className="w-full bg-transparent text-sm text-stone-800 focus:outline-none"
+            minLength={6}
           />
         </Field>
 
@@ -96,7 +99,7 @@ export default function SignupPage() {
         <span className="h-px flex-1 bg-stone-200" />
       </div>
 
-      <GoogleButton label="Googleではじめる" />
+      <GoogleButton label="Googleではじめる" from="signup" />
 
       <Link href="/login" className="text-center text-xs text-stone-500">
         すでにアカウントをお持ちの方

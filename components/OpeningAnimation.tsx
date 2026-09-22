@@ -332,10 +332,19 @@ export default function OpeningAnimation() {
       }
     };
 
-    // 「ゆかり」の文字。線をなぞるように出します
+    // 「ゆかり」の文字。線をなぞるように出します。
+    //
+    // 書き順の制御（stroke-dasharray）を入れ終えたので、ここで見える状態に戻します。
+    // HTML側では opacity=0 にしてあります。そうしないと、
+    // ここへ来るまでの一瞬だけ、完成した文字が見えてしまいます。
+    const lettering = svg.querySelector<SVGGElement>("#lettering");
+    if (lettering !== null) lettering.style.opacity = "1";
+
     const letters = [...svg.querySelectorAll<SVGPathElement>("#lettering path")].map((el) => {
       const length = el.getTotalLength();
       el.style.strokeDasharray = `${length} ${length}`;
+      // 線の長さぶんずらして、まだ1本も描かれていない状態にしておきます
+      el.style.strokeDashoffset = `${length}`;
       return {
         el,
         length,
@@ -497,6 +506,15 @@ export default function OpeningAnimation() {
         />
         <g
           id="lettering"
+          // ▼ 最初は隠しておきます。
+          //
+          //   「ゆかり」の線はHTMLに最初から書いてあるので、
+          //   何もしないと、JSが描き始めるまでの一瞬だけ
+          //   完成した文字がそのまま見えてしまいます。
+          //
+          //   JSは1コマ目で opacity を 1 に戻します。
+          //   （書き順の制御は stroke-dasharray でやっています）
+          opacity={0}
           fill="none"
           stroke="#282b27"
           strokeWidth="3.2"
@@ -513,10 +531,14 @@ export default function OpeningAnimation() {
         </g>
       </svg>
 
-      <p className="absolute bottom-16 text-[11px] tracking-[0.22em] text-[#767a72]">
+      {/* ▼ 案内の文字は、少し遅れて出します。
+          HTMLは先に届きますが、紐はJSが描き始めてから現れます。
+          そのため何もしないと、紐より先に文字だけが一瞬見えます。
+          opening-caption は globals.css で「0.35秒待ってから浮かび上がる」指定です。 */}
+      <p className="opening-caption absolute bottom-16 text-[11px] tracking-[0.22em] text-[#767a72]">
         糸がむすぶ、ゆかり。
       </p>
-      <p className="absolute bottom-8 text-[10px] text-stone-400">
+      <p className="opening-caption absolute bottom-8 text-[10px] text-stone-400">
         {isDone ? "画面を押してはじめる" : "画面を押すと飛ばせます"}
       </p>
     </div>

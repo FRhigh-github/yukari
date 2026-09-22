@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
+import CameraBadge from "@/components/CameraBadge";
 import BirthdayPicker from "@/components/BirthdayPicker";
 
 type SetupFormProps = {
@@ -91,7 +92,10 @@ export default function SetupForm({
 
       if (error) throw new Error(error.message);
 
-      router.push("/");
+      // ▼ ホームではなく、まず「入る／作る」を選ぶ画面へ。
+      //   この時点ではどのコミュニティにも入っていないので、
+      //   ホームへ送っても誰もいない相関図が出るだけになります。
+      router.push("/start");
       router.refresh();
     } catch (setupError) {
       setMessage(
@@ -103,13 +107,22 @@ export default function SetupForm({
 
   return (
     <form onSubmit={handleStart} className="space-y-4">
-      {/* ▼ アイコン。押すと写真を選べます */}
+      {/* ▼ アイコン。押すと写真を選べます。
+          丸があるだけでは押せると気づかれないので、
+          カメラの印を右下に重ねています。 */}
       <label className="mx-auto block w-24 cursor-pointer text-center">
-        <span
-          className="mx-auto block h-24 w-24 rounded-full bg-stone-100 bg-cover bg-center"
-          style={preview ? { backgroundImage: `url("${preview}")` } : undefined}
-        />
-        <span className="mt-1 block text-xs text-stone-500">アイコン</span>
+        <span className="relative mx-auto block h-24 w-24">
+          <span
+            className="block h-24 w-24 rounded-full bg-stone-100 bg-cover bg-center"
+            style={
+              preview ? { backgroundImage: `url("${preview}")` } : undefined
+            }
+          />
+          <CameraBadge />
+        </span>
+        <span className="mt-1 block text-xs text-stone-500">
+          写真を選ぶ
+        </span>
         <input
           type="file"
           accept="image/*"

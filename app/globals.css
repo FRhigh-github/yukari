@@ -63,6 +63,28 @@ body {
   display: none;
 }
 
+/* ▼ オープニングの案内文を、少し遅れて出します。
+   紐はJSが描き始めてから現れるので、何もしないと
+   文字だけが先に一瞬見えてしまいます。
+   forwards = 終わったあとの状態（見えている）を保ちます。 */
+@keyframes opening-caption-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.opening-caption {
+  opacity: 0;
+  animation: opening-caption-in 0.5s ease 0.35s forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opening-caption {
+    opacity: 1;
+    animation: none;
+  }
+}
+
 /* ▼ 一度見たあとのオープニングを、描かれる前に隠します。
    目印（data-opening-seen）は layout.tsx の小さな処理が付けます。
    JavaScript が動き出すのを待たないので、ちらつきません。 */

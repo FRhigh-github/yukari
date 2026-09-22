@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getHomeData } from "@/lib/home";
 import MemberCircles from "@/components/MemberCircles";
 import CommunitySwitcher from "@/components/CommunitySwitcher";
 import PullToRefresh from "@/components/PullToRefresh";
 import RecoveryNotice from "@/components/RecoveryNotice";
+import HintOverlay from "@/components/HintOverlay";
+import { SHOW_HINTS } from "@/lib/tutorial";
 
 // 画面の真ん中に、文と案内ボタンを1つ出すだけの小さな部品
 function Notice({ text, href, label }: { text: string; href: string; label: string }) {
@@ -22,7 +25,8 @@ function Notice({ text, href, label }: { text: string; href: string; label: stri
 
 // searchParams = URL の ? より後ろ。/?c=xxxx の xxxx を受け取ります。
 export default async function Home({ searchParams }: PageProps<"/">) {
-  const { c } = await searchParams;
+  // tour=1 は、アカウントを作ってから初めてホームに来た人です
+  const { c, tour } = await searchParams;
 
   // ?c=a&c=b のように2回書かれると配列になるので、文字列のときだけ使います
   const selectedId = typeof c === "string" ? c : null;
@@ -32,9 +36,15 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const { user, communities, members, currentId, recoveryRequests } =
     await getHomeData(selectedId);
 
-  if (user === null) {
-    return <Notice text="ログインしてください" href="/login" label="ログインへ" />;
-  }
+  // ▼ ログインしていない人は、ここで追い返します。
+  //
+  //   前は「ログインしてください」と書いた画面を出していましたが、
+  //   その前にオープニングが流れてしまい、
+  //   「アニメーション → ホーム → ログイン」という順番になっていました。
+  //
+  //   redirect は画面を作る前に止めるので、何も表示されません。
+  //   ログインが済んでから戻ってきたときに、初めて紐が流れます。
+  if (user === null) redirect("/login");
 
   return (
     // h-full = 親（layout の main）からもらった高さいっぱい。
@@ -47,6 +57,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
         <span className="text-sm text-stone-400">🔔</span>
       </header>
+
+      {/* 初めての人にだけ、一言そえます */}
+      {SHOW_HINTS && tour === "1" ? (
+        <HintOverlay text="まん中が自分。まわりの人を押すと、その人のご報告が見られます。" />
+      ) : null}
 
       {/* 復旧の申請が出ていれば、いちばん上に知らせます */}
       <RecoveryNotice requests={recoveryRequests} />

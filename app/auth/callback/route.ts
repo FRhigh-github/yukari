@@ -10,6 +10,9 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
 
+  // 交換に失敗したときの理由を、あとで画面に出すために控えておきます
+  let exchangeError: string | null = null
+
   if (code) {
     const supabase = await createClient()
 
@@ -29,12 +32,40 @@ export async function GET(request: Request) {
         .eq('id', data.user.id)
         .maybeSingle()
 
-      if (!profile?.birthday) return NextResponse.redirect(`${origin}/setup`)
+      // ▼ 初めての人には、そのことを伝えます。
+      //
+      //   Googleは「初めてか、2回目か」を区別してくれません。
+      //   押した時点でアカウントが作られてしまうので、
+      //   「ログインしたつもりが、新しく作られていた」ことが起こります。
+      //   気づかないまま進むと、前のアカウントの中身が見えずに戸惑います。
+      if (!profile?.birthday) {
+        // ログイン画面から押した人にだけ知らせます。
+        // サインアップ画面から押した人は、作るつもりで押しているので不要です。
+        const isFromLogin = searchParams.get('from') === 'login'
+
+        return NextResponse.redirect(
+          `${origin}/setup${isFromLogin ? '?new=1' : ''}`,
+        )
+      }
 
       return NextResponse.redirect(`${origin}/`)
     }
+
+    exchangeError = error.message
   }
 
-  // code がない、または交換に失敗した場合はログイン画面へ戻す
-  return NextResponse.redirect(`${origin}/login?error=1`)
+  // ▼ ここへ来るのは、うまくいかなかったときです。
+  //
+  //   Google 側で断られた場合、?error=... と ?error_description=... が付いてきます。
+  //   何も出さずにログイン画面へ戻すと「押したのに戻された」としか分からないので、
+  //   理由をそのまま持って帰って、画面に出します。
+  const reason =
+    searchParams.get('error_description') ??
+    searchParams.get('error') ??
+    exchangeError ??
+    'Googleから返事がありませんでした'
+
+  return NextResponse.redirect(
+    `${origin}/login?error=${encodeURIComponent(reason)}`,
+  )
 }

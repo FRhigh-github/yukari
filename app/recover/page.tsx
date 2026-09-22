@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import KnotMark from "@/components/KnotMark";
 
 // ブラウザに覚えさせるときの名前
 const SAVED_KEY = "yukari-recovery-request";
@@ -110,8 +111,10 @@ export default function RecoverPage() {
 
   return (
     <main className="flex h-full flex-col justify-center gap-5 p-8">
+      <KnotMark />
+
       <div>
-        <h1 className="text-2xl font-bold text-stone-800">思い出ログイン</h1>
+        <h1 className="text-xl font-bold text-stone-800">思い出ログイン</h1>
         <p className="mt-2 text-xs leading-relaxed text-stone-500">
           同じコミュニティの3人に、それぞれコードを発行してもらってください。
           3つそろうと、24時間後にログインできます。

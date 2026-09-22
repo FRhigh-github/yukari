@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
+import CameraBadge from "@/components/CameraBadge";
 import { MOODS } from "@/lib/mood";
 import BirthdayPicker from "@/components/BirthdayPicker";
 
@@ -120,14 +121,29 @@ export default function ProfileForm({
     <div className="pb-24">
       {/* ▼ アイコン */}
       <section className="flex flex-col items-center gap-2 bg-[#fdf6f0] py-6">
-        <div
-          className="h-24 w-24 rounded-full bg-white bg-cover bg-center shadow-sm"
-          style={preview ? { backgroundImage: `url("${preview}")` } : undefined}
-        />
+        {/* label で囲むと、写真の丸そのものを押して選べます。
+            カメラの印は「押せる」ことに気づいてもらうためです。 */}
+        <label className="relative block h-24 w-24 cursor-pointer">
+          <span
+            className="block h-24 w-24 rounded-full bg-white bg-cover bg-center shadow-sm"
+            style={
+              preview ? { backgroundImage: `url("${preview}")` } : undefined
+            }
+          />
+          <CameraBadge />
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) handlePick(file);
+            }}
+          />
+        </label>
 
-        {/* label で囲むと、文字を押しても写真を選べます */}
         <label className="cursor-pointer text-xs text-stone-500">
-          アイコンを編集
+          写真を変える
           <input
             type="file"
             accept="image/*"

@@ -21,11 +21,20 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: "portrait",
     icons: [
       {
-        // app/icon.svg に置いたあわじ結び。
+        // app/icon.svg に置いた結び目。
         // svg は大きさを持たないので、どの端末でもきれいに出ます。
         src: "/icon.svg",
         sizes: "any",
         type: "image/svg+xml",
+      },
+      {
+        // ▼ iPhone のホーム画面は svg を受け付けません。
+        //   同じ絵を 512px の png にしたものを、こちらに置いています。
+        //   （app/apple-icon.png という名前にすると、
+        //     Next.js が apple-touch-icon としても出してくれます）
+        src: "/apple-icon.png",
+        sizes: "512x512",
+        type: "image/png",
       },
     ],
   };

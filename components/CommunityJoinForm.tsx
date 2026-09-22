@@ -4,7 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function CommunityJoinForm() {
+type CommunityJoinFormProps = {
+  // アカウントを作った直後に来たかどうか。行き先を変えるのに使います。
+  isFirstTime?: boolean;
+};
+
+export default function CommunityJoinForm({
+  isFirstTime = false,
+}: CommunityJoinFormProps) {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -29,7 +36,8 @@ export default function CommunityJoinForm() {
     // 参加できたら、そのままホームへ戻します。
     // 「参加しました」とだけ出して同じ画面に残ると、
     // 次に何をすればいいのか分からなくなるためです。
-    router.push("/");
+    // 初めての人（/start から来た人）には、ホームで一言だけ案内を出します
+    router.push(isFirstTime ? "/?tour=1" : "/");
     router.refresh();
   };
 
