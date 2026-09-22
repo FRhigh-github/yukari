@@ -15,10 +15,24 @@ export async function GET(request: Request) {
 
     // code を渡して、ログイン情報（セッション）に交換してもらう。
     // 成功すると、Cookieにログイン状態が保存される。
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-    // 問題なければトップページへ送る
-    if (!error) return NextResponse.redirect(`${origin}/`)
+    if (!error) {
+      // ▼ 初めての人か、すでに使っている人かで行き先を変えます。
+      //
+      //   Googleは名前とアイコンはくれますが、誕生日はくれません。
+      //   なので誕生日が空なら「まだ入力していない人」とみなして、
+      //   アカウント情報の入力画面へ送ります。
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('birthday')
+        .eq('id', data.user.id)
+        .maybeSingle()
+
+      if (!profile?.birthday) return NextResponse.redirect(`${origin}/setup`)
+
+      return NextResponse.redirect(`${origin}/`)
+    }
   }
 
   // code がない、または交換に失敗した場合はログイン画面へ戻す

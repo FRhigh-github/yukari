@@ -1,9 +1,11 @@
-// ログイン画面です。
+// アカウントを作る画面です。
 //
-// 入り方は3つ。
-//   ・メールとパスワード
-//   ・Google
-//   ・思い出ログイン（メールもGoogleも失った人が、仲間の力で戻る道）
+// ここで決めるのは「入るための鍵」だけです（メールとパスワード、またはGoogle）。
+// 名前や誕生日は次の /setup で入力してもらいます。
+//
+// 分けている理由は Google です。
+// Googleは一度外のページに飛ぶので、同じ画面で名前を書いてもらうと消えてしまいます。
+// どちらの道も必ず /setup を通る形にすれば、記入漏れが起きません。
 
 "use client";
 
@@ -13,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import GoogleButton from "@/components/GoogleButton";
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -21,34 +23,39 @@ export default function LoginPage() {
   const [isSending, setIsSending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const handleLogin = async (event: React.FormEvent) => {
+  const handleSignup = async (event: React.FormEvent) => {
     event.preventDefault();
     setMessage(null);
     setIsSending(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
-      // 「メールが違う」「パスワードが違う」を区別して出しません。
-      // どちらか分かると、登録済みのメールを探られる手がかりになります。
-      setMessage("メールアドレスかパスワードが違います");
+      setMessage(error.message);
       setIsSending(false);
       return;
     }
 
-    router.push("/");
+    // ▼ メールの確認が必要な設定だと、ここではまだログインできていません。
+    //   その場合は session が空で返ってきます。
+    if (data.session === null) {
+      setMessage(
+        "確認メールを送りました。メールのリンクを開いてから、ログインしてください。",
+      );
+      setIsSending(false);
+      return;
+    }
+
+    router.push("/setup");
     router.refresh();
   };
 
   return (
     <main className="flex h-full flex-col justify-center gap-5 p-8">
-      <h1 className="text-2xl font-bold text-stone-800">ゆかり</h1>
+      <h1 className="text-2xl font-bold text-stone-800">はじめる</h1>
 
-      <form onSubmit={handleLogin} className="space-y-3">
+      <form onSubmit={handleSignup} className="space-y-3">
         <Field label="メールアドレス">
           <input
             required
@@ -63,8 +70,10 @@ export default function LoginPage() {
           <input
             required
             type="password"
+            minLength={6}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            placeholder="6文字以上"
             className="w-full bg-transparent text-sm text-stone-800 focus:outline-none"
           />
         </Field>
@@ -74,33 +83,29 @@ export default function LoginPage() {
           disabled={isSending}
           className="w-full cursor-pointer rounded-full bg-stone-800 py-3 text-sm font-bold text-white disabled:opacity-40"
         >
-          {isSending ? "確認中..." : "ログイン"}
+          {isSending ? "登録中..." : "登録する"}
         </button>
       </form>
 
       {message ? <p className="text-xs text-red-600">{message}</p> : null}
 
+      {/* 線と「または」。左右の線は flex-1 で余白いっぱいに伸ばします */}
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-stone-200" />
         <span className="text-[10px] text-stone-400">または</span>
         <span className="h-px flex-1 bg-stone-200" />
       </div>
 
-      <GoogleButton label="Googleでログイン" />
+      <GoogleButton label="Googleではじめる" />
 
-      <div className="flex flex-col items-center gap-2">
-        <Link href="/recover" className="text-xs text-stone-500 underline">
-          メールもパスワードも分からない（思い出ログイン）
-        </Link>
-
-        <Link href="/signup" className="text-xs text-stone-500">
-          はじめての方はこちら
-        </Link>
-      </div>
+      <Link href="/login" className="text-center text-xs text-stone-500">
+        すでにアカウントをお持ちの方
+      </Link>
     </main>
   );
 }
 
+// 入力欄1つぶん。上に項目名、下に線を引いた入力欄。
 function Field({
   label,
   children,

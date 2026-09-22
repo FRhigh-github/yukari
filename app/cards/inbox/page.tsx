@@ -17,22 +17,24 @@ export default async function CardInboxPage({
   //   前は「本人確認 → その id でカードを絞る」と2段階でしたが、
   //   RLS が「自分が関わったカードしか返さない」ので、
   //   先に全部もらって、届いた／送ったの仕分けはこちらでやります。
-  const [userResult, { data: allCards }] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase
-      .from("card_sends")
-      .select("id, message, sent_at, from_user, to_user, template_id, drawing_url")
-      .order("sent_at", { ascending: false }),
-  ]);
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
 
-  const user = userResult.data.user;
-
-  const cards =
-    user === null
-      ? null
-      : (allCards?.filter((card) =>
-          isSent ? card.from_user === user.id : card.to_user === user.id,
-        ) ?? null);
+  // ▼ 前は本人確認と同時に「全部」取って、こちら側で選り分けていました。
+  //   1往復ぶん速くなりますが、届いたぶんが欲しいときに
+  //   送ったぶんまで運んでくることになります。
+  //   欲しいほうだけをDBに絞ってもらうほうが、結局は軽く済みます。
+  //
+  //   message は画面で使っていないので外しました。
+  //   drawing_data（置いたものの一覧）も、ここでは要りません。
+  const { data: cards } = user
+    ? await supabase
+        .from("card_sends")
+        .select("id, sent_at, from_user, to_user, template_id, drawing_url")
+        .eq(isSent ? "from_user" : "to_user", user.id)
+        .order("sent_at", { ascending: false })
+        .limit(50)
+    : { data: null };
 
   // カードの絵は cards という保管庫に入っています。
   // 非公開なので、見るには期限付きの URL を発行してもらいます（1時間）。

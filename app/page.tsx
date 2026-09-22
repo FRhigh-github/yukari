@@ -3,6 +3,7 @@ import { getHomeData } from "@/lib/home";
 import MemberCircles from "@/components/MemberCircles";
 import CommunitySwitcher from "@/components/CommunitySwitcher";
 import PullToRefresh from "@/components/PullToRefresh";
+import RecoveryNotice from "@/components/RecoveryNotice";
 
 // 画面の真ん中に、文と案内ボタンを1つ出すだけの小さな部品
 function Notice({ text, href, label }: { text: string; href: string; label: string }) {
@@ -28,7 +29,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   // currentId = 実際に見ているコミュニティ。
   // ?c= が無いときは、getHomeData が一番上を選んで返してくれます。
-  const { user, communities, members, currentId } =
+  const { user, communities, members, currentId, recoveryRequests } =
     await getHomeData(selectedId);
 
   if (user === null) {
@@ -46,6 +47,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
         <span className="text-sm text-stone-400">🔔</span>
       </header>
+
+      {/* 復旧の申請が出ていれば、いちばん上に知らせます */}
+      <RecoveryNotice requests={recoveryRequests} />
 
       {members.length === 0 ? (
         <Notice

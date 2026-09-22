@@ -7,7 +7,14 @@ import { usePathname } from "next/navigation";
 // 下タブを出さない画面。ここに URL を足せば、その画面ではタブが消えます。
 // /cards/new は下に道具の棚があるので、重ねると送信ボタンが隠れます。
 // 作っている最中の画面なので、/draw と同じくタブは出しません。
-const HIDE_NAV = ["/login", "/draw", "/cards/new"];
+const HIDE_NAV = [
+  "/login",
+  "/signup",
+  "/setup",
+  "/recover",
+  "/draw",
+  "/cards/new",
+];
 
 // アイコンは形（svg の中身）だけを持たせています。
 // 4つとも同じ大きさ・同じ線の太さなので、囲いの部分は下で1回だけ書きます。

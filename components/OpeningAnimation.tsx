@@ -13,7 +13,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+
+// ▼ オープニングを流さない画面
+//
+//   ログインやサインアップの最中に紐が出てくると、
+//   入るという目的の邪魔になります。
+//   入ったあと（ホームに着いたとき）に流すほうが、始まりらしくなります。
+const SKIP_PATHS = ["/login", "/signup", "/setup", "/recover"];
 
 // 元は9.65秒。起動のたびに長いので、少し早送りで流します。
 // 数字を大きくするほど速くなります。
@@ -27,6 +34,11 @@ const SEEN_KEY = "yukari-opening-seen";
 
 export default function OpeningAnimation() {
   const router = useRouter();
+
+  // 今どの画面にいるか。ログイン系の画面では流しません。
+  // この判定はサーバー側でも行われるので、一瞬ちらつくこともありません。
+  const pathname = usePathname();
+  const isSkipped = SKIP_PATHS.includes(pathname);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -78,7 +90,7 @@ export default function OpeningAnimation() {
   };
 
   useEffect(() => {
-    if (!isShown) return;
+    if (!isShown || isSkipped) return;
 
     const svg = svgRef.current;
     const box = boxRef.current;
@@ -450,9 +462,9 @@ export default function OpeningAnimation() {
       cords.replaceChildren();
       defs.replaceChildren();
     };
-  }, [isShown]);
+  }, [isShown, isSkipped]);
 
-  if (!isShown) return null;
+  if (!isShown || isSkipped) return null;
 
   return (
     <div

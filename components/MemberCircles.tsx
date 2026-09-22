@@ -4,6 +4,7 @@
 // 中心からの距離が、そのまま「疎遠さ」になります。
 
 import Link from "next/link";
+import MemberCircle from "@/components/MemberCircle";
 import type { Member } from "@/lib/home";
 
 type MemberCirclesProps = {
@@ -120,49 +121,11 @@ export default function MemberCircles({
         </Link>
       ) : null}
 
-      {/* ▼ まわりのメンバー */}
+      {/* ▼ まわりのメンバー
+          マル1つぶんの中身は MemberCircle にまとめてあります。
+          長押しを受け取るために、ブラウザ側で動く部品にする必要があるためです。 */}
       {placed.map(({ member, x, y }) => (
-        <Link
-          key={member.id}
-          href={`/members/${member.id}`}
-          // 「中心へ移動」してから「計算したぶんずらす」の2段階です
-          className="absolute left-1/2 top-1/2 flex w-16 flex-col items-center gap-1"
-          style={{
-            transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
-          }}
-        >
-          {/* 外側の輪。報告がある人だけ光らせます */}
-          <div
-            className={`rounded-full p-[2.5px] ${
-              member.hasNews
-                ? "bg-gradient-to-tr from-amber-400 via-orange-500 to-pink-500"
-                : "bg-stone-200"
-            }`}
-          >
-            <div className="rounded-full bg-white p-[2px]">
-              {/* アイコンは <img> ではなく背景画像で置いています。
-                  <img> は読み込みに失敗すると「壊れた画像」の印が出ますが、
-                  背景画像なら何も出ず、下の灰色がそのまま残ります。 */}
-              <div
-                className="h-12 w-12 rounded-full bg-stone-300 bg-cover bg-center"
-                style={
-                  member.avatarUrl
-                    ? { backgroundImage: `url("${encodeURI(member.avatarUrl)}")` }
-                    : undefined
-                }
-              />
-            </div>
-          </div>
-
-          {/* 名前。truncate = 長いときは「…」で切る */}
-          <span
-            className={`w-full truncate text-center text-[10px] leading-tight ${
-              member.hasNews ? "font-bold text-stone-700" : "text-stone-400"
-            }`}
-          >
-            {member.displayName ?? "名無し"}
-          </span>
-        </Link>
+        <MemberCircle key={member.id} member={member} x={x} y={y} />
       ))}
     </div>
   );

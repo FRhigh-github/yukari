@@ -23,11 +23,16 @@ export default async function MemberPage({
   const [{ data: profile }, { data: posts }, { data: reactions }] =
     await Promise.all([
       supabase.from("profiles").select("display_name").eq("id", id).single(),
+      // 列は使うものだけ並べます。
+      // select("*") だと、誰かが列を足した瞬間に、
+      // 知らないうちに取ってくる量が増えます。
+      // limit は、報告が増えたときに一気に読み込まないための上限です。
       supabase
         .from("posts")
-        .select("*")
+        .select("id, title, body, image_url, created_at")
         .eq("author_id", id)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(30),
 
       // ▼ 反応も、ここで一緒に取ります。
       //   前は「報告を取る → その id で反応を取る」と2段階でしたが、

@@ -221,15 +221,24 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
         .limit(1)
         .maybeSingle();
 
-      // drawing_data には、置いたものの一覧をそのまま残します。
-      // 画像だけだと後から直せませんが、これがあれば作り直せます。
+      // ▼ drawing_data には、置いたものの一覧を残します。
+      //   後から作り直せるようにするためです。
+      //
+      //   ただし写真だけは外します。
+      //   items の中の写真は data:image/jpeg;base64,... という文字の塊で、
+      //   1枚で数百KB〜数MBあります。絵はすでに保管庫に上げてあるので、
+      //   そのままDBにも入れると、同じ写真を二重に持つことになります。
+      const layout = items.map((item) =>
+        item.type === "image" ? { ...item, src: "" } : item,
+      );
+
       const { error: insertError } = await supabase.from("card_sends").insert({
         template_id: template?.id ?? null,
         from_user: data.user.id,
         to_user: toUser,
         community_id: communityId,
         drawing_url: upload.data.path,
-        drawing_data: items,
+        drawing_data: layout,
       });
 
       if (insertError) throw new Error(insertError.message);

@@ -1,0 +1,112 @@
+// 自分のプロフィール画面です。
+//
+// 出すもの
+//   ・アイコン（気持ちを選んでいれば、その印を右下に重ねます）
+//   ・入っているコミュニティの名前
+//   ・名前と誕生日
+//   ・自分のご報告の一覧
+
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import ProfileHeader from "@/components/ProfileHeader";
+
+export default async function ProfilePage() {
+  const supabase = await createClient();
+
+  // 1回目：本人確認と、入っているコミュニティを同時に取ります
+  const [userResult, { data: communities }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from("communities").select("name"),
+  ]);
+
+  const user = userResult.data.user;
+
+  if (user === null) {
+    return (
+      <main className="p-6">
+        <p className="text-sm text-stone-500">ログインしてください。</p>
+        <Link href="/login" className="text-sm text-stone-800 underline">
+          ログインへ
+        </Link>
+      </main>
+    );
+  }
+
+  // 2回目：自分の情報と、自分のご報告を同時に取ります
+  const [{ data: profile }, { data: posts }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("display_name, avatar_url, birthday, mood")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("posts")
+      .select("id, title, image_url")
+      .eq("author_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(30),
+  ]);
+
+  // 写真の置き場所から、期限付きのURLを発行してもらいます（1時間）
+  const imagePaths =
+    posts
+      ?.filter((post) => post.image_url && !post.image_url.startsWith("http"))
+      .map((post) => post.image_url) ?? [];
+
+  const { data: signedUrls } =
+    imagePaths.length > 0
+      ? await supabase.storage.from("posts").createSignedUrls(imagePaths, 3600)
+      : { data: null };
+
+  const findImageUrl = (path: string | null) => {
+    if (!path) return null;
+    if (path.startsWith("http")) return path;
+    return signedUrls?.find((item) => item.path === path)?.signedUrl ?? null;
+  };
+
+  return (
+    <main className="pb-24">
+      <ProfileHeader
+        displayName={profile?.display_name ?? null}
+        avatarUrl={profile?.avatar_url ?? null}
+        birthday={profile?.birthday ?? null}
+        mood={profile?.mood ?? null}
+        communityNames={communities?.map((community) => community.name) ?? []}
+        isMe
+      />
+
+      {/* ▼ 下半分：自分のご報告 */}
+      <h2 className="border-y border-stone-200 bg-white px-5 py-3 text-lg font-bold text-stone-800">
+        ご報告
+      </h2>
+
+      {posts?.length === 0 ? (
+        <p className="p-5 text-sm text-stone-500">まだご報告はありません。</p>
+      ) : (
+        <ul>
+          {posts?.map((post) => (
+            <li key={post.id} className="border-b border-stone-100">
+              <Link
+                href={`/members/${user.id}`}
+                className="flex items-center gap-3 p-4"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm text-stone-700">
+                  {post.title}
+                </span>
+
+                {findImageUrl(post.image_url) ? (
+                  <span
+                    className="h-14 w-20 shrink-0 rounded-lg bg-stone-100 bg-cover bg-center"
+                    style={{
+                      backgroundImage: `url("${findImageUrl(post.image_url)}")`,
+                    }}
+                  />
+                ) : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </main>
+  );
+}
