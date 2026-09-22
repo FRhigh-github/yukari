@@ -65,8 +65,9 @@ export default function MemberCircle({ member, x, y }: MemberCircleProps) {
         // 長押しで出る「リンクのプレビュー」を止めます。
         // 出ると、こちらの表示と重なって邪魔になります。
         onContextMenu={(event) => event.preventDefault()}
-        // select-none = 長押ししたときに文字が選択されるのを防ぎます
-        className="absolute left-1/2 top-1/2 flex w-16 select-none flex-col items-center gap-1"
+        // select-none  = 長押ししたときに文字が選択されるのを防ぎます
+        // no-callout   = iPhone のリンクプレビューを止めます（globals.css）
+        className="no-callout absolute left-1/2 top-1/2 flex w-16 select-none flex-col items-center gap-1"
         style={{
           transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
         }}

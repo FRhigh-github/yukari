@@ -40,6 +40,11 @@ export default function OpeningAnimation() {
   const pathname = usePathname();
   const isSkipped = SKIP_PATHS.includes(pathname);
 
+  // 「飛ばしてほしい」という合図。描画のループが毎コマ見ています。
+  // 状態（useState）ではなくこちらにしているのは、
+  // ループの中から読む必要があり、画面の描き直しも要らないためです。
+  const skipRef = useRef(false);
+
   const svgRef = useRef<SVGSVGElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -87,6 +92,22 @@ export default function OpeningAnimation() {
     setIsFading(true);
     // 消えるアニメーション(400ms)が終わってから、要素ごと片づけます
     setTimeout(() => setIsShown(false), 400);
+  };
+
+  // ▼ 押されたときの動き。2段階にしています。
+  //
+  //   1回目 … 途中でも、いっきに完成形まで進める
+  //   2回目 … ホームへ進む
+  //
+  //   1回で消してしまうと、結ばれる瞬間を見ないまま終わります。
+  //   急いでいる人も、完成形だけは目に入る形にしました。
+  const handleTap = () => {
+    if (isDone) {
+      finish();
+      return;
+    }
+    // 描画のループはこの箱を見ています（下の tick を参照）
+    skipRef.current = true;
   };
 
   useEffect(() => {
@@ -449,6 +470,9 @@ export default function OpeningAnimation() {
     let request = 0;
 
     const tick = (now: number) => {
+      // 1回目のタップで、いっきに完成形まで進めます
+      if (skipRef.current) time = DURATION;
+
       time = Math.min(DURATION, time + ((now - last) / 1000) * RATE);
       last = now;
       paint(time);
@@ -478,7 +502,7 @@ export default function OpeningAnimation() {
   return (
     <div
       ref={boxRef}
-      onClick={finish}
+      onClick={handleTap}
       // absolute inset-0 = 親（アプリの枠）いっぱいに広げる。
       // overflow-hidden = はみ出したぶんを切り取る。
       //   紐は画面の外から入ってくるので、これが無いと
@@ -539,7 +563,7 @@ export default function OpeningAnimation() {
         糸がむすぶ、ゆかり。
       </p>
       <p className="opening-caption absolute bottom-8 text-[10px] text-stone-400">
-        {isDone ? "画面を押してはじめる" : "画面を押すと飛ばせます"}
+        {isDone ? "画面を押してはじめる" : "画面を押すと最後まで進みます"}
       </p>
     </div>
   );

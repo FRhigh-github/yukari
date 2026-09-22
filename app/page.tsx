@@ -75,7 +75,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       ) : (
         // flex-1 = 残りの高さを全部つかう。マルはこの中に割り振られます。
         // 上から引っぱると、中身を取り直せます。
-        <div className="min-h-0 flex-1 px-3">
+        //
+        // pb は、下タブと2つのボタンが重なっているぶんの逃げです。
+        // これが無いと、相関図の中心が「隠れている部分まで含めた真ん中」になり、
+        // 上に大きな余白ができてしまいます。
+        <div className="min-h-0 flex-1 px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)]">
           <PullToRefresh>
             <MemberCircles members={members} currentUserId={user.id} />
           </PullToRefresh>
