@@ -29,9 +29,6 @@ import { createClient } from "@/lib/supabase/client";
 // 保存に使う設定
 // =====================================================
 
-// 送り先のコミュニティ(今は手書き機能と同じく、動作確認のため固定)
-const COMMUNITY_ID = "dfda40cd-2953-45b0-8620-26f03b9d7c58";
-
 // 画像を保存する Storage のバケット名(手書き機能と同じ場所)
 const BUCKET = "drawings";
 
@@ -489,6 +486,27 @@ export default function LetterPage() {
         throw new Error("ログインしていません。/login からログインしてください");
       }
 
+      // ----- 1.5 送り先のコミュニティを決める -----
+      // ここは前まで、動作確認のために id を直接書いていました。
+      // そのコミュニティが消えたあと、
+      //   violates foreign key constraint "time_capsules_community_id_fkey"
+      // （そんなコミュニティは無い）というエラーになっていました。
+      //
+      // communities は RLS で「自分が入っているものしか返らない」ので、
+      // 取れた中の先頭をそのまま送り先にします。
+      const communityResult = await supabase
+        .from("communities")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+
+      const communityId = communityResult.data?.id;
+      if (!communityId) {
+        throw new Error(
+          "コミュニティに入っていません。先にコミュニティに参加してください",
+        );
+      }
+
       // ----- 2. 紙を PNG にする -----
       const blob = await makeLetterPng();
       if (blob === null) {
@@ -521,7 +539,7 @@ export default function LetterPage() {
 
       const capsuleResult = await supabase.from("time_capsules").insert({
         id: capsuleId,
-        community_id: COMMUNITY_ID,
+        community_id: communityId,
         author_id: user.id,
         image_url: path,
         body: bodyText === "" ? null : bodyText,
@@ -539,7 +557,7 @@ export default function LetterPage() {
         const eventResult = await supabase.from("events").insert({
           id: eventId,
           capsule_id: capsuleId,
-          community_id: COMMUNITY_ID,
+          community_id: communityId,
           created_by: user.id,
           name: eventPlan.name,
         });
@@ -552,7 +570,7 @@ export default function LetterPage() {
         const optionsResult = await supabase.from("event_date_options").insert(
           eventPlan.dates.map((d) => ({
             event_id: eventId,
-            community_id: COMMUNITY_ID,
+            community_id: communityId,
             event_date: d,
           }))
         );
