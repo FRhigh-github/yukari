@@ -94,8 +94,9 @@ export default function MemberCircle({ member, x, y }: MemberCircleProps) {
           </div>
 
           {/* 気持ちの印 */}
+          {/* 気持ちの印。顔にかぶらないよう、輪の外へ少し逃がしています */}
           {mood ? (
-            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] shadow">
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[8px] shadow-sm">
               {mood.emoji}
             </span>
           ) : null}

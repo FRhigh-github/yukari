@@ -83,12 +83,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       )}
 
       {/* 左下：届いたカードを見る手紙ボックス
-          bottom-[5.5rem] = 下タブ（約76px）の上に置くための高さ。
-          bottom-4 のままだと、重ねた下タブの後ろに隠れてしまいます。 */}
+          下タブ（約76px）＋ iPhone下端の余白 の上に置きます。
+          余白を足さずに数字だけで決めると、端末によって重なります。 */}
       <Link
         href="/cards/inbox"
         aria-label="届いたカード"
-        className="absolute bottom-[5.5rem] left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg"
+        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg"
       >
         <svg
           viewBox="0 0 24 24"
@@ -111,7 +111,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {/* 右下：ご報告を書く */}
       <Link
         href="/post"
-        className="absolute bottom-[5.5rem] right-4 z-30 rounded-full bg-stone-400 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
+        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-4 z-30 rounded-full bg-stone-400 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
       >
         ステキな報告をする
       </Link>

@@ -22,11 +22,16 @@ type MemberCirclesProps = {
 //   人が真下にちょうど来るとは限らないためです。
 //   たとえば6人だと、一番下の人でも radiusY の 0.87倍あたりに止まります。
 //   なので、見た目より大きめの数字を入れる必要があります。
+//
+// ▼ 縦を 320 から 260 に縮めました。
+//   実機で見ると、外側の人の名前が下タブの裏に隠れていたためです。
+//   相関図の下には「ご報告をする」ボタンと下タブが重なっているので、
+//   見えている高さは思ったより狭くなっています。
 const RINGS = [
-  { radiusX: 70, radiusY: 150, capacity: 6 },
-  { radiusX: 130, radiusY: 320, capacity: 12 },
+  { radiusX: 70, radiusY: 130, capacity: 6 },
+  { radiusX: 128, radiusY: 260, capacity: 12 },
   // 最後の輪は、あふれた人を全部引き受けます
-  { radiusX: 145, radiusY: 330, capacity: Infinity },
+  { radiusX: 142, radiusY: 272, capacity: Infinity },
 ];
 
 type Placed = {
