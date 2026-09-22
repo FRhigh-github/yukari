@@ -526,7 +526,19 @@ export default function OpeningAnimation() {
           fill="none"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="pointer-events-none [&_.cord-body]:fill-[#eee6d7] [&_.cord-edge]:fill-[#b7ae9d] [&_.rope-second_.cord-body]:fill-[#858b82] [&_.rope-second_.cord-edge]:fill-[#6b706a]"
+          // ▼ 紐の色。水引の紅白にしています。
+          //
+          //   cord-body = 紐の真ん中、cord-edge = そのふち です。
+          //   ふちを本体より少し濃くすると、平らな帯ではなく
+          //   丸い紐が置いてあるように見えます。
+          //
+          //   1本目の「白」は、真っ白ではなく生成り(#eee6d7)にしています。
+          //   背景が白なので、本当に白くすると紐が消えてしまい、
+          //   紅の1本だけが宙に浮いて見えてしまうためです。
+          //   水引の白も、実物は紙に近いこの色をしています。
+          //
+          //   2本目が紅。globals.css の --mizuhiki-beni と同じ色です。
+          className="pointer-events-none [&_.cord-body]:fill-[#eee6d7] [&_.cord-edge]:fill-[#b7ae9d] [&_.rope-second_.cord-body]:fill-[#b7282e] [&_.rope-second_.cord-edge]:fill-[#8a1d22]"
         />
         <g
           id="lettering"

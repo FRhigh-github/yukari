@@ -745,7 +745,11 @@ export default function LetterPage() {
     // 画面がスクロールしてしまっていました。
     <main className="flex h-full justify-center overflow-hidden bg-[#f3ede2] text-stone-800">
       {/* ===== スマホの幅の入れ物 ===== */}
-      <div className="relative flex h-full w-full max-w-[430px] flex-col px-4 pb-4 pt-4">
+      {/* pb は、下に重なっている下タブのぶんの逃げです。
+          この画面には下タブが出ているので、4px だけだと
+          いちばん下にある「未来へ送る」ボタンが裏に隠れてしまいます。
+          env(safe-area-inset-bottom) は iPhone 下端の横棒のぶんです。 */}
+      <div className="relative flex h-full w-full max-w-[430px] flex-col px-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] pt-4">
         {/* ===== 手紙の紙 ===== */}
         <div
           ref={paperRef}

@@ -12,6 +12,21 @@
      Windows など、どれも無い端末では最後の sans-serif になります。 */
   --font-ios: -apple-system, BlinkMacSystemFont, "Hiragino Sans",
     "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+
+  /* ▼ 水引の色
+     お祝いごとに使う紅白と金銀から取りました。
+
+     画面いっぱいに使う色ではありません。
+     土台はいままでどおり白と stone 系のままにして、
+     「ここが大事」という所だけこの色にします。
+     和の色を広く敷くと、アプリではなくお祝いサイトに見えてしまうためです。
+
+     beni  = 紅。いちばん強い色。報告がある印など、1画面に1〜2か所だけ
+     kin   = 金。ふちどりや細い線に使う、控えめな方
+     gin   = 銀。押せないもの・終わったものに使う */
+  --mizuhiki-beni: #b7282e;
+  --mizuhiki-kin: #c2a14d;
+  --mizuhiki-gin: #a8aeb3;
 }
 
 @theme inline {
@@ -19,6 +34,12 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-ios);
   --font-mono: var(--font-geist-mono);
+
+  /* ここに書くと Tailwind の色として使えるようになります。
+     例: text-beni / bg-beni / border-kin */
+  --color-beni: var(--mizuhiki-beni);
+  --color-kin: var(--mizuhiki-kin);
+  --color-gin: var(--mizuhiki-gin);
 }
 
 /* ▼ ページ全体が動かないようにする
