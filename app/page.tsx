@@ -33,7 +33,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   // currentId = 実際に見ているコミュニティ。
   // ?c= が無いときは、getHomeData が一番上を選んで返してくれます。
-  const { user, communities, members, currentId, recoveryRequests } =
+  const { user, communities, members, currentId, recoveryRequests, todayCount } =
     await getHomeData(selectedId);
 
   // ▼ ログインしていない人は、ここで追い返します。
@@ -51,11 +51,23 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     // 縦に伸ばさず、この中で収める形にします。
     <div className="relative flex h-full flex-col">
       {/* shrink-0 = 場所が足りなくてもこのバーは縮めない */}
-      <header className="flex shrink-0 items-center justify-between border-b border-stone-100 px-5 py-3">
+      <header className="flex shrink-0 items-center gap-3 border-b border-stone-100 px-4 py-3">
         {/* 作る・参加する・設定への入口も、この中にまとめてあります */}
-        <CommunitySwitcher communities={communities} selectedId={currentId} />
+        <CommunitySwitcher
+          communities={communities}
+          selectedId={currentId}
+          memberCount={members.length}
+          todayCount={todayCount}
+        />
 
-        <span className="text-sm text-stone-400">🔔</span>
+        {/* 知らせ。報告がある日は、鐘の右上に紅い点を出します。
+            relative は、この点を鐘を基準に置くために必要です。 */}
+        <span className="relative shrink-0 text-xl text-stone-500">
+          🔔
+          {todayCount > 0 ? (
+            <span className="absolute right-0 top-0 h-2 w-2 rounded-full bg-beni" />
+          ) : null}
+        </span>
       </header>
 
       {/* 初めての人にだけ、一言そえます */}

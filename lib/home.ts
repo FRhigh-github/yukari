@@ -36,7 +36,7 @@ export async function getHomeData(selectedId: string | null) {
   // communities は RLS で「メンバーしか読めない」設定なので、DB 側が絞ってくれます。
   const [userResult, { data: communities }] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from("communities").select("id, name"),
+    supabase.from("communities").select("id, name, icon_url"),
   ]);
 
   const user = userResult.data.user;
@@ -48,6 +48,7 @@ export async function getHomeData(selectedId: string | null) {
       members: [],
       currentId: null,
       recoveryRequests: [],
+      todayCount: 0,
     };
   }
 
@@ -66,6 +67,7 @@ export async function getHomeData(selectedId: string | null) {
       members: [],
       currentId: null,
       recoveryRequests: [],
+      todayCount: 0,
     };
   }
 
@@ -91,7 +93,7 @@ export async function getHomeData(selectedId: string | null) {
       // 「最近」は、このコミュニティの新しい投稿20件ぶん、ということにします
       supabase
         .from("posts")
-        .select("author_id")
+        .select("author_id, created_at")
         .in("community_id", targetIds)
         .order("created_at", { ascending: false })
         .limit(20),
@@ -118,6 +120,18 @@ export async function getHomeData(selectedId: string | null) {
 
   const recentAuthorIds = recentPosts?.map((post) => post.author_id) ?? [];
 
+  // ▼ 「今日 N件の報告」を出すための数です。
+  //   上で取ってきた新しい投稿20件を、そのまま数え直しているだけなので、
+  //   データベースへの問い合わせは増えていません。
+  //
+  //   toDateString() は「Sat Sep 22 2026」のような文字列を返します。
+  //   時刻が入らないので、これが同じなら同じ日、と分かります。
+  const today = new Date().toDateString();
+  const todayCount =
+    recentPosts?.filter(
+      (post) => new Date(post.created_at).toDateString() === today,
+    ).length ?? 0;
+
   const members: Member[] =
     profiles?.map((profile) => ({
       id: profile.id,
@@ -141,5 +155,12 @@ export async function getHomeData(selectedId: string | null) {
           ?.displayName ?? "どなたか",
     })) ?? [];
 
-  return { user, communities: list, members, currentId, recoveryRequests };
+  return {
+    user,
+    communities: list,
+    members,
+    currentId,
+    recoveryRequests,
+    todayCount,
+  };
 }

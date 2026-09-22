@@ -13,17 +13,25 @@ import Loader from "@/components/Loader";
 export type Community = {
   id: string;
   name: string;
+  // コミュニティのアイコン。決めていなければ null。
+  // ? を付けてあるのは、この型を「名前を選ぶだけ」の画面でも使っているためです。
+  // そちらではアイコンが要らないので、取ってきていません。
+  icon_url?: string | null;
 };
 
 type CommunitySwitcherProps = {
   communities: Community[];
   // 今見ているコミュニティのid。1つも入っていないときだけ null。
   selectedId: string | null;
+  memberCount: number;
+  todayCount: number;
 };
 
 export default function CommunitySwitcher({
   communities,
   selectedId,
+  memberCount,
+  todayCount,
 }: CommunitySwitcherProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -52,17 +60,44 @@ export default function CommunitySwitcher({
 
       {/* relative = この中の「absolute」が、このチップを基準に置かれるようになります。
         一覧をチップのすぐ下に出すために必要です。 */}
-      <div className="relative">
-        {/* 押せることが分かるように、枠のあるチップにしています */}
+      <div className="relative min-w-0 flex-1">
+        {/* ▼ 顔写真 ＋ 名前 ＋ 人数と今日の件数。
+            名前だけのチップだったころは、どのコミュニティを見ているのか
+            文字を読まないと分かりませんでした。
+            顔を先に出すと、読む前に「あの人たちのところだ」と分かります。 */}
         <button
           type="button"
           onClick={() => setIsOpen(true)}
           // cursor-pointer = PCで指マークにする指定。
           // Tailwind v4 から、ボタンでも自分で書かないと矢印のままになります。
-          className="flex max-w-[16rem] cursor-pointer items-center gap-1.5 rounded-full bg-stone-100 py-1.5 pl-3 pr-2.5 text-sm text-stone-700"
+          className="flex w-full cursor-pointer items-center gap-3 text-left"
         >
-          <span className="truncate">{pressedName ?? currentName}</span>
-          <span className="shrink-0 text-[10px] text-stone-400">▼</span>
+          {/* ▼ コミュニティのアイコン。
+              まだ決めていないときは、名前の1文字目を出します。
+              前はメンバーの顔を3枚重ねていましたが、
+              コミュニティが増えると、どれも「人の顔が3つ」になって
+                見分けがつきませんでした。
+
+              四角にしているのは、人の顔（丸）と区別するためです。 */}
+          <CommunityMark
+            iconUrl={selected?.icon_url ?? null}
+            name={pressedName ?? currentName}
+            size="h-11 w-11 text-base"
+          />
+
+          {/* min-w-0 = 名前が長くても、この欄が押し広がらないようにする指定 */}
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5">
+              <span className="truncate text-[17px] font-bold text-stone-800">
+                {pressedName ?? currentName}
+              </span>
+              <span className="shrink-0 text-[10px] text-stone-400">▼</span>
+            </span>
+            <span className="block truncate text-xs text-stone-400">
+              {memberCount}人
+              {todayCount > 0 ? ` ・ 今日 ${todayCount}件の報告` : ""}
+            </span>
+          </span>
         </button>
 
         {isOpen ? (
@@ -76,7 +111,10 @@ export default function CommunitySwitcher({
 
             {/* ▼ チップのすぐ下に出る一覧。
               top-full = チップの下端から。押した場所と出る場所をそろえます。 */}
-            <div className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-2xl bg-white py-2 shadow-xl">
+            {/* ▼ 幅は、画面の端から16px残したところまで目いっぱい使います。
+                w-60(240px) のときは名前が「しばよこハッカソ…」と切れていました。
+                右に余っている場所があるのに切るのは、読む側に損なだけです。 */}
+            <div className="absolute left-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-[22rem] overflow-hidden rounded-2xl bg-white py-2 shadow-xl">
               <ul className="max-h-[50vh] overflow-y-auto overscroll-contain">
                 {communities.map((community) => (
                   <li key={community.id}>
@@ -135,7 +173,7 @@ type ListRowProps = {
 
 function ListRow({ community, isSelected, onSelect, onClose }: ListRowProps) {
   return (
-    <div className="flex items-center">
+    <div className="flex items-center gap-1 pl-3 pr-2">
       {/* ▼ ボタンではなく Link にしています。
           Link は、画面に出た時点で次のページを先に用意しておいてくれます。
           押してから取りに行かないぶん、切り替わりが速くなります。 */}
@@ -143,29 +181,68 @@ function ListRow({ community, isSelected, onSelect, onClose }: ListRowProps) {
         href={`/?c=${community.id}`}
         onClick={onSelect}
         // min-w-0 = 中身が長くても、欄を押し広げないようにする指定。
-        // これが無いと名前が伸びて、右の ⚙ が押し出されてしまいます。
-        className={`flex h-12 min-w-0 flex-1 cursor-pointer items-center gap-2 px-5 text-left text-sm ${
+        // これが無いと名前が伸びて、右の「設定」が押し出されてしまいます。
+        className={`flex h-14 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-2 text-left text-sm ${
           isSelected ? "font-bold text-stone-900" : "text-stone-600"
         }`}
       >
+        {/* アイコン。上のバーと同じ絵を出して、
+            「いま押したものが、上に出ているものだ」と分かるようにします */}
+        <CommunityMark
+          iconUrl={community.icon_url ?? null}
+          name={community.name}
+          size="h-9 w-9 text-sm"
+        />
         <span className="truncate">{community.name}</span>
         {/* shrink-0 = ✓ は縮めない。縮むと名前とくっついて見えます */}
         {isSelected ? (
-          <span className="shrink-0 text-orange-500">✓</span>
+          <span className="shrink-0 text-beni">✓</span>
         ) : null}
       </Link>
 
-      {/* ⚙ はどの行にも出します。
+      {/* ▼ 設定への入口。
+          前は ⚙ の絵だけを置いていましたが、
+          文字が無いと「押せるもの」だと気づかれませんでした。
+          薄い下地を敷いて、ボタンの形にしてあります。
+
           設定から戻ると、その行のコミュニティのホームに着きます。
           （押した行＝これから見る場所、というつながりにしています） */}
       <Link
         href={`/communities/${community.id}`}
         onClick={onClose}
-        aria-label={`${community.name} の設定`}
-        className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center text-stone-400"
+        className="flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-full bg-stone-100 px-3 text-xs text-stone-500"
       >
-        ⚙
+        <span>⚙</span>
+        <span>設定</span>
       </Link>
     </div>
+  );
+}
+
+// コミュニティを表す四角です。上のバーと一覧の両方で使います。
+//
+// アイコンが決まっていないコミュニティもあるので、
+// そのときは名前の1文字目を出します。
+// 空の四角より、文字があるほうが見分けがつくためです。
+type CommunityMarkProps = {
+  iconUrl: string | null;
+  name: string;
+  // 大きさ。置く場所で変えたいので、外から指定してもらいます
+  size: string;
+};
+
+function CommunityMark({ iconUrl, name, size }: CommunityMarkProps) {
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-xl bg-stone-200 bg-cover bg-center font-bold text-stone-500 ${size}`}
+      style={
+        iconUrl
+          ? { backgroundImage: `url("${encodeURI(iconUrl)}")` }
+          : undefined
+      }
+    >
+      {/* 絵があるときは文字を出しません。重なって読めなくなるためです */}
+      {iconUrl ? null : name.slice(0, 1)}
+    </span>
   );
 }

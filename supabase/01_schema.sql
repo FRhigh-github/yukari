@@ -59,6 +59,8 @@ create table communities (
   name text not null,
   invite_code text not null,
   created_by uuid,
+  -- コミュニティのアイコン。null のときは、メンバーの顔を重ねて出します
+  icon_url text,
   created_at timestamp with time zone default now() not null
 );
 

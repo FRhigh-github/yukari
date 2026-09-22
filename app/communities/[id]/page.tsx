@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import InviteCode from "@/components/InviteCode";
 import CommunitySettings from "@/components/CommunitySettings";
+import CommunityIcon from "@/components/CommunityIcon";
 
 export default async function CommunityPage({
   params,
@@ -18,7 +19,7 @@ export default async function CommunityPage({
   // maybeSingle() は「0件でもエラーにしない single()」です。
   const { data: community } = await supabase
     .from("communities")
-    .select("id, name, invite_code, created_by")
+    .select("id, name, invite_code, created_by, icon_url")
     .eq("id", id)
     .maybeSingle();
 
@@ -61,10 +62,15 @@ export default async function CommunityPage({
         <Link href={`/?c=${community.id}`} className="text-sm text-stone-500">
           ← ホーム
         </Link>
-        <h1 className="mt-2 text-xl font-bold text-stone-800">
-          {community.name}
-        </h1>
       </div>
+
+      {/* アイコンと名前。招待コードより先に置いています。
+          「今どのコミュニティの設定を開いているか」を最初に示すためです。 */}
+      <CommunityIcon
+        communityId={community.id}
+        name={community.name}
+        iconUrl={community.icon_url}
+      />
 
       <section>
         <h2 className="mb-2 text-sm font-bold text-stone-600">招待コード</h2>
