@@ -1,11 +1,15 @@
+'use client'
+
 // ホーム画面のマルを、自分を中心にした同心円に並べる部品です。
 //
 // 中心 = 自分。内側の輪 = 最近ご報告があった人。外側 = それ以外。
 // 中心からの距離が、そのまま「疎遠さ」になります。
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import MemberCircle from "@/components/MemberCircle";
 import type { Member } from "@/lib/home";
+import { createClient } from "@/lib/supabase/client";
 
 type MemberCirclesProps = {
   members: Member[];
@@ -19,14 +23,14 @@ type MemberCirclesProps = {
 // 数字を変えれば、そのまま配置が変わります。
 //
 // ※ radiusY は「一番下に来る人の位置」ではありません。
-//   人が真下にちょうど来るとは限らないためです。
-//   たとえば6人だと、一番下の人でも radiusY の 0.87倍あたりに止まります。
-//   なので、見た目より大きめの数字を入れる必要があります。
+//    人が真下にちょうど来るとは限らないためです。
+//    たとえば6人だと、一番下の人でも radiusY の 0.87倍あたりに止まります。
+//    なので、見た目より大きめの数字を入れる必要があります。
 //
 // ▼ 縦を 320 から 260 に縮めました。
-//   実機で見ると、外側の人の名前が下タブの裏に隠れていたためです。
-//   相関図の下には「ご報告をする」ボタンと下タブが重なっているので、
-//   見えている高さは思ったより狭くなっています。
+//    実機で見ると、外側の人の名前が下タブの裏に隠れていたためです。
+//    相関図の下には「ご報告をする」ボタンと下タブが重なっているので、
+//    見えている高さは思ったより狭くなっています。
 const RINGS = [
   { radiusX: 70, radiusY: 130, capacity: 6 },
   { radiusX: 128, radiusY: 260, capacity: 12 },
@@ -79,6 +83,34 @@ export default function MemberCircles({
   members,
   currentUserId,
 }: MemberCirclesProps) {
+  // 手紙の有無を覚える変数
+  const [hasLetter, setHasLetter] = useState(false);
+  const [letterId, setLetterId] = useState<string | null>(null); // 手紙詳細を開くためのID保持用
+  const supabase = createClient();
+
+  useEffect(() => {
+    // 届いた手紙があるか確認する処理
+    async function checkLetter() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 手紙詳細画面に合わせて time_capsules テーブルから取得
+      const { data, error } = await supabase
+        .from('time_capsules')
+        .select('id')
+        .limit(1);
+
+      if (error) return;
+
+      if (data && data.length > 0) {
+        setHasLetter(true);
+        setLetterId(data[0].id);
+      }
+    }
+
+    checkLetter();
+  }, []);
+
   // 自分は中心に置くので、輪に並べる人たちとは分けます
   const me = members.find((member) => member.id === currentUserId);
   const others = members.filter((member) => member.id !== currentUserId);
@@ -89,6 +121,17 @@ export default function MemberCircles({
 
   return (
     <div className="relative h-full w-full overflow-hidden">
+      {/* ▼ 届いた手紙がある時だけ右上に表示する紙飛行機マーク */}
+      {hasLetter && letterId && (
+        <Link
+          href={`/letters/${letterId}`}
+          className="absolute right-4 top-4 z-50 rounded-full bg-white p-2 text-2xl shadow-md border border-stone-200"
+          title="未来の手紙が届いています"
+        >
+          ✈️
+        </Link>
+      )}
+
       {/* ▼ 中心から伸びる線
           線は div を1本の棒として使っています。
           origin-left（回転の軸を左端にする）で、

@@ -51,7 +51,7 @@ const normalizeAnswer = (ans?: string | null): ResponseStatus | null => {
 
 export default function EventDetailPage() {
   const params = useParams();
-  const eventId = params.id as string;
+  const rawId = params.id as string;
 
   const [event, setEvent] = useState<EventData | null>(null);
   const [memberResponses, setMemberResponses] = useState<MemberResponse[]>([]);
@@ -66,7 +66,8 @@ export default function EventDetailPage() {
   const supabase = createClient();
 
   const fetchEventData = async () => {
-    if (!eventId) return;
+    if (!rawId) return;
+    setLoading(true);
 
     // 1. ユーザー情報取得
     const {
@@ -75,25 +76,28 @@ export default function EventDetailPage() {
     const myId = user?.id || null;
     setCurrentUserId(myId);
 
-    // 2. イベント本体の取得
+    // 💡 2. イベント本体の取得（イベントID、またはcapsule_idのどちらでもヒットするように変更）
     const { data: eventData, error: eventErr } = await supabase
       .from("events")
       .select("*")
-      .eq("id", eventId)
+      .or(`id.eq.${rawId},capsule_id.eq.${rawId}`)
       .maybeSingle();
 
     if (eventErr) console.error("イベント取得エラー:", eventErr);
 
     if (!eventData) {
       setLoading(false);
+      setEvent(null);
       return;
     }
+
+    const targetEventId = eventData.id;
 
     // 3. 日時候補の取得
     const { data: dateOptions, error: optErr } = await supabase
       .from("event_date_options")
       .select("*")
-      .eq("event_id", eventId);
+      .eq("event_id", targetEventId);
 
     if (optErr) console.error("日時候補取得エラー:", optErr);
 
@@ -172,7 +176,7 @@ export default function EventDetailPage() {
 
   useEffect(() => {
     fetchEventData();
-  }, [eventId]);
+  }, [rawId]);
 
   // 1. 候補日ごとの〇△×集計計算
   const getSummaryCounts = (optionId: string) => {
@@ -190,14 +194,15 @@ export default function EventDetailPage() {
 
   // 2. イベント日程の確定（主催者機能）
   const handleConfirmDate = async (optionId: string) => {
+    if (!event) return;
     if (!confirm("この日程で確定しますか？")) return;
 
-    const newConfirmedId = event?.confirmed_option_id === optionId ? null : optionId;
+    const newConfirmedId = event.confirmed_option_id === optionId ? null : optionId;
 
     const { error } = await supabase
       .from("events")
       .update({ confirmed_option_id: newConfirmedId })
-      .eq("id", eventId);
+      .eq("id", event.id);
 
     if (error) {
       alert(`確定処理に失敗しました: ${error.message}`);
@@ -274,7 +279,7 @@ export default function EventDetailPage() {
       <div className="flex items-center justify-between mb-4">
         <Link href="/" className="text-gray-500 text-xs">＜ 戻る</Link>
         <h1 className="text-xs font-bold text-gray-700 truncate">{eventTitle}</h1>
-        <Link href={`/events/${eventId}/chat`} className="text-xs text-blue-600 font-bold">💬 チャット</Link>
+        <Link href={`/events/${event.id}/chat`} className="text-xs text-blue-600 font-bold">💬 チャット</Link>
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
@@ -324,14 +329,12 @@ export default function EventDetailPage() {
                     )}
                   </td>
 
-                  {/* 1. 集計表示 */}
                   <td className="py-2.5 px-1 text-[10px] whitespace-nowrap">
                     <span className="text-green-600 font-bold">〇{counts.ok}</span>{" "}
                     <span className="text-yellow-600 font-bold">△{counts.maybe}</span>{" "}
                     <span className="text-red-500 font-bold">×{counts.ng}</span>
                   </td>
 
-                  {/* 各ユーザーの回答 */}
                   {memberResponses.map((m) => {
                     const ans = m.responses[opt.id];
                     return (
@@ -344,7 +347,6 @@ export default function EventDetailPage() {
                     );
                   })}
 
-                  {/* 2. 主催者の日程確定ボタン */}
                   {isHost && (
                     <td className="py-2.5 px-1">
                       <button
@@ -365,7 +367,6 @@ export default function EventDetailPage() {
           </tbody>
         </table>
 
-        {/* コメント一覧 */}
         {memberResponses.some((m) => m.comment && m.comment.trim() !== "") && (
           <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
             <p className="text-[11px] font-bold text-gray-600">💬 コメント</p>
@@ -390,13 +391,11 @@ export default function EventDetailPage() {
         </button>
       </div>
 
-      {/* 回答入力モーダル */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-5 w-full max-w-xs shadow-xl space-y-4">
             <h3 className="text-sm font-bold text-gray-800">出欠の回答</h3>
 
-            {/* 候補日ごとの〇△×選択 */}
             <div className="space-y-3 max-h-60 overflow-y-auto">
               {event.event_date_options.map((opt) => {
                 const dateText = opt.possible_date || opt.event_date || opt.date || "日時未設定";
@@ -428,7 +427,6 @@ export default function EventDetailPage() {
               })}
             </div>
 
-            {/* コメント入力欄 */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-700">コメント（任意）</label>
               <input
