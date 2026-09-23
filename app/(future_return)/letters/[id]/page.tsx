@@ -98,6 +98,11 @@ export default function LetterDetailPage() {
   const displayBody = currentLetter.body || "";
   const displayDate = currentLetter.open_at || "";
 
+  // 指定日時より前（未来の手紙）かどうか判定
+  const isLocked = currentLetter.open_at
+    ? new Date(currentLetter.open_at) > new Date()
+    : false;
+
   // 紐づくイベントID、または手紙自身のIDを取得（community_idは除外）
   const targetId = currentLetter.event_id || currentLetter.id;
 
@@ -124,8 +129,8 @@ export default function LetterDetailPage() {
             </div>
           )}
 
-          {/* 署名付きURLが取得できた場合のみ画像を表示 */}
-          {signedImageUrl && (
+          {/* 署名付きURLが取得できた場合のみ画像を表示（かつロックされていない場合） */}
+          {!isLocked && signedImageUrl && (
             <div className="my-3 rounded-lg overflow-hidden">
               <img
                 src={signedImageUrl}
@@ -136,12 +141,12 @@ export default function LetterDetailPage() {
           )}
 
           <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-            {displayBody}
+            {isLocked ? "🔒 この手紙はまだ開封できません。" : displayBody}
           </p>
         </div>
 
-        {/* IDが存在する場合の「日程調整へ進む」ボタン */}
-        {targetId && (
+        {/* 開封可能な場合のみ「日程調整へ進む」ボタンを表示 */}
+        {!isLocked && targetId && (
           <div className="pt-6 flex justify-end z-10">
             <Link
               href={`/events/${targetId}`}
