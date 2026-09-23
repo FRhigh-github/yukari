@@ -4,18 +4,19 @@
 // 中心からの距離が、そのまま「疎遠さ」になります。
 //
 // ▼ 並べ方は、蜂の巣と同じ「六角形の並び」です。
-//     1つ目の輪 … 6人（真上から 60度ずつ）
-//     2つ目の輪 … 6人（1つ目の輪のあいだ、30度ずらした向き）
-//     3つ目の輪 … 6人（1つ目の輪と同じ向きで、2倍の距離）
-//   こう置くと、となりどうしがどこも同じ距離になり、
-//   左右対称の、きっちりした形になります。
+//   1つ目の輪に6人、2つ目の輪に12人、3つ目の輪に18人…と、
+//   輪が1つ増えるごとに 6人ずつ置ける場所が増えます。
+//   どのとなりどうしも同じ距離（GAP）になるので、左右対称の、きっちりした形になります。
+//   メンバーが増えるほど輪が外へ広がって、模様そのものが大きく育っていきます。
 //
-//   輪の大きさは、画面の幅と高さを測って、いちばん外の輪がちょうど収まるように決めます。
+// ▼ 指で動かせます。
+//     指1本でなぞる   … 移動
+//     指2本でつまむ   … 拡大・縮小（パソコンではマウスのホイール）
+//     ダブルタップ   … 最初の表示に戻る
+//   最初は、報告がある人がいる輪までが、ちょうど画面に収まる大きさで出します。
 //
 // ▼ 線は、水引で作る花（細い輪をいくつも重ねて、花びらにしたもの）にならっています。
-//   中心の自分と一人ひとりを、「中心を通る細い輪」で結びます。
-//   輪がいくつも重なって、花びらのように見えます。
-//   1人につき2本、少し大きさを変えて重ね、何本かの紐を束ねた水引らしさを出しています。
+//   中心の自分と一人ひとりを「中心を通る細い輪」で結ぶので、輪が花びらのように重なります。
 //   色は、中心の近くが紅、外へ行くほど金になるグラデーションです。
 
 "use client";
@@ -29,22 +30,74 @@ import type { Member } from "@/lib/home";
 const BENI = "#b7282e";
 const KIN = "#c2a14d";
 
-// アイコンの半分の大きさ（px）。輪が画面からはみ出さないように、この分だけ内側に収めます
+// となりどうしの距離（px、拡大・縮小する前の大きさ）。アイコンが約60pxなので、少しすき間を空けます
+const GAP = 76;
+
+// アイコンの半分の大きさ（px）。最初の表示で、画面の端からはみ出さないように使います
 const ICON_RADIUS = 32;
 
-// 輪の中で埋めていく順番。
-// 向かい合う場所どうしを交互に埋めるので、人数が少なくても片寄りません。
-// （0 = 真上、そこから時計回りに 1, 2, … 5）
-const FILL_ORDER = [0, 3, 1, 4, 2, 5];
+// 拡大・縮小できる範囲（1 がもとの大きさ）
+const MIN_ZOOM = 0.3;
+const MAX_ZOOM = 2.5;
 
-// 3つの輪の決まり。
-//   distance = 中心からの距離（1つ目の輪を 1 としたとき）
-//   angle    = 1人目を置く向き（度）。-90 が真上
-const RINGS = [
-  { distance: 1, angle: -90 },
-  { distance: Math.sqrt(3), angle: -60 },
-  { distance: 2, angle: -90 },
-];
+// 触れてから、これ以上指が動いたら「動かした」とみなします（px）。
+// 動かしたときは、指を離してもアイコンを押したことにしません
+const DRAG_THRESHOLD = 6;
+
+// 蜂の巣の並びで、k 番目の輪にある場所を、真上から時計回りに並べて返します。
+// 六角形の6つの角を順にたどり、角と角のあいだを k 等分して場所を置いていきます。
+function hexRing(k: number) {
+  const corners = Array.from({ length: 6 }, (_, i) => {
+    const angle = ((-90 + i * 60) * Math.PI) / 180;
+    return { x: Math.cos(angle) * k * GAP, y: Math.sin(angle) * k * GAP };
+  });
+  const spots: { x: number; y: number }[] = [];
+  for (let side = 0; side < 6; side++) {
+    const from = corners[side];
+    const to = corners[(side + 1) % 6];
+    for (let step = 0; step < k; step++) {
+      const t = step / k;
+      spots.push({ x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t });
+    }
+  }
+  return spots;
+}
+
+// 輪の中で、どの順に埋めていくか。
+// 前から順に埋めると片側に寄ってしまうので、半分・4分の1・4分の3…と
+// 離れたところから交互に埋めて、人数が少なくても片寄らないようにします。
+function spreadOrder(length: number) {
+  const order: number[] = [];
+  const used = new Set<number>();
+  for (let j = 0; order.length < length; j++) {
+    // j を2進数にして、左右を反転した小数（0, 0.5, 0.25, 0.75, …）を作ります
+    let fraction = 0;
+    let bit = 0.5;
+    for (let n = j; n > 0; n = Math.floor(n / 2)) {
+      if (n % 2 === 1) fraction += bit;
+      bit /= 2;
+    }
+    const index = Math.floor(fraction * length);
+    if (!used.has(index)) {
+      used.add(index);
+      order.push(index);
+    }
+  }
+  return order;
+}
+
+// 人数ぶんの場所を、内側の輪から順に作ります。ring = その人が何番目の輪にいるか
+function layout(count: number) {
+  const spots: { x: number; y: number; ring: number }[] = [];
+  for (let k = 1; spots.length < count; k++) {
+    const ring = hexRing(k);
+    for (const index of spreadOrder(ring.length)) {
+      if (spots.length >= count) break;
+      spots.push({ ...ring[index], ring: k });
+    }
+  }
+  return spots;
+}
 
 type MemberCirclesProps = {
   members: Member[];
@@ -55,179 +108,222 @@ export default function MemberCircles({
   members,
   currentUserId,
 }: MemberCirclesProps) {
-  // ▼ 置く範囲の大きさを測って、1つ目の輪の半径（px）を決めます。
-  //   大きさは画面に出てからでないと測れないので、最初は 70px で出しておきます。
+  // 自分は中心に置くので、輪に並べる人たちとは分けます
+  const me = members.find((member) => member.id === currentUserId);
+  const others = members.filter((member) => member.id !== currentUserId);
+
+  // members は「報告がある人が先」に並んでいるので、そのまま内側の輪から埋まります
+  const spots = layout(others.length);
+
+  // ▼ 置く範囲の大きさ。画面に出てからでないと測れないので、最初は仮の大きさです
   const areaRef = useRef<HTMLDivElement>(null);
-  const [unit, setUnit] = useState(70);
-  const [isListOpen, setIsListOpen] = useState(false);
+  const [size, setSize] = useState({ width: 360, height: 560 });
 
   useEffect(() => {
     const area = areaRef.current;
     if (area === null) return;
-
     // ResizeObserver = 大きさが変わるたびに教えてくれる仕組み
     const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      // いちばん外の輪（距離 2）＋アイコンの半分 が、幅と高さの半分に収まる大きさ
-      const fit = (Math.min(width, height) / 2 - ICON_RADIUS) / 2;
-      setUnit(Math.max(40, fit));
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
     });
     observer.observe(area);
     return () => observer.disconnect();
   }, []);
 
-  // 自分は中心に置くので、輪に並べる人たちとは分けます
-  const me = members.find((member) => member.id === currentUserId);
-  const others = members.filter((member) => member.id !== currentUserId);
+  // ▼ 最初の表示の倍率。
+  //   報告がある人がいる輪（少なくとも2つ目の輪）までが、画面に収まる倍率にします。
+  const newsRing = Math.max(
+    2,
+    ...spots.filter((_, index) => others[index].hasNews).map((spot) => spot.ring),
+  );
+  const fitZoom = Math.min(
+    MAX_ZOOM,
+    Math.max(
+      MIN_ZOOM,
+      Math.min(size.width, size.height) / 2 / (newsRing * GAP + ICON_RADIUS),
+    ),
+  );
 
-  // 置ける場所は 6人 × 3つの輪 = 18か所。
-  // 入りきらないときは、最後の1か所を「その他」にします
-  const capacity = RINGS.length * 6;
-  const fitsAll = others.length <= capacity;
-  const shown = fitsAll ? others : others.slice(0, capacity - 1);
-  const rest = others.slice(shown.length);
+  // ▼ いまの表示。move = 移動した量（px）、zoom = 最初の倍率に対して、さらに何倍か
+  const [view, setView] = useState({ moveX: 0, moveY: 0, zoom: 1 });
+  const scale = fitZoom * view.zoom;
 
-  // n番目の場所の位置（中心からの px）
-  const spotAt = (n: number) => {
-    const ring = RINGS[Math.floor(n / 6)];
-    const step = FILL_ORDER[n % 6];
-    const angle = ((ring.angle + step * 60) * Math.PI) / 180;
-    return {
-      x: Math.cos(angle) * ring.distance * unit,
-      y: Math.sin(angle) * ring.distance * unit,
-    };
+  // 倍率を、決めた範囲（MIN_ZOOM〜MAX_ZOOM）に収めます
+  const clampZoom = (zoom: number) =>
+    Math.min(MAX_ZOOM / fitZoom, Math.max(MIN_ZOOM / fitZoom, zoom));
+
+  // ▼ 指の動きを覚えておく場所。
+  //   描き直しのたびに消えては困るので、useRef に入れておきます。
+  //   pointers   = いま画面に触れている指の位置（指ごとの番号 → 位置）
+  //   startPoint = 1本目の指が触れた位置。どれだけ動いたかを測るのに使います
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const startPointRef = useRef({ x: 0, y: 0 });
+  const draggedRef = useRef(false);
+  const lastTapRef = useRef(0);
+
+  const handlePointerDown = (event: React.PointerEvent) => {
+    const point = { x: event.clientX, y: event.clientY };
+    pointersRef.current.set(event.pointerId, point);
+
+    if (pointersRef.current.size === 1) {
+      startPointRef.current = point;
+      draggedRef.current = false;
+      // ▼ ダブルタップ（0.3秒以内に2回触れた）で、最初の表示に戻します
+      const now = Date.now();
+      if (now - lastTapRef.current < 300) {
+        setView({ moveX: 0, moveY: 0, zoom: 1 });
+      }
+      lastTapRef.current = now;
+    } else {
+      // 2本目の指が触れたら、つまむ操作なので「動かした」扱いにします
+      draggedRef.current = true;
+    }
   };
 
+  const handlePointerMove = (event: React.PointerEvent) => {
+    const pointers = pointersRef.current;
+    const before = pointers.get(event.pointerId);
+    if (before === undefined) return;
+    const after = { x: event.clientX, y: event.clientY };
+
+    if (pointers.size === 1) {
+      // ▼ 指1本：動いたぶんだけ移動
+      const dx = after.x - before.x;
+      const dy = after.y - before.y;
+      setView((v) => ({ ...v, moveX: v.moveX + dx, moveY: v.moveY + dy }));
+
+      const start = startPointRef.current;
+      if (Math.hypot(after.x - start.x, after.y - start.y) > DRAG_THRESHOLD) {
+        draggedRef.current = true;
+      }
+    } else if (pointers.size === 2) {
+      // ▼ 指2本：2本の指のあいだの距離が何倍になったかで、拡大・縮小
+      const other = [...pointers.entries()].find(([id]) => id !== event.pointerId)?.[1];
+      if (other !== undefined) {
+        const distanceBefore = Math.hypot(before.x - other.x, before.y - other.y);
+        const distanceAfter = Math.hypot(after.x - other.x, after.y - other.y);
+        if (distanceBefore > 0) {
+          const ratio = distanceAfter / distanceBefore;
+          setView((v) => ({ ...v, zoom: clampZoom(v.zoom * ratio) }));
+        }
+      }
+    }
+
+    pointers.set(event.pointerId, after);
+  };
+
+  const handlePointerUp = (event: React.PointerEvent) => {
+    pointersRef.current.delete(event.pointerId);
+  };
+
+  // ▼ パソコンで確かめるときのために、マウスのホイールでも拡大・縮小できるようにします。
+  //   React の onWheel では、画面全体のスクロールを止められません
+  //   （ブラウザが「止めない約束」で受け取る仕組みになっているため）。
+  //   そこで、ブラウザに直接「止めることがある」と伝えて受け取ります（passive: false）。
+  useEffect(() => {
+    const area = areaRef.current;
+    if (area === null) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const ratio = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+      setView((v) => ({
+        ...v,
+        zoom: Math.min(MAX_ZOOM / fitZoom, Math.max(MIN_ZOOM / fitZoom, v.zoom * ratio)),
+      }));
+    };
+    area.addEventListener("wheel", handleWheel, { passive: false });
+    return () => area.removeEventListener("wheel", handleWheel);
+  }, [fitZoom]);
+
   return (
-    <div ref={areaRef} className="relative h-full w-full overflow-hidden">
-      {/* ▼ 中心から一人ひとりへ伸びる線。アイコンより先に描いて、後ろに回します。
-            svg を範囲いっぱいに広げ、中心を真ん中にずらして（translate）描いています。 */}
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
-        aria-hidden="true"
+    <div
+      ref={areaRef}
+      // touch-none = ブラウザ自体のスクロールや拡大をさせない（指の動きをこちらで受け取るため）
+      className="relative h-full w-full touch-none overflow-hidden"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      // 動かしたあとに指を離したときは、アイコンを押したことにしません（リンクへ飛ばない）
+      onClickCapture={(event) => {
+        if (draggedRef.current) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+    >
+      {/* ▼ 動かす中身。移動と拡大・縮小を、この1枚にまとめてかけます */}
+      <div
+        className="absolute inset-0"
+        style={{
+          transform: `translate(${view.moveX}px, ${view.moveY}px) scale(${scale})`,
+        }}
       >
-        <defs>
-          {/* radialGradient = 中心から外へ向かって色が変わるグラデーション。
-              userSpaceOnUse = 位置を px で指定する、という意味です */}
-          <radialGradient
-            id="cord-gradient"
-            gradientUnits="userSpaceOnUse"
-            cx="0"
-            cy="0"
-            r={unit * 2}
-          >
-            {/* 金を強めに。半分より内側で、もう金に変わります */}
-            <stop offset="0%" stopColor={BENI} />
-            <stop offset="40%" stopColor={KIN} />
-            <stop offset="100%" stopColor="#e3c77f" />
-          </radialGradient>
-        </defs>
-        {/* 50% の位置へずらして、中心を 0,0 にします */}
-        <g style={{ transform: "translate(50%, 50%)" }} fill="none">
-          {[...shown.map((_, index) => index), ...(rest.length > 0 ? [capacity - 1] : [])].map(
-            (n) => {
-              const { x, y } = spotAt(n);
-              // 中心（0,0）とその人（x,y）を直径の両はしにする円。
-              // こうすると、どの輪も中心を通るので、花びらが中心から開いているように見えます
-              const radius = Math.hypot(x, y) / 2;
+        {/* ▼ 水引の花の輪。アイコンより先に描いて、後ろに回します */}
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+          aria-hidden="true"
+        >
+          <defs>
+            {/* radialGradient = 中心から外へ向かって色が変わるグラデーション */}
+            <radialGradient
+              id="cord-gradient"
+              gradientUnits="userSpaceOnUse"
+              cx="0"
+              cy="0"
+              r={GAP * 2}
+            >
+              {/* 金を強めに。半分より内側で、もう金に変わります */}
+              <stop offset="0%" stopColor={BENI} />
+              <stop offset="40%" stopColor={KIN} />
+              <stop offset="100%" stopColor="#e3c77f" />
+            </radialGradient>
+          </defs>
+          {/* 50% の位置へずらして、中心を 0,0 にします */}
+          <g style={{ transform: "translate(50%, 50%)" }} fill="none">
+            {spots.map((spot, index) => {
+              // 中心（0,0）とその人を、直径の両はしにする輪
+              const radius = Math.hypot(spot.x, spot.y) / 2;
               return (
-                <g key={n}>
-                  <circle cx={x / 2} cy={y / 2} r={radius} stroke="url(#cord-gradient)" strokeWidth={1.1} opacity={0.8} />
+                <g key={index}>
+                  <circle cx={spot.x / 2} cy={spot.y / 2} r={radius} stroke="url(#cord-gradient)" strokeWidth={1.1} opacity={0.8} />
                   {/* 少しだけ大きい輪をもう1本。2本の紐を束ねたように見せます */}
-                  <circle cx={x / 2} cy={y / 2} r={radius + 3} stroke="url(#cord-gradient)" strokeWidth={0.8} opacity={0.5} />
+                  <circle cx={spot.x / 2} cy={spot.y / 2} r={radius + 3} stroke="url(#cord-gradient)" strokeWidth={0.8} opacity={0.5} />
                 </g>
               );
-            },
-          )}
-        </g>
-      </svg>
+            })}
+          </g>
+        </svg>
 
-      {/* ▼ 自分（中心） */}
-      {me ? (
-        <Link
-          href={`/members/${currentUserId}`}
-          aria-label="自分"
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-kin bg-white p-[3px]"
-        >
-          <div
-            className="h-14 w-14 rounded-full bg-stone-300 bg-cover bg-center"
-            style={
-              me.avatarUrl
-                ? { backgroundImage: `url("${encodeURI(me.avatarUrl)}")` }
-                : undefined
-            }
-          />
-        </Link>
-      ) : null}
-
-      {/* ▼ まわりのメンバー。
-            マル1つぶんの中身は MemberCircle にまとめてあります。
-            長押しを受け取るために、ブラウザ側で動く部品にする必要があるためです。 */}
-      {shown.map((member, index) => {
-        const { x, y } = spotAt(index);
-        return (
-          <MemberCircle key={member.id} member={member} x={x} y={y} hideName />
-        );
-      })}
-
-      {/* ▼ 入りきらなかった人。最後の場所に「その他」として置きます */}
-      {rest.length > 0 ? (
-        <button
-          type="button"
-          onClick={() => setIsListOpen(true)}
-          aria-label={`その他 ${rest.length}人を見る`}
-          className="absolute left-1/2 top-1/2 flex h-[57px] w-[57px] cursor-pointer items-center justify-center rounded-full border border-kin bg-white text-sm font-bold text-kin"
-          style={{
-            transform: `translate(-50%, -50%) translate(${spotAt(capacity - 1).x}px, ${spotAt(capacity - 1).y}px)`,
-          }}
-        >
-          +{rest.length}
-        </button>
-      ) : null}
-
-      {/* ▼ その他のメンバーの一覧。下からせり上がる板です */}
-      {isListOpen ? (
-        <div
-          onClick={() => setIsListOpen(false)}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/30"
-        >
-          {/* stopPropagation = 板の中を押したときに、背景の「閉じる」を動かさない */}
-          <div
-            onClick={(event) => event.stopPropagation()}
-            className="max-h-[70vh] w-full max-w-[430px] overflow-y-auto rounded-t-2xl bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3"
+        {/* ▼ 自分（中心） */}
+        {me ? (
+          <Link
+            href={`/members/${currentUserId}`}
+            aria-label="自分"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-kin bg-white p-[3px]"
           >
-            {/* 上の小さな棒。「引き出した板」だと分かるようにする目印です */}
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-200" />
+            <div
+              className="h-14 w-14 rounded-full bg-stone-300 bg-cover bg-center"
+              style={
+                me.avatarUrl
+                  ? { backgroundImage: `url("${encodeURI(me.avatarUrl)}")` }
+                  : undefined
+              }
+            />
+          </Link>
+        ) : null}
 
-            <p className="mb-2 text-sm font-bold text-stone-700">
-              その他のメンバー（{rest.length}人）
-            </p>
-
-            <ul>
-              {rest.map((member) => (
-                <li key={member.id}>
-                  <Link
-                    href={`/members/${member.id}`}
-                    className="flex h-14 items-center gap-3"
-                  >
-                    <span
-                      className="h-10 w-10 shrink-0 rounded-full bg-stone-200 bg-cover bg-center"
-                      style={
-                        member.avatarUrl
-                          ? { backgroundImage: `url("${encodeURI(member.avatarUrl)}")` }
-                          : undefined
-                      }
-                    />
-                    <span className="min-w-0 flex-1 truncate text-[15px] text-stone-700">
-                      {member.displayName ?? "名無し"}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      ) : null}
+        {/* ▼ まわりのメンバー。長押しでプロフィールが出るのは MemberCircle の働きです */}
+        {others.map((member, index) => (
+          <MemberCircle
+            key={member.id}
+            member={member}
+            x={spots[index].x}
+            y={spots[index].y}
+            hideName
+          />
+        ))}
+      </div>
     </div>
   );
 }

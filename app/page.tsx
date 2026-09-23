@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getHomeData } from "@/lib/home";
 import CommunitySwitcher from "@/components/CommunitySwitcher";
-import PullToRefresh from "@/components/PullToRefresh";
 import MemberCircles from "@/components/MemberCircles";
 import RecoveryNotice from "@/components/RecoveryNotice";
 import HintOverlay from "@/components/HintOverlay";
@@ -86,12 +85,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         //   ばらばらに散らす版（components/MemberScatter.tsx）と、
         //   梅結びの模様（components/MizuhikiHome.tsx）は、いまは使っていません。
         //
-        // flex-1 = 残りの高さを全部つかう。上から引っぱると、中身を取り直せます。
+        // flex-1 = 残りの高さを全部つかう。
+        // 上から引っぱって取り直す動き（PullToRefresh）は外しました。
+        // 指1本で模様を動かす操作と、同じ動きでぶつかるためです。
         // pb は、下タブと2つのボタンが重なっているぶんの逃げです。
         <div className="min-h-0 flex-1 px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)]">
-          <PullToRefresh>
-            <MemberCircles members={members} currentUserId={user.id} />
-          </PullToRefresh>
+          <MemberCircles members={members} currentUserId={user.id} />
         </div>
       )}
 
