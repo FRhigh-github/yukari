@@ -86,14 +86,16 @@ export default function PostForm({ communities }: PostFormProps) {
   };
 
   return (
-    <div className="min-h-full bg-gray-300 p-4">
+    // 色はホームにそろえています（生成りの背景・金のふち・紅は「ご報告」ボタンだけ）
+    // pb = 下タブ（浮いている分も入れて約110px）に「ご報告」ボタンが隠れないための余白
+    <div className="min-h-full bg-[#faf9f6] px-4 pb-[calc(env(safe-area-inset-bottom)+8rem)] pt-4">
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* コミュニティ選択 */}
         <div className="relative">
           <select
             value={communityId}
             onChange={(event) => setCommunityId(event.target.value)}
-            className="w-full appearance-none rounded-full bg-gray-500 px-4 py-2.5 text-center font-medium text-white focus:outline-none"
+            className="h-11 w-full appearance-none rounded-full border border-kin/50 bg-white px-10 text-center font-bold text-stone-800 focus:outline-none"
           >
             {communities.length === 0 ? (
               <option value="">参加しているコミュニティがありません</option>
@@ -104,13 +106,22 @@ export default function PostForm({ communities }: PostFormProps) {
               </option>
             ))}
           </select>
-          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-white">
+          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-kin">
             ▼
           </span>
         </div>
 
         {/* 画像を添付。input は隠して、label 全体を押せるようにしています */}
-        <label className="relative flex h-64 w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-3xl bg-white shadow-sm">
+        {/* ▼ 写真を選んだら、ここがそのまま「見え方のお試し（プレビュー）」になります。
+              見る側のストーリー画面（StoryViewer）と同じ 9:16 の形・余白のぼかし・文字の重なり方です。
+              押すと写真を選び直せます */}
+        <label
+          className={`relative mx-auto flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl ${
+            imageFile
+              ? "aspect-[9/16] w-2/3 bg-stone-700 ring-1 ring-kin/60"
+              : "h-64 w-full border border-dashed border-kin/60 bg-white"
+          }`}
+        >
           <input
             type="file"
             accept="image/*"
@@ -118,18 +129,36 @@ export default function PostForm({ communities }: PostFormProps) {
             onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
           />
           {imageFile ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={URL.createObjectURL(imageFile)}
-              alt=""
-              className="h-full w-full object-cover"
-            />
+            <>
+              {/* 見る側と同じく、後ろにぼかした同じ写真を敷いて余白をなじませます */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={URL.createObjectURL(imageFile)}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-xl"
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={URL.createObjectURL(imageFile)}
+                alt=""
+                className="absolute inset-0 h-full w-full object-contain"
+              />
+              {/* 下を暗くして、入力中のタイトルと本文を重ねて見せます */}
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3 pt-12 text-left">
+                <p className="text-base font-bold text-white">{title || "タイトル"}</p>
+                <p className="line-clamp-4 text-[10px] leading-relaxed text-white/85">{body}</p>
+              </div>
+              <span className="absolute right-2 top-2 rounded-full bg-black/50 px-2 py-1 text-[10px] text-white">
+                押すと選び直せます
+              </span>
+            </>
           ) : (
-            <div className="flex flex-col items-center gap-2 text-gray-800">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-black text-2xl font-light">
+            <div className="flex flex-col items-center gap-2 text-kin">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-kin text-2xl font-light">
                 ＋
               </div>
-              <span className="text-sm font-medium">写真を選ぶ（必須）</span>
+              <span className="text-sm text-stone-500">写真を選ぶ（必須）</span>
             </div>
           )}
         </label>
@@ -140,25 +169,25 @@ export default function PostForm({ communities }: PostFormProps) {
           placeholder="タイトルを入力"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          className="w-full rounded-2xl bg-white px-4 py-3.5 text-center text-gray-700 shadow-sm placeholder:text-gray-400 focus:outline-none"
+          className="w-full rounded-xl border border-kin/30 bg-white px-4 py-3 text-[17px] font-bold text-stone-800 placeholder:font-normal placeholder:text-stone-400 focus:border-kin focus:outline-none"
         />
 
         <textarea
           placeholder="本文を入力"
           value={body}
           onChange={(event) => setBody(event.target.value)}
-          className="h-28 w-full resize-none rounded-2xl bg-white p-4 text-center text-gray-700 shadow-sm placeholder:text-gray-400 focus:outline-none"
+          className="h-32 w-full resize-none rounded-xl border border-kin/30 bg-white p-4 text-[17px] text-stone-700 placeholder:text-stone-400 focus:border-kin focus:outline-none"
         />
 
         {error ? (
-          <p className="text-center text-xs text-red-600">{error}</p>
+          <p className="text-center text-xs text-beni">{error}</p>
         ) : null}
 
         <div className="flex justify-end pt-2">
           <button
             type="submit"
             disabled={isSending}
-            className="flex items-center gap-2 rounded-full bg-neutral-800 px-6 py-2.5 font-bold text-white shadow-md disabled:opacity-40"
+            className="flex h-12 items-center gap-2 rounded-full bg-beni px-7 font-bold text-white ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6] disabled:opacity-40"
           >
             <span>{isSending ? "送信中..." : "ご報告"}</span>
             <svg className="h-4 w-4 rotate-45" fill="currentColor" viewBox="0 0 20 20">

@@ -23,7 +23,15 @@ const TABS = [
   {
     href: "/cards",
     label: "カード",
-    path: <path d="M4 3h16v18H4zM8 3v3h8V3" />,
+    // 横長のカードに、小さなハートを1つ。
+    // 前は縦長の四角に留め具が付いた形で、クリップボードに見えていました。
+    // 横長にすると「カード」らしくなり、ハートで「気持ちを送るもの」だと分かります。
+    path: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M12 15.5s-3.5-2.1-3.5-4.4A1.9 1.9 0 0 1 12 10a1.9 1.9 0 0 1 3.5 1.1c0 2.3-3.5 4.4-3.5 4.4z" />
+      </>
+    ),
   },
   {
     href: "/",
@@ -61,20 +69,37 @@ function TabIcon({ path, isCurrent }: TabIconProps) {
   const isActive = isCurrent || pending;
 
   return (
-    <svg
-      viewBox="0 0 24 24"
-      width="24"
-      height="24"
-      // 選ばれているタブだけ、中を塗りつぶします
-      fill={isActive ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={isActive ? "text-stone-900" : "text-stone-500"}
+    // ▼ 選ばれているタブの後ろに、白い台を敷きます。
+    //   影(shadow-md)を付けると、その1つだけがバーから
+    //   ふわっと持ち上がって見えます（Instagram の下タブと同じ見せ方）。
+    //   色を変えるだけより「いまここにいる」がはっきりします。
+    //
+    //   transition = 台が出たり消えたりするときに、パッと変わらず少しなめらかにします。
+    <span
+      className={`flex h-10 w-14 items-center justify-center rounded-full transition-all duration-200 ${
+        isActive ? "bg-white shadow-md ring-1 ring-kin/40" : ""
+      }`}
     >
-      {path}
-    </svg>
+      <svg
+        viewBox="0 0 24 24"
+        width="24"
+        height="24"
+        // 中は塗りません。塗ると線の形がつぶれて、何の絵か分かりにくくなるためです。
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        // 色は水引から取っています（globals.css）。
+        //   ふだん   = 紅(beni)
+        //   選択中   = 金(kin)
+        // stroke を currentColor にしてあるので、
+        // ここで文字色を変えるだけで線の色が変わります。
+        className={isActive ? "text-kin" : "text-beni"}
+      >
+        {path}
+      </svg>
+    </span>
   );
 }
 
@@ -83,6 +108,10 @@ export default function BottomNav() {
 
   // null を返すと何も表示されません
   if (HIDE_NAV.includes(pathname)) return null;
+  // ご報告のストーリー画面（/members/xxx）も、画面いっぱいに使うので出しません。
+  // id が人ごとに違うので、上の一覧ではなく「形」で見分けます。
+  // /members/xxx/profile は2段深いので、ここには当てはまりません
+  if (/^\/members\/[^/]+$/.test(pathname)) return null;
 
   return (
     // 外側の枠。ここで画面の端からの距離を作ります。
@@ -97,9 +126,11 @@ export default function BottomNav() {
           rounded-2xl で角を丸め、shadow-lg で影を落とすと、
           画面から少し持ち上がっているように見えます。 */}
       {/* backdrop-blur = 後ろにあるものをぼかす指定。
-          bg-stone-200/70 の「/70」は 70% の濃さ、という意味です。
-          この2つで、後ろが透けるすりガラスになります。 */}
-      <nav className="pointer-events-auto flex items-center justify-around rounded-2xl bg-stone-200/70 px-2 py-1.5 shadow-lg backdrop-blur-xl">
+          bg-[#faf9f6]/85 の「/85」は 85% の濃さ、という意味です。
+          この2つで、後ろが透けるすりガラスになります。
+          色は灰色ではなく、ホームの背景と同じ生成り色にして、金の細いふち（ring-kin）を付けています。
+          選択中の白い台にも金のふちを付けて、生成りの上でも見分けられるようにしています。 */}
+      <nav className="pointer-events-auto flex items-center justify-around rounded-2xl bg-[#faf9f6]/85 px-2 py-1.5 shadow-lg ring-1 ring-kin/40 backdrop-blur-xl">
         {TABS.map((tab) => {
           const isActive = pathname === tab.href;
 
@@ -108,11 +139,12 @@ export default function BottomNav() {
               key={tab.href}
               href={tab.href}
               // 文字は出さないので、代わりに aria-label で名前を持たせます。
-              // h-11 w-11 = 44px。押せる範囲を iOS の基準に合わせています。
+              // h-11 = 44px。押せる範囲を iOS の基準に合わせています。
+              // 横は、中の白い台(w-14)が入るように広げてあります。
               aria-label={tab.label}
               // active:scale-90 = 指で押しているあいだ、少し縮みます。
               // 押せたことがその場で分かるので、待ち時間が気になりにくくなります。
-              className="flex h-11 w-11 items-center justify-center transition-transform active:scale-90"
+              className="flex h-11 w-16 items-center justify-center transition-transform active:scale-90"
             >
               <TabIcon path={tab.path} isCurrent={isActive} />
             </Link>

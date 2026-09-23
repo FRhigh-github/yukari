@@ -29,7 +29,9 @@ export const viewport: Viewport = {
   // ノッチ（画面上の切り欠き）の下まで表示を広げます。
   // 代わりに、文字が隠れないよう globals.css で余白を足しています。
   viewportFit: "cover",
-  themeColor: "#ffffff",
+  // 一番上（時計や電池が並ぶ帯）の色。ホームの背景と同じ生成り色にしています。
+  // ストーリー画面（StoryViewer）を開いている間だけ、そちらで暗い色に変えます
+  themeColor: "#faf9f6",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -76,12 +78,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       {/* 外側の灰色。PCで見たとき、アプリの外にあたる部分です */}
       <body className="min-h-full bg-stone-200">
-        {/* アプリ本体。max-w-sm(384px) + mx-auto で、スマホ1台ぶんを真ん中に置きます。
+        {/* アプリ本体。max-w-[430px] + mx-auto で、スマホ1台ぶんを真ん中に置きます。
+            430px は、いちばん大きい iPhone（Pro Max）の幅です。
+            前は max-w-sm(384px) で、ふつうの iPhone（390〜402px）より細く、
+            左右に外側の色が細い帯になって見えていました。
             100dvh = 今この瞬間に見えている画面の高さ。
             スマホは上下のバーが出たり引っ込んだりするので、
             100vh だとはみ出します。dvh はそれに追従します。 */}
         {/* relative = この枠の中を、位置指定の基準にする（オープニングがここに収まります） */}
-        <div className="relative mx-auto flex h-full max-w-sm flex-col bg-white shadow-xl">
+        <div className="relative mx-auto flex h-full max-w-[430px] flex-col bg-white shadow-xl">
           {/* 下タブは常に見えたまま、中身だけがスクロールします。
               min-h-0 = flex の中で overflow を効かせるために必要な指定。
               overscroll-contain = 中身を端まで送っても、外側に影響させない。

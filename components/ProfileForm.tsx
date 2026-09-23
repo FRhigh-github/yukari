@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { shrinkImage } from "@/lib/image";
+import ImageCropper from "@/components/ImageCropper";
 import CameraBadge from "@/components/CameraBadge";
 import { MOODS } from "@/lib/mood";
 import BirthdayPicker from "@/components/BirthdayPicker";
@@ -37,8 +37,17 @@ export default function ProfileForm({
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const handlePick = async (file: File) => {
-    const blob = await shrinkImage(file);
+  // 切り取り中の写真。null なら切り取り画面は出していません
+  const [cropFile, setCropFile] = useState<File | null>(null);
+
+  // 写真を選んだら、まず切り取り画面を出します。
+  // 切り取った結果は 512px の正方形なので、ここで縮める（shrinkImage）必要はありません
+  const handlePick = (file: File) => {
+    setCropFile(file);
+  };
+
+  const handleCropped = (blob: Blob) => {
+    setCropFile(null);
     setNewAvatar(blob);
     // createObjectURL = 選んだ画像を、その場で表示できるURLにする命令
     setPreview(URL.createObjectURL(blob));
@@ -138,6 +147,8 @@ export default function ProfileForm({
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) handlePick(file);
+              // 同じ写真をもう一度選んでも反応するように、選んだ記録を消しておきます
+              event.target.value = "";
             }}
           />
         </label>
@@ -151,10 +162,22 @@ export default function ProfileForm({
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) handlePick(file);
+              // 同じ写真をもう一度選んでも反応するように、選んだ記録を消しておきます
+              event.target.value = "";
             }}
           />
         </label>
       </section>
+
+      {/* 切り取り画面。人のアイコンは丸く出すので、枠も丸くします */}
+      {cropFile ? (
+        <ImageCropper
+          file={cropFile}
+          round
+          onDone={handleCropped}
+          onCancel={() => setCropFile(null)}
+        />
+      ) : null}
 
       {/* ▼ 名前と誕生日。左に項目名、右に入力欄を並べます */}
       <Row label="名前">

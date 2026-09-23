@@ -91,11 +91,14 @@ export default function CommunitySwitcher({
               <span className="truncate text-[17px] font-bold text-stone-800">
                 {pressedName ?? currentName}
               </span>
-              <span className="shrink-0 text-[10px] text-stone-400">▼</span>
+              <span className="shrink-0 text-[10px] text-kin">▼</span>
             </span>
             <span className="block truncate text-xs text-stone-400">
               {memberCount}人
-              {todayCount > 0 ? ` ・ 今日 ${todayCount}件の報告` : ""}
+              {/* 今日の報告だけ金にして、目が行くようにします */}
+              {todayCount > 0 ? (
+                <span className="text-kin"> ・ 今日 {todayCount}件の報告</span>
+              ) : null}
             </span>
           </span>
         </button>
@@ -234,7 +237,8 @@ type CommunityMarkProps = {
 function CommunityMark({ iconUrl, name, size }: CommunityMarkProps) {
   return (
     <span
-      className={`flex shrink-0 items-center justify-center rounded-xl bg-stone-200 bg-cover bg-center font-bold text-stone-500 ${size}`}
+      // border-kin/50 = 金の細いふち。画像のあるなしにかかわらず、同じ枠に見せます
+      className={`flex shrink-0 items-center justify-center rounded-xl border border-kin/50 bg-stone-100 bg-cover bg-center font-bold text-kin ${size}`}
       style={
         iconUrl
           ? { backgroundImage: `url("${encodeURI(iconUrl)}")` }

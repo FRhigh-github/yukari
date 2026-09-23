@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getHomeData } from "@/lib/home";
-import MemberCircles from "@/components/MemberCircles";
 import CommunitySwitcher from "@/components/CommunitySwitcher";
-import PullToRefresh from "@/components/PullToRefresh";
+import MemberCircles from "@/components/MemberCircles";
 import RecoveryNotice from "@/components/RecoveryNotice";
 import HintOverlay from "@/components/HintOverlay";
+import NotificationToggle from "@/components/NotificationToggle";
 import { SHOW_HINTS } from "@/lib/tutorial";
 
 // 画面の真ん中に、文と案内ボタンを1つ出すだけの小さな部品
@@ -49,9 +49,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   return (
     // h-full = 親（layout の main）からもらった高さいっぱい。
     // 縦に伸ばさず、この中で収める形にします。
-    <div className="relative flex h-full flex-col">
+    // bg-[#faf9f6] = 少し温かみのある白。オープニングの背景と同じ色です。
+    // 真っ白より紙に近く、水引の紅がなじみます。
+    <div className="relative flex h-full flex-col bg-[#faf9f6]">
       {/* shrink-0 = 場所が足りなくてもこのバーは縮めない */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-stone-100 px-4 py-3">
+      <header className="flex shrink-0 items-center gap-3 border-b border-kin/30 px-4 py-3">
         {/* 作る・参加する・設定への入口も、この中にまとめてあります */}
         <CommunitySwitcher
           communities={communities}
@@ -60,14 +62,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           todayCount={todayCount}
         />
 
-        {/* 知らせ。報告がある日は、鐘の右上に紅い点を出します。
-            relative は、この点を鐘を基準に置くために必要です。 */}
-        <span className="relative shrink-0 text-xl text-stone-500">
-          🔔
-          {todayCount > 0 ? (
-            <span className="absolute right-0 top-0 h-2 w-2 rounded-full bg-beni" />
-          ) : null}
-        </span>
+        {/* 通知のオン・オフ。報告がある日は、鐘の右上に紅い点が出ます */}
+        <NotificationToggle hasNews={todayCount > 0} />
       </header>
 
       {/* 初めての人にだけ、一言そえます */}
@@ -85,26 +81,37 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           label="コミュニティに参加する"
         />
       ) : (
-        // flex-1 = 残りの高さを全部つかう。マルはこの中に割り振られます。
-        // 上から引っぱると、中身を取り直せます。
+        // ▼ メンバーのアイコンを、自分を中心にした同心円に並べます（MemberCircles）。
+        //   ばらばらに散らす版（components/MemberScatter.tsx）と、
+        //   梅結びの模様（components/MizuhikiHome.tsx）は、いまは使っていません。
         //
-        // pb は、下タブと2つのボタンが重なっているぶんの逃げです。
-        // これが無いと、相関図の中心が「隠れている部分まで含めた真ん中」になり、
-        // 上に大きな余白ができてしまいます。
-        <div className="min-h-0 flex-1 px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)]">
-          <PullToRefresh>
-            <MemberCircles members={members} currentUserId={user.id} />
-          </PullToRefresh>
+        // flex-1 = 残りの高さを全部つかう。
+        // 上から引っぱって取り直す動き（PullToRefresh）は外しました。
+        // 指1本で模様を動かす操作と、同じ動きでぶつかるためです。
+        // 余白（px / pb）は付けません。付けると、そこで模様が切れて見えるためです。
+        // 下タブとボタンに重なるぶんは、MemberCircles の中で中心を上にずらして逃がしています。
+        <div className="min-h-0 flex-1">
+          <MemberCircles members={members} currentUserId={user.id} />
         </div>
       )}
 
-      {/* 左下：届いたカードを見る手紙ボックス
-          下タブ（約76px）＋ iPhone下端の余白 の上に置きます。
-          余白を足さずに数字だけで決めると、端末によって重なります。 */}
+      {/* ▼ 下の2つのボタン。どちらもアイコンだけの丸いボタンです。
+            言葉を添えると、よく見るテンプレートの形になってしまうため、外しています。
+            何のボタンかは aria-label（読み上げ用の名前）で伝えます。
+            アイコンは下タブと同じ描き方（線の太さ2・角は丸く・塗りなし）です。
+
+            色は水引の紅・金と、白・グレーだけにしています。
+              ふみばこ = 白地に金のふちとアイコン。見るだけの、控えめなボタン
+              報告する = 紅地。まわりに金の細い輪を回して、水引の紅白と金のように見せます
+
+            下タブ（約76px）＋ iPhone下端の余白 の上に置きます。
+            余白を足さずに数字だけで決めると、端末によって重なります。 */}
+
+      {/* 左下：届いたカードを見る「ふみばこ」（文箱＝手紙を入れておく和の箱） */}
       <Link
         href="/cards/inbox"
-        aria-label="届いたカード"
-        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg"
+        aria-label="ふみばこ（届いたカード）"
+        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-kin/60 bg-white shadow-md"
       >
         <svg
           viewBox="0 0 24 24"
@@ -112,24 +119,38 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           height="22"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.8"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="text-stone-600"
+          className="text-kin"
         >
-          {/* 郵便受けの形。箱と、差し込み口と、旗 */}
-          <path d="M3 11h14a2 2 0 0 1 2 2v7H3z" />
-          <path d="M6 14h5" />
-          <path d="M19 13V5h-4" />
+          {/* 箱と、上から差し込まれた手紙 */}
+          <path d="M3 12h5l1.5 2.5h5L16 12h5" />
+          <path d="M3 12v7h18v-7l-2.5-6h-13z" />
+          <path d="M9 9h6" />
         </svg>
       </Link>
 
       {/* 右下：ご報告を書く */}
       <Link
         href="/post"
-        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-4 z-30 rounded-full bg-stone-400 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
+        aria-label="報告する"
+        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-beni text-white shadow-md ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6]"
       >
-        ステキな報告をする
+        <svg
+          viewBox="0 0 24 24"
+          width="24"
+          height="24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {/* 筆（ペン）の形。斜めの軸と、先の小さな線 */}
+          <path d="M4 20h4L19 9l-4-4L4 16z" />
+          <path d="M14 6l4 4" />
+        </svg>
       </Link>
     </div>
   );

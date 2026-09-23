@@ -42,19 +42,19 @@ export default function InviteCode({ code, communityName }: InviteCodeProps) {
       <button
         type="button"
         onClick={handleCopyCode}
-        className="flex w-full items-center justify-between rounded-xl bg-stone-100 px-4 py-3"
+        className="flex w-full items-center justify-between rounded-xl border border-kin/50 bg-white px-4 py-3"
       >
         {/* tracking-widest = 文字の間を広げて読みやすくします */}
         <span className="font-mono text-lg tracking-widest text-stone-800">
           {code}
         </span>
-        <span className="text-xs text-stone-500">コピー</span>
+        <span className="text-xs text-kin">コピー</span>
       </button>
 
       <button
         type="button"
         onClick={handleShare}
-        className="w-full rounded-xl bg-stone-800 py-3 text-sm font-bold text-white"
+        className="h-12 w-full rounded-xl bg-beni text-sm font-bold text-white"
       >
         招待を送る
       </button>
