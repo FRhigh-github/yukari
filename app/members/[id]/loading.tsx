@@ -1,22 +1,25 @@
 // loading.tsx という名前でファイルを置くと、
 // そのページのデータが届くまでの間、これが代わりに表示されます。
 //
-// これが無いと、押してから中身が届くまで何も起きず、
-// 画面が動き終わったあとに、間をおいて中身が出てきます。
-// 先に「形だけ」を出しておくと、その間が埋まります。
+// ご報告の画面は、ストーリーのように画面いっぱいで見せます（StoryViewer）。
+// 待っている間も同じ形・同じ色にしておくと、中身が届いたときに
+// 写真と文字がそのまま浮かび上がるだけに見え、「読み込み中」の感じが出ません。
 //
-// animate-pulse = ゆっくり点滅させる（読み込み中だと伝わります）
+// 前は一覧の形の灰色の箱を点滅させていましたが、
+// 届いた画面とまったく形が違うので、切り替わりが目立っていました。
 
 export default function Loading() {
   return (
-    <main className="p-6 pb-24">
-      <div className="h-4 w-12 rounded bg-stone-200" />
-      <div className="mb-4 mt-3 h-6 w-48 rounded bg-stone-200" />
-
-      <div className="animate-pulse space-y-3">
-        <div className="h-28 rounded-2xl bg-stone-100" />
-        <div className="h-28 rounded-2xl bg-stone-100" />
+    // StoryViewer と同じく、アプリの枠いっぱいに広げます
+    <div className="absolute inset-0 z-40 bg-[#faf9f6]">
+      <div className="px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
+        {/* 何枚目かの線の場所 */}
+        <div className="h-0.5 rounded-full bg-stone-300" />
+        {/* アイコンの場所。44px の行にそろえて、届いたときに位置がずれないようにします */}
+        <div className="mt-2 flex min-h-11 items-center gap-2">
+          <span className="h-9 w-9 rounded-full bg-stone-200 ring-2 ring-kin/40" />
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

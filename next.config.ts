@@ -25,6 +25,39 @@ const nextConfig: NextConfig = {
   // 1つずつ書くのではなく、家庭やキャンパスでよく使われる範囲をまとめて許可しています。
   allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "172.*.*.*"],
 
+  // ▼ すべての画面に付ける、身を守るための指定（セキュリティヘッダー）
+  //
+  // X-Frame-Options / frame-ancestors
+  //   = 別のサイトが、このアプリを自分のページの中に埋め込めないようにします。
+  //     埋め込まれると、透明にして重ねたボタンを押させる、といういたずら
+  //     （クリックジャッキング）ができてしまうためです。
+  // X-Content-Type-Options: nosniff
+  //   = ファイルの種類をブラウザに推測させません。
+  //     画像のふりをした別物を、プログラムとして動かされるのを防ぎます。
+  // Referrer-Policy
+  //   = 外のサイトへ移るとき、どの画面から来たかを「ドメインだけ」しか伝えません。
+  //     URL の中の id（/members/xxxx など）が外に漏れないようにします。
+  // Permissions-Policy
+  //   = 使わない機能（位置情報・マイク・カメラの直接利用）を、最初から使えなくします。
+  //     写真を選ぶ <input type="file"> は、この指定の影響を受けません。
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "geolocation=(), microphone=(), camera=()",
+          },
+        ],
+      },
+    ];
+  },
+
   experimental: {
     // ▼ 一度見た画面を、ブラウザにどれだけ覚えておいてもらうか（秒）
     //

@@ -7,19 +7,21 @@
 //   ・自分のご報告の一覧
 
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
+import { getSignedUrls } from "@/lib/signedUrls";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
 
   // 1回目：本人確認と、入っているコミュニティを同時に取ります
-  const [userResult, { data: communities }] = await Promise.all([
-    supabase.auth.getUser(),
+  // 本人確認は通信なしで済みます（lib/supabase/server.ts の getCurrentUserId）
+  const [userId, { data: communities }] = await Promise.all([
+    getCurrentUserId(supabase),
     supabase.from("communities").select("name"),
   ]);
 
-  const user = userResult.data.user;
+  const user = userId === null ? null : { id: userId };
 
   if (user === null) {
     return (
@@ -47,21 +49,19 @@ export default async function ProfilePage() {
       .limit(30),
   ]);
 
-  // 写真の置き場所から、期限付きのURLを発行してもらいます（1時間）
+  // 写真の置き場所から、期限付きのURLを発行してもらいます
   const imagePaths =
     posts
       ?.filter((post) => post.image_url && !post.image_url.startsWith("http"))
       .map((post) => post.image_url) ?? [];
 
-  const { data: signedUrls } =
-    imagePaths.length > 0
-      ? await supabase.storage.from("posts").createSignedUrls(imagePaths, 3600)
-      : { data: null };
+  // URL は lib/signedUrls.ts で作ります（同じ写真には同じURLを返すので、写真を使い回せます）
+  const findSignedImage = await getSignedUrls("posts", imagePaths);
 
   const findImageUrl = (path: string | null) => {
     if (!path) return null;
     if (path.startsWith("http")) return path;
-    return signedUrls?.find((item) => item.path === path)?.signedUrl ?? null;
+    return findSignedImage(path);
   };
 
   return (

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ReceivedCard from "@/components/ReceivedCard";
 import type { CardKind } from "@/components/CardTemplate";
+import { getSignedUrls } from "@/lib/signedUrls";
 
 export default async function CardInboxPage({
   searchParams,
@@ -17,8 +18,9 @@ export default async function CardInboxPage({
   //   前は「本人確認 → その id でカードを絞る」と2段階でしたが、
   //   RLS が「自分が関わったカードしか返さない」ので、
   //   先に全部もらって、届いた／送ったの仕分けはこちらでやります。
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
+  // 本人確認。通信なしで済みます（lib/supabase/server.ts の getCurrentUserId）
+  const userId = await getCurrentUserId(supabase);
+  const user = userId === null ? null : { id: userId };
 
   // ▼ 前は本人確認と同時に「全部」取って、こちら側で選り分けていました。
   //   1往復ぶん速くなりますが、届いたぶんが欲しいときに
@@ -37,14 +39,14 @@ export default async function CardInboxPage({
     : { data: null };
 
   // カードの絵は cards という保管庫に入っています。
-  // 非公開なので、見るには期限付きの URL を発行してもらいます（1時間）。
+  // 非公開なので、見るには期限付きの URL を発行してもらいます。
   const drawingPaths =
     cards
       ?.map((card) => card.drawing_url)
       .filter((path): path is string => path !== null) ?? [];
 
   // ▼ 2回目：この3つは、カードが分かればどれも同時に出せます
-  const [{ data: senders }, { data: backgrounds }, { data: drawingUrls }] =
+  const [{ data: senders }, { data: backgrounds }, findDrawingUrl] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -57,15 +59,9 @@ export default async function CardInboxPage({
         .from("card_templates")
         .select("id, kind, name")
         .in("id", cards?.map((card) => card.template_id) ?? []),
-      drawingPaths.length > 0
-        ? supabase.storage.from("cards").createSignedUrls(drawingPaths, 3600)
-        : Promise.resolve({ data: null }),
+      // URL は lib/signedUrls.ts で作ります（同じカードには同じURLを返すので、絵を使い回せます）
+      getSignedUrls("cards", drawingPaths),
     ]);
-
-  const findDrawingUrl = (path: string | null) =>
-    path === null
-      ? null
-      : (drawingUrls?.find((item) => item.path === path)?.signedUrl ?? null);
 
   return (
     // 色はホームにそろえています（生成りの背景・金のふち・紅は「カードを作る」だけ）

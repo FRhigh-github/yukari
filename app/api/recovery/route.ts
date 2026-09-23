@@ -13,9 +13,12 @@
 
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { makeTicket } from "@/lib/recoveryTicket";
 
 export async function POST(request: Request) {
-  const { codes } = await request.json();
+  // 送られてきた中身が JSON として読めないときは、ここで断ります（読めないと処理ごと落ちるため）
+  const body = await request.json().catch(() => null);
+  const codes = body?.codes;
 
   // 受け取った形を確かめます。ここを省くと、変な値で落ちます。
   if (!Array.isArray(codes) || codes.length !== 3) {
@@ -86,6 +89,25 @@ export async function POST(request: Request) {
     );
   }
 
+  // ▼ 使い回せないように、申請を立てる「前に」使用済みにします。
+  //   前は申請を立てたあとに使用済みにしていたので、同じ3つのコードを
+  //   ほぼ同時に2回送ると、申請が2つ立ってしまうことがありました。
+  //   .eq("used", false) を付けると「まだ使われていないものだけ」を書き換えるので、
+  //   同時に来ても、先に届いた方しか3件ぶん書き換えられません。
+  const { data: marked } = await supabase
+    .from("recovery_codes")
+    .update({ used: true })
+    .in("code", cleaned)
+    .eq("used", false)
+    .select("code");
+
+  if (marked?.length !== 3) {
+    return NextResponse.json(
+      { error: "コードが違うか、期限が切れています" },
+      { status: 400 },
+    );
+  }
+
   const { data: created, error } = await supabase
     .from("recovery_requests")
     .insert({ target_user: targetUser, community_id: membership.community_id })
@@ -93,14 +115,18 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // DB のエラー文は、表の名前など中の作りが分かってしまうので、画面には出しません
+    console.error("recovery request insert failed", error);
+    return NextResponse.json(
+      { error: "申請を立てられませんでした。時間をおいて試してください" },
+      { status: 500 },
+    );
   }
 
-  // 使い回せないように、使用済みにします
-  await supabase
-    .from("recovery_codes")
-    .update({ used: true })
-    .in("code", cleaned);
-
-  return NextResponse.json({ requestId: created.id });
+  // 申請した本人にだけ、引換券を渡します（lib/recoveryTicket.ts）。
+  // ログインのときに、申請の番号と一緒に出してもらいます
+  return NextResponse.json({
+    requestId: created.id,
+    ticket: makeTicket(created.id),
+  });
 }

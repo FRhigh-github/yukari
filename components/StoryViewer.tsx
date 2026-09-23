@@ -188,6 +188,14 @@ export default function StoryViewer({
         </p>
       )}
 
+      {/* ▼ 次（1つ古い）ご報告の写真を、見えない所で先に読んでおきます。
+          右側を押した瞬間に、写真がもう届いている状態にするためです。
+          hidden = 画面には出さないが、ブラウザは読み込んでおいてくれます */}
+      {posts[index + 1]?.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={posts[index + 1].imageUrl ?? ""} alt="" aria-hidden="true" className="hidden" />
+      ) : null}
+
       {/* ▼ 手書きカード */}
       {isWriting && post ? (
         <ReactionCardSheet

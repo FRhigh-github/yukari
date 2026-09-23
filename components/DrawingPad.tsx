@@ -285,7 +285,9 @@ export default function DrawingPad({
       const path = `${data.user.id}/${crypto.randomUUID()}.png`;
       const upload = await supabase.storage
         .from("drawings")
-        .upload(path, blob, { contentType: "image/png" });
+        // cacheControl = ブラウザに「この写真は1年間そのまま使い回してよい」と伝えます。
+        // ファイル名は毎回ちがう id なので、同じ名前の中身が変わることはありません
+        .upload(path, blob, { contentType: "image/png", cacheControl: "31536000" });
       if (upload.error !== null) {
         throw new Error("画像の保存: " + upload.error.message);
       }

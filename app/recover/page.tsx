@@ -8,6 +8,10 @@
 // 申請の番号はブラウザに覚えさせます。
 // まだログインできていないので、DBに「あなたの申請はこれです」と
 // 聞ける状態にないためです。
+//
+// 番号と一緒に「引換券」も覚えさせます。
+// 番号は同じコミュニティの人なら誰でも見られるので、
+// 引換券が無いとログインできないようにしてあります（lib/recoveryTicket.ts）。
 
 "use client";
 
@@ -54,7 +58,11 @@ export default function RecoverPage() {
     }
 
     try {
-      localStorage.setItem(SAVED_KEY, result.requestId);
+      // 番号と引換券を1つにまとめて、文字にして覚えさせます
+      localStorage.setItem(
+        SAVED_KEY,
+        JSON.stringify({ requestId: result.requestId, ticket: result.ticket }),
+      );
     } catch {
       // 使えない環境でも、この画面を開いたままなら続けられます
     }
@@ -68,11 +76,19 @@ export default function RecoverPage() {
     setMessage(null);
     setIsSending(true);
 
-    const saved = localStorage.getItem(SAVED_KEY);
+    // 覚えさせた番号と引換券を取り出します。
+    // 壊れていたり、前の形（番号だけ）で残っていたりしたら、空のまま送ります
+    // （サーバーが「この端末からは復旧できません」と返します）
+    let saved: { requestId?: string; ticket?: string } = {};
+    try {
+      saved = JSON.parse(localStorage.getItem(SAVED_KEY) ?? "{}");
+    } catch {
+      saved = {};
+    }
 
     const response = await fetch("/api/recovery/complete", {
       method: "POST",
-      body: JSON.stringify({ requestId: saved }),
+      body: JSON.stringify({ requestId: saved.requestId, ticket: saved.ticket }),
     });
 
     const result = await response.json();

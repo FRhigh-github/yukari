@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import StoryViewer from "@/components/StoryViewer";
+import { getSignedUrls } from "@/lib/signedUrls";
 import type { Reaction } from "@/components/ReactionBoard";
 
 // [id] という名前のフォルダにすると、URL の一部を受け取れます。
@@ -62,18 +63,17 @@ export default async function MemberPage({
   const drawingPaths = reactions?.map((reaction) => reaction.drawing_url) ?? [];
 
   // 2回目：この3つは、1回目の結果がそろえば同時に出せます
-  const [{ data: signedUrls }, { data: reactionUsers }, { data: drawingUrls }] =
+  //   写真のURLは lib/signedUrls.ts で作ります。同じ写真には6日間同じURLを返すので、
+  //   2回目からはブラウザが前にダウンロードした写真をそのまま使えます。
+  //   渡している場所は、どれも RLS を通して取ってきたものです（そこの約束を参照）
+  const [findSignedImage, { data: reactionUsers }, findDrawingUrl] =
     await Promise.all([
-      imagePaths.length > 0
-        ? supabase.storage.from("posts").createSignedUrls(imagePaths, 3600)
-        : Promise.resolve({ data: null }),
+      getSignedUrls("posts", imagePaths),
       supabase
         .from("profiles")
         .select("id, display_name")
         .in("id", reactionUserIds),
-      drawingPaths.length > 0
-        ? supabase.storage.from("drawings").createSignedUrls(drawingPaths, 3600)
-        : Promise.resolve({ data: null }),
+      getSignedUrls("drawings", drawingPaths),
     ]);
 
   // 置き場所から URL を探す。find() = 条件に合う最初の1件を返す
@@ -81,7 +81,7 @@ export default async function MemberPage({
     if (!path) return null;
     // デバッグ用データは最初から URL なので、そのまま使います
     if (path.startsWith("http")) return path;
-    return signedUrls?.find((item) => item.path === path)?.signedUrl ?? null;
+    return findSignedImage(path);
   };
 
   // 報告1件ぶんの反応を、表示に使う形にして返します
@@ -90,9 +90,7 @@ export default async function MemberPage({
       ?.filter((reaction) => reaction.post_id === postId)
       .map((reaction) => ({
         id: reaction.id,
-        imageUrl:
-          drawingUrls?.find((item) => item.path === reaction.drawing_url)
-            ?.signedUrl ?? null,
+        imageUrl: findDrawingUrl(reaction.drawing_url),
         authorName:
           reactionUsers?.find((user) => user.id === reaction.from_user)
             ?.display_name ?? null,

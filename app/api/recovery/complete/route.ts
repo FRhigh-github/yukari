@@ -10,12 +10,25 @@
 
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isValidTicket } from "@/lib/recoveryTicket";
 
 export async function POST(request: Request) {
-  const { requestId } = await request.json();
+  // 送られてきた中身が JSON として読めないときは、ここで断ります
+  const body = await request.json().catch(() => null);
+  const requestId = body?.requestId;
 
   if (typeof requestId !== "string") {
     return NextResponse.json({ error: "申請が見つかりません" }, { status: 400 });
+  }
+
+  // ▼ 申請した本人しか持っていない「引換券」を確かめます（lib/recoveryTicket.ts）。
+  //   申請の番号は同じコミュニティの人なら誰でも見られるので、番号だけでは通しません。
+  //   DB に聞く前に断れるので、でたらめな呼び出しで DB を使わせずに済みます
+  if (!isValidTicket(requestId, body?.ticket)) {
+    return NextResponse.json(
+      { error: "この端末からは復旧できません。コードを入れた端末で開いてください" },
+      { status: 403 },
+    );
   }
 
   const supabase = createAdminClient();
@@ -37,6 +50,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // 一度ログインに使った申請は、もう使えません（1回限り）。
+  // 前は、通ったあとも何度でもログイン用の合言葉を出せていました
+  if (recoveryRequest.status === "approved") {
+    return NextResponse.json(
+      { error: "この申請はもう使われています" },
+      { status: 403 },
+    );
+  }
+
   // 24時間たったか＆拒否されていないか。DB側の関数に聞きます
   const { data: unlocked } = await supabase.rpc("recovery_is_unlocked", {
     request: requestId,
@@ -50,12 +72,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ waiting: true, readyAt: readyAt.toISOString() });
   }
 
+  // ▼ 合言葉を作る前に、申請を「使用済み（approved）」にします。
+  //   .eq("status", "pending") を付けると、まだ使われていないときだけ書き換わるので、
+  //   ほぼ同時に2回押されても、合言葉が出るのは先に届いた1回だけになります。
+  const { data: claimed } = await supabase
+    .from("recovery_requests")
+    .update({ status: "approved" })
+    .eq("id", requestId)
+    .eq("status", "pending")
+    .select("id");
+
+  if (claimed?.length !== 1) {
+    return NextResponse.json(
+      { error: "この申請はもう使われています" },
+      { status: 403 },
+    );
+  }
+
+  // 途中で失敗したときは、申請を元（pending）に戻して、もう一度押せるようにします
+  const release = () =>
+    supabase
+      .from("recovery_requests")
+      .update({ status: "pending" })
+      .eq("id", requestId);
+
   // ログインさせる相手のメールアドレスを調べます。
   // 本人はこのメールを見られませんが、合言葉を作るのに必要です。
   const { data: userData, error: userError } =
     await supabase.auth.admin.getUserById(recoveryRequest.target_user);
 
   if (userError || !userData.user?.email) {
+    await release();
     return NextResponse.json(
       { error: "この人はメールで登録されていないため、復旧できません" },
       { status: 400 },
@@ -71,16 +118,12 @@ export async function POST(request: Request) {
     });
 
   if (linkError || !link.properties?.hashed_token) {
+    await release();
     return NextResponse.json(
       { error: "ログインの準備に失敗しました" },
       { status: 500 },
     );
   }
-
-  await supabase
-    .from("recovery_requests")
-    .update({ status: "approved" })
-    .eq("id", requestId);
 
   return NextResponse.json({ tokenHash: link.properties.hashed_token });
 }

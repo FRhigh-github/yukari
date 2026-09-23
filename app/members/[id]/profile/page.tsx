@@ -8,6 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
 import RecoveryCodeButton from "@/components/RecoveryCodeButton";
+import { getSignedUrls } from "@/lib/signedUrls";
 
 export default async function MemberProfilePage({
   params,
@@ -39,21 +40,19 @@ export default async function MemberProfilePage({
         .limit(30),
     ]);
 
-  // 写真の置き場所から、期限付きのURLを発行してもらいます（1時間）
+  // 写真の置き場所から、期限付きのURLを発行してもらいます
   const imagePaths =
     posts
       ?.filter((post) => post.image_url && !post.image_url.startsWith("http"))
       .map((post) => post.image_url) ?? [];
 
-  const { data: signedUrls } =
-    imagePaths.length > 0
-      ? await supabase.storage.from("posts").createSignedUrls(imagePaths, 3600)
-      : { data: null };
+  // URL は lib/signedUrls.ts で作ります（同じ写真には同じURLを返すので、写真を使い回せます）
+  const findSignedImage = await getSignedUrls("posts", imagePaths);
 
   const findImageUrl = (path: string | null) => {
     if (!path) return null;
     if (path.startsWith("http")) return path;
-    return signedUrls?.find((item) => item.path === path)?.signedUrl ?? null;
+    return findSignedImage(path);
   };
 
   // ▼ 一緒に持ってきた communities から、名前だけを取り出します。

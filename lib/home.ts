@@ -1,7 +1,7 @@
 // ホーム画面に出す中身を、DB から取ってくる処理です。
 // page.tsx に全部書くと長くなるので、こちらに分けています。
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 
 export type Member = {
   id: string;
@@ -28,18 +28,24 @@ export type RecoveryRequest = {
 export async function getHomeData(selectedId: string | null) {
   const supabase = await createClient();
 
-  // ▼ getUser() は、Supabase に問い合わせて本人確認をします。つまり通信1回ぶんです。
+  // ▼ 本人確認（getCurrentUserId）は通信なしで済みます（lib/supabase/server.ts）。
   //   communities の取得はこれを待つ必要がないので、同時に出しています。
-  //   （ログインの確認はCookieを使って Supabase 側が勝手にやってくれるためです）
   //
   // 絞り込みを書いていないのに自分のぶんだけ返ります。
   // communities は RLS で「メンバーしか読めない」設定なので、DB 側が絞ってくれます。
-  const [userResult, { data: communities }] = await Promise.all([
-    supabase.auth.getUser(),
+  //
+  // time_capsules（未来への手紙）も、ここで一緒に聞きます。
+  // 前はホームが出たあとに画面側で聞いていたので、✈️ が遅れてポンと出ていました。
+  // RLS で「開封日を過ぎた手紙」しか返ってこないので、1件あれば届いている、ということです。
+  const [userId, { data: communities }, { data: letters }] = await Promise.all([
+    getCurrentUserId(supabase),
     supabase.from("communities").select("id, name, icon_url"),
+    supabase.from("time_capsules").select("id").limit(1),
   ]);
 
-  const user = userResult.data.user;
+  // 画面側は user.id だけを使うので、その形にそろえて返します
+  const user = userId === null ? null : { id: userId };
+  const letterId = letters?.[0]?.id ?? null;
 
   if (user === null) {
     return {
@@ -49,6 +55,7 @@ export async function getHomeData(selectedId: string | null) {
       currentId: null,
       recoveryRequests: [],
       todayCount: 0,
+      letterId: null,
     };
   }
 
@@ -68,6 +75,7 @@ export async function getHomeData(selectedId: string | null) {
       currentId: null,
       recoveryRequests: [],
       todayCount: 0,
+      letterId: null,
     };
   }
 
@@ -162,5 +170,6 @@ export async function getHomeData(selectedId: string | null) {
     currentId,
     recoveryRequests,
     todayCount,
+    letterId,
   };
 }

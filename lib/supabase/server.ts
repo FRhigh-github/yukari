@@ -34,3 +34,20 @@ export async function createClient() {
     }
   )
 }
+
+// ▼ ログインしている人の id を返します。ログインしていなければ null。
+//
+// 前は各画面で auth.getUser() を使っていました。
+// getUser() は、毎回 Supabase のサーバーまで「この人は本物？」と聞きに行くので、
+// 画面を開くたびに通信1回ぶん（日本からだと 0.1〜0.3秒ほど）待たされていました。
+//
+// getClaims() は、ログインの証明書（JWT）に付いている署名を、この場で確かめます。
+// このプロジェクトの署名は ES256（公開鍵で確かめられる方式）なので、
+// 最初に一度だけ公開鍵をもらえば、あとは通信なしで本人確認ができます。
+// 偽物の証明書は署名が合わないので、getUser() と同じく安全です。
+export async function getCurrentUserId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<string | null> {
+  const { data } = await supabase.auth.getClaims()
+  return data?.claims.sub ?? null
+}

@@ -16,6 +16,10 @@ export default function PostForm({ communities }: PostFormProps) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  // 選んだ写真を表示するためのURL。選んだときに1回だけ作ります。
+  // 前は描き直すたびに URL.createObjectURL を呼んでいたので、
+  // タイトルを1文字打つごとに新しいURLができて、写真を読み直していました
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   // 最初から1つ目を選んだ状態にしておきます
@@ -40,8 +44,12 @@ export default function PostForm({ communities }: PostFormProps) {
     setIsSending(true);
 
     const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
+    // getClaims() = ログインの証明書の署名を、この場で確かめる命令。
+    // getUser() と違って Supabase まで聞きに行かないので、送るまでの待ちが1回ぶん減ります
+    //（詳しくは lib/supabase/server.ts の getCurrentUserId）
+    const { data } = await supabase.auth.getClaims();
+    const userId = data?.claims.sub;
+    if (!userId) {
       router.push("/login");
       return;
     }
@@ -56,8 +64,14 @@ export default function PostForm({ communities }: PostFormProps) {
 
     const upload = await supabase.storage
       .from("posts")
-      .upload(`${crypto.randomUUID()}.jpg`, shrunk, {
+      // 置き場所は「自分の id / でたらめな id.jpg」。
+      // 置き場所の決まり（supabase/04_security.sql）で、
+      // 自分の id のフォルダにしか写真を置けないようにしているためです
+      .upload(`${userId}/${crypto.randomUUID()}.jpg`, shrunk, {
         contentType: "image/jpeg",
+        // cacheControl = ブラウザに「この写真は1年間そのまま使い回してよい」と伝えます。
+        // ファイル名は毎回ちがう id なので、同じ名前の中身が変わることはありません
+        cacheControl: "31536000",
       });
 
     if (upload.error) {
@@ -70,7 +84,7 @@ export default function PostForm({ communities }: PostFormProps) {
       title,
       body,
       image_url: upload.data.path,
-      author_id: data.user.id,
+      author_id: userId,
       community_id: communityId,
     });
 
@@ -126,21 +140,27 @@ export default function PostForm({ communities }: PostFormProps) {
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              // 前に作ったURLは、もう使わないので片付けます（メモリを返す）
+              if (imageUrl) URL.revokeObjectURL(imageUrl);
+              setImageFile(file);
+              setImageUrl(file ? URL.createObjectURL(file) : null);
+            }}
           />
           {imageFile ? (
             <>
               {/* 見る側と同じく、後ろにぼかした同じ写真を敷いて余白をなじませます */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={URL.createObjectURL(imageFile)}
+                src={imageUrl ?? ""}
                 alt=""
                 aria-hidden="true"
                 className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-xl"
               />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={URL.createObjectURL(imageFile)}
+                src={imageUrl ?? ""}
                 alt=""
                 className="absolute inset-0 h-full w-full object-contain"
               />

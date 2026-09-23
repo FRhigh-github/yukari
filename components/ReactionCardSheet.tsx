@@ -82,8 +82,12 @@ export default function ReactionCardSheet({
 
     try {
       const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (data.user === null) throw new Error("ログインしていません");
+      // getClaims() = ログインの証明書の署名を、この場で確かめる命令。
+      // getUser() と違って Supabase まで聞きに行かないので、送るまでの待ちが1回ぶん減ります
+      //（詳しくは lib/supabase/server.ts の getCurrentUserId）
+      const { data } = await supabase.auth.getClaims();
+      const userId = data?.claims.sub;
+      if (!userId) throw new Error("ログインしていません");
 
       // canvas は背景が透明なので、白を敷いてから画像にします
       const exportCanvas = document.createElement("canvas");
@@ -100,15 +104,17 @@ export default function ReactionCardSheet({
       if (blob === null) throw new Error("画像への変換に失敗しました");
 
       // 送り方は /draw（DrawingPad.tsx）と同じです
-      const path = `${data.user.id}/${crypto.randomUUID()}.png`;
+      const path = `${userId}/${crypto.randomUUID()}.png`;
       const upload = await supabase.storage
         .from("drawings")
-        .upload(path, blob, { contentType: "image/png" });
+        // cacheControl = ブラウザに「この写真は1年間そのまま使い回してよい」と伝えます。
+        // ファイル名は毎回ちがう id なので、同じ名前の中身が変わることはありません
+        .upload(path, blob, { contentType: "image/png", cacheControl: "31536000" });
       if (upload.error !== null) throw new Error("画像の保存: " + upload.error.message);
 
       const insert = await supabase.from("post_reactions").insert({
         post_id: postId,
-        from_user: data.user.id,
+        from_user: userId,
         community_id: communityId,
         drawing_url: path,
       });

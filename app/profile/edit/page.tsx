@@ -5,15 +5,15 @@
 // 一瞬だけ空の入力欄が見えてしまうためです。
 
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileForm from "@/components/ProfileForm";
 
 export default async function ProfileEditPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 本人確認。通信なしで済みます（lib/supabase/server.ts の getCurrentUserId）
+  const userId = await getCurrentUserId(supabase);
+  const user = userId === null ? null : { id: userId };
 
   if (user === null) {
     return (
