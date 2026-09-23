@@ -55,9 +55,9 @@ export default function StoryViewer({
   //   画面ごとの設定（viewport）で変えると、ホームに戻っても黒いまま残ってしまったので、
   //   開いたときに変えて、閉じるときに元の色へ戻すやり方にしています。
   //
-  //   ただ、新しい iPhone の Safari は theme-color を見ずに、
-  //   「ページの背景色」を見て帯を塗ることがあります。
-  //   そのため、html と body の背景色も一緒に暗くしています。
+  //   ただ、新しい iPhone の Safari（iOS 26〜）は theme-color を見ません。
+  //   代わりに「一番上に貼り付いた要素」か「body の背景色」を見るので、
+  //   body の背景色も一緒に暗くして、下の return でも細い帯を貼っています。
   useEffect(() => {
     const dark = "#1c1917";
     const meta = document.querySelector('meta[name="theme-color"]');
@@ -107,6 +107,12 @@ export default function StoryViewer({
   return (
     // absolute inset-0 = アプリの枠（スマホ幅の1枚）いっぱいに広げます
     <div className="absolute inset-0 z-40 select-none overflow-hidden bg-stone-700">
+      {/* ▼ Safari の上の帯を暗くするための、画面の一番上に貼り付けた細い帯です。
+          iPhone の Safari（iOS 26〜）は theme-color を無視して、
+          「画面の一番上に貼り付いている（fixed の）要素の背景色」を見て帯を塗ります。
+          写真の上のほうはもともと暗くしているので、この帯は目立ちません */}
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-50 h-2 bg-[#1c1917]" />
+
       {/* ▼ 写真。押す・スワイプはこの面で受け取ります。touch-none = 画面をスクロールさせない */}
       <div
         className="absolute inset-0 touch-none select-none"
