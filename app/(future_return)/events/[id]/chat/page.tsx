@@ -1,313 +1,277 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// Supabase の events テーブルの型定義
-type EventDetail = {
+type Message = {
   id: string;
-  title?: string | null;
-  community_id?: string | null;
+  event_id?: string | null;
+  user_id: string;
+  content: string;
+  created_at: string;
+  user_name?: string;
 };
 
-// Supabase の event_date_options テーブルの型定義
-type DateOption = {
-  id: string;
-  event_id: string;
-  option_date?: string | null;
-  date?: string | null;
-};
-
-// Supabase の event_responses テーブルの型定義
-type EventResponse = {
-  id: string;
-  event_id: string;
-  event_date_option_id: string;
-  status: string; // 'ok' | 'maybe' | 'ng' など
-};
-
-export default function EventDetailPage() {
+export default function EventChatPage() {
   const params = useParams();
-  const router = useRouter();
-  const eventId = params.id as string;
+  const rawId = params.id as string;
 
-  const [event, setEvent] = useState<EventDetail | null>(null);
-  const [dateOptions, setDateOptions] = useState<DateOption[]>([]); // 候補日リスト
-  const [responses, setResponses] = useState<EventResponse[]>([]); // 回答リスト
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [eventTitle, setEventTitle] = useState<string>("チャット");
   const [loading, setLoading] = useState(true);
-
-  // 回答モーダルの状態管理
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [myResponses, setMyResponses] = useState<{ [optionId: string]: string }>({});
-  const [saving, setSaving] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const currentUserIdRef = useRef<string | null>(null);
 
   const supabase = createClient();
 
-  // データの取得処理
-  async function fetchEventData() {
-    if (!eventId) return;
-
-    // 1. events テーブルからイベント情報を取得
-    const { data: eventData, error: eventError } = await supabase
-      .from("events")
-      .select("*")
-      .eq("id", eventId)
+  // ユーザーIDから表示名を取得するヘルパー関数
+  const fetchUserName = async (userId: string): Promise<string> => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("name, username")
+      .eq("id", userId)
       .maybeSingle();
 
-    if (eventError) {
-      console.error("イベント取得エラー:", eventError.message);
-    } else if (eventData) {
-      setEvent(eventData);
-
-      // 2. event_date_options テーブルから候補日一覧を取得
-      const { data: optionsData, error: optionsError } = await supabase
-        .from("event_date_options")
-        .select("*")
-        .eq("event_id", eventId);
-
-      if (optionsError) {
-        console.error("候補日取得エラー:", optionsError.message);
-      } else if (optionsData) {
-        setDateOptions(optionsData);
-      }
-
-      // 3. event_responses テーブルから回答一覧を取得
-      const { data: responsesData, error: responsesError } = await supabase
-        .from("event_responses")
-        .select("*")
-        .eq("event_id", eventId);
-
-      if (responsesError) {
-        console.error("回答取得エラー:", responsesError.message);
-      } else if (responsesData) {
-        setResponses(responsesData);
-      }
-    }
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    fetchEventData();
-  }, [eventId]);
-
-  // モーダルを開いたときの初期選択値を設定
-  const handleOpenModal = () => {
-    const initialMap: { [optionId: string]: string } = {};
-    dateOptions.forEach((opt) => {
-      const existing = responses.find((r) => r.event_date_option_id === opt.id);
-      initialMap[opt.id] = existing ? existing.status : "ok";
-    });
-    setMyResponses(initialMap);
-    setIsModalOpen(true);
+    return data?.name || data?.username || "メンバー";
   };
 
-  // ステータス（〇 / △ / ✕）の切り替え処理
-  const handleStatusChange = (optionId: string, status: string) => {
-    setMyResponses((prev) => ({ ...prev, [optionId]: status }));
-  };
+  // メッセージ取得用関数
+  const fetchMessages = async (myId: string | null) => {
+    if (!rawId) return;
 
-  // 回答の保存処理
-  const handleSaveResponses = async () => {
-    setSaving(true);
-
-    const updates = dateOptions.map((opt) => ({
-      event_id: eventId,
-      event_date_option_id: opt.id,
-      status: myResponses[opt.id] || "ok",
-    }));
-
-    const { error } = await supabase
-      .from("event_responses")
-      .upsert(updates, { onConflict: "event_id, event_date_option_id" });
+    const { data: msgData, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("event_id", rawId)
+      .order("created_at", { ascending: true });
 
     if (error) {
-      console.error("回答保存エラー:", error.message);
-      alert("回答の保存に失敗しました。");
-    } else {
-      await fetchEventData();
-      setIsModalOpen(false);
+      console.error("メッセージ取得エラー:", error.message);
+      return;
     }
-    setSaving(false);
+
+    if (msgData && msgData.length > 0) {
+      const userIds = Array.from(new Set(msgData.map((m: any) => m.user_id)));
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("id, name, username")
+        .in("id", userIds);
+
+      const profileMap = new Map<string, string>(
+        (profilesData || []).map((p) => [p.id, p.name || p.username || "メンバー"])
+      );
+
+      const formatted = msgData.map((m: any) => ({
+        ...m,
+        user_name: m.user_id === myId ? "自分" : profileMap.get(m.user_id) || "メンバー",
+      }));
+
+      setMessages(formatted);
+    } else {
+      setMessages([]);
+    }
   };
 
-  // チャット画面への遷移処理
-  const handleGoToChat = () => {
-    if (event?.community_id) {
-      router.push(`/communities/${event.community_id}/chat`);
-    } else {
-      router.push(`/events/${eventId}/chat`);
+  useEffect(() => {
+    if (!rawId) return;
+
+    // 1. チャンネル作成と購読を同期的に実行（非同期処理の待機による二重登録を回避）
+    const channel = supabase
+      .channel(`event_chat_${rawId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `event_id=eq.${rawId}`,
+        },
+        async (payload) => {
+          const newMsg = payload.new as Message;
+          const myId = currentUserIdRef.current;
+
+          const senderName =
+            newMsg.user_id === myId
+              ? "自分"
+              : await fetchUserName(newMsg.user_id);
+
+          const msgWithName: Message = {
+            ...newMsg,
+            user_name: senderName,
+          };
+
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === msgWithName.id)) return prev;
+            return [...prev, msgWithName];
+          });
+        }
+      )
+      .subscribe();
+
+    // 2. 初期データ（ユーザー・イベント情報・過去ログ）の取得
+    const initChat = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const myId = user?.id || null;
+      setCurrentUserId(myId);
+      currentUserIdRef.current = myId;
+
+      const { data: eventData } = await supabase
+        .from("events")
+        .select("title, name")
+        .eq("id", rawId)
+        .maybeSingle();
+
+      if (eventData) {
+        setEventTitle(eventData.title || eventData.name || "イベントチャット");
+      }
+
+      await fetchMessages(myId);
+      setLoading(false);
+    };
+
+    initChat();
+
+    // 3. クリーンアップで確実にチャンネルを解除
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [rawId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // メッセージ送信処理
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim() || !rawId) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const senderId = user?.id || currentUserId;
+
+    if (!senderId) {
+      alert("ログイン情報が確認できません。再度ログインしてください。");
+      return;
+    }
+
+    const textToSend = inputText;
+    setInputText("");
+
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({
+        event_id: rawId,
+        user_id: senderId,
+        content: textToSend,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("メッセージ送信エラー:", error.message);
+      alert(`メッセージの送信に失敗しました: ${error.message}`);
+      setInputText(textToSend);
+    } else if (data) {
+      const newMsgWithProfile: Message = {
+        ...(data as Message),
+        user_name: "自分",
+      };
+
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsgWithProfile.id)) return prev;
+        return [...prev, newMsgWithProfile];
+      });
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center max-w-sm mx-auto font-sans text-xs text-gray-500">
-        イベント情報を読み込んでいます...
-      </div>
-    );
-  }
-
-  if (!event) {
-    return (
-      <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center max-w-sm mx-auto font-sans text-xs text-gray-500">
-        イベントが見つかりませんでした。
+      <div className="min-h-screen bg-[#FDFBF7] p-4 flex items-center justify-center max-w-sm mx-auto text-xs text-gray-500 font-sans">
+        チャットを読み込み中...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] p-4 flex flex-col justify-between max-w-sm mx-auto font-sans text-gray-800 relative">
-      {/* 上部・メインエリア */}
-      <div>
-        {/* ヘッダー部分：イベント名表示 */}
-        <div className="border-b pb-3 mb-4 flex items-center space-x-2 text-sm font-bold">
-          <span>📅</span>
-          <span>{event.title || "イベント名なし"}</span>
-        </div>
-
-        {/* イベント候補日一覧エリア */}
-        <div className="space-y-3">
-          <h2 className="text-xs font-bold text-gray-600">イベント候補日</h2>
-
-          {dateOptions.length === 0 ? (
-            <p className="text-xs text-gray-400">候補日が登録されていません。</p>
-          ) : (
-            <div className="bg-white rounded-lg p-3 shadow-sm space-y-3 border border-gray-100">
-              {dateOptions.map((option) => {
-                const rawDate = option.option_date || option.date;
-                const dateText = rawDate
-                  ? new Date(rawDate).toLocaleDateString("ja-JP", {
-                      month: "numeric",
-                      day: "numeric",
-                      weekday: "short",
-                    })
-                  : "日程未定";
-
-                const optionResponses = responses.filter(
-                  (r) => r.event_date_option_id === option.id
-                );
-                const okCount = optionResponses.filter(
-                  (r) => r.status === "ok" || r.status === "○"
-                ).length;
-                const maybeCount = optionResponses.filter(
-                  (r) => r.status === "maybe" || r.status === "△"
-                ).length;
-                const ngCount = optionResponses.filter(
-                  (r) => r.status === "ng" || r.status === "×"
-                ).length;
-
-                return (
-                  <div
-                    key={option.id}
-                    className="flex justify-between items-center py-2 border-b border-gray-50 last:border-none text-xs"
-                  >
-                    <span className="font-medium text-gray-700">{dateText}</span>
-
-                    <div className="flex items-center space-x-3 text-gray-500 text-[11px]">
-                      <span>〇 {okCount}</span>
-                      <span>△ {maybeCount}</span>
-                      <span>✕ {ngCount}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+    <div className="min-h-screen bg-[#FDFBF7] max-w-sm mx-auto font-sans flex flex-col h-screen border-x border-gray-100">
+      {/* ヘッダー */}
+      <div className="bg-white border-b px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-10">
+        <Link href={`/events/${rawId}`} className="text-xs text-gray-500 font-bold hover:underline">
+          ＜ イベント詳細
+        </Link>
+        <h1 className="text-xs font-bold text-gray-800 truncate max-w-[180px]">
+          💬 {eventTitle}
+        </h1>
+        <div className="w-12"></div>
       </div>
 
-      {/* 下部・ボタンエリア（設計図通り） */}
-      <div className="mt-8 space-y-2 pt-4">
-        <button
-          type="button"
-          onClick={handleOpenModal}
-          className="w-full py-2.5 bg-gray-600 text-white text-xs font-bold rounded-md hover:bg-gray-700 transition"
-        >
-          回答を修正する
-        </button>
-        <button
-          type="button"
-          onClick={handleGoToChat}
-          className="w-full py-2.5 bg-gray-700 text-white text-xs font-bold rounded-md hover:bg-gray-800 transition"
-        >
-          チャットで連絡
-        </button>
-      </div>
-
-      {/* 回答入力用モーダルポップアップ */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-5 w-full max-w-xs space-y-4 shadow-lg">
-            <h3 className="text-sm font-bold text-gray-800 border-b pb-2">
-              出欠回答の入力
-            </h3>
-
-            <div className="space-y-3 max-h-60 overflow-y-auto">
-              {dateOptions.map((option) => {
-                const rawDate = option.option_date || option.date;
-                const dateText = rawDate
-                  ? new Date(rawDate).toLocaleDateString("ja-JP", {
-                      month: "numeric",
-                      day: "numeric",
-                      weekday: "short",
-                    })
-                  : "日程未定";
-
-                const currentStatus = myResponses[option.id] || "ok";
-
-                return (
-                  <div
-                    key={option.id}
-                    className="flex justify-between items-center text-xs py-1"
-                  >
-                    <span className="text-gray-700 font-medium">{dateText}</span>
-
-                    <div className="flex space-x-1">
-                      {[
-                        { label: "〇", value: "ok" },
-                        { label: "△", value: "maybe" },
-                        { label: "✕", value: "ng" },
-                      ].map((item) => (
-                        <button
-                          key={item.value}
-                          type="button"
-                          onClick={() => handleStatusChange(option.id, item.value)}
-                          className={`px-2.5 py-1 rounded text-xs transition ${
-                            currentStatus === item.value
-                              ? "bg-gray-800 text-white font-bold"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex space-x-2 pt-2 border-t">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="w-1/2 py-2 bg-gray-200 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-300"
-              >
-                キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveResponses}
-                disabled={saving}
-                className="w-1/2 py-2 bg-amber-600 text-white text-xs font-bold rounded-md hover:bg-amber-700 transition disabled:opacity-50"
-              >
-                {saving ? "保存中..." : "保存する"}
-              </button>
-            </div>
+      {/* メッセージ表示領域 */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {messages.length === 0 ? (
+          <div className="text-center text-xs text-gray-400 py-10">
+            まだメッセージはありません。<br />最初のメッセージを送ってみましょう！
           </div>
-        </div>
-      )}
+        ) : (
+          messages.map((msg) => {
+            const isMe = msg.user_id === currentUserId;
+            return (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+              >
+                {!isMe && (
+                  <span className="text-[10px] text-gray-500 mb-1 ml-1 font-medium">
+                    {msg.user_name || "メンバー"}
+                  </span>
+                )}
+                <div
+                  className={`max-w-[75%] px-3 py-2 rounded-2xl text-xs break-words ${
+                    isMe
+                      ? "bg-amber-600 text-white rounded-br-none"
+                      : "bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm"
+                  }`}
+                >
+                  {msg.content}
+                </div>
+                <span className="text-[9px] text-gray-400 mt-0.5 px-1">
+                  {new Date(msg.created_at).toLocaleTimeString("ja-JP", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* 送信フォーム */}
+      <form onSubmit={handleSendMessage} className="p-3 bg-white border-t flex gap-2 items-center mb-16">
+        <input
+          type="text"
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          placeholder="メッセージを入力..."
+          className="flex-1 bg-gray-100 text-xs px-3 py-2 rounded-full focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+        <button
+          type="submit"
+          disabled={!inputText.trim()}
+          className="bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-full disabled:opacity-40 transition"
+        >
+          送信
+        </button>
+      </form>
     </div>
   );
 }

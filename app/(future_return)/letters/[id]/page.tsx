@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// Supabase の time_capsules テーブルの実際のカラム名に合わせた型定義
 type TimeCapsule = {
   id: string;
   title?: string | null;
@@ -14,52 +13,68 @@ type TimeCapsule = {
   open_at?: string | null;
   sealed_at?: string | null;
   event_id?: string | null;
+  community_id?: string | null;
 };
 
 export default function LetterDetailPage() {
   const params = useParams();
-  const letterId = params.id as string;
+  const initialLetterId = params.id as string;
 
-  const [letter, setLetter] = useState<TimeCapsule | null>(null);
-  const [signedImageUrl, setSignedImageUrl] = useState<string | null>(null); // 署名付き画像URLを入れる状態
+  const [letters, setLetters] = useState<TimeCapsule[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [signedImageUrl, setSignedImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const supabase = createClient();
 
+  // 1. 全ての手紙を取得してリストを保持する
   useEffect(() => {
-    async function fetchLetter() {
-      if (!letterId) return;
-
-      // URLのIDに一致するタイムカプセル(手紙)を1件取得
+    async function fetchAllLetters() {
       const { data, error } = await supabase
         .from("time_capsules")
         .select("*")
-        .eq("id", letterId)
-        .maybeSingle(); // 該当データがなくてもエラーで止まらないよう安全に取得
+        .order("open_at", { ascending: false });
 
-      if (error) {
-        console.error("タイムカプセル(手紙)の取得エラー:", error.message);
-      } else if (data) {
-        setLetter(data);
-
-        // 画像が設定されている場合、非公開バケットから署名付きURLを発行
-        if (data.image_url) {
-          const { data: urlData, error: urlError } = await supabase.storage
-            .from("time_capsules") // 正しいバケット名 (time_capsules) に修正
-            .createSignedUrl(data.image_url, 3600); // 3600秒（1時間）有効なURLを作成
-
-          if (urlError) {
-            console.error("画像の署名付きURL発行エラー:", urlError.message);
-          } else if (urlData) {
-            setSignedImageUrl(urlData.signedUrl);
-          }
-        }
+      if (!error && data && data.length > 0) {
+        setLetters(data);
+        // 最初はURLのIDと一致する手紙のインデックスをセット
+        const foundIndex = data.findIndex((item) => item.id === initialLetterId);
+        setCurrentIndex(foundIndex !== -1 ? foundIndex : 0);
       }
       setLoading(false);
     }
 
-    fetchLetter();
-  }, [letterId]);
+    fetchAllLetters();
+  }, [initialLetterId]);
+
+  // 2. 表示中の手紙が切り替わったら画像を取得する
+  const currentLetter = letters[currentIndex];
+
+  useEffect(() => {
+    async function loadSignedImage() {
+      setSignedImageUrl(null);
+      if (!currentLetter?.image_url) return;
+
+      if (
+        currentLetter.image_url.startsWith("http://") ||
+        currentLetter.image_url.startsWith("https://")
+      ) {
+        setSignedImageUrl(currentLetter.image_url);
+      } else {
+        const { data: urlData, error: urlError } = await supabase.storage
+          .from("time_capsules")
+          .createSignedUrl(currentLetter.image_url, 3600);
+
+        if (!urlError && urlData) {
+          setSignedImageUrl(urlData.signedUrl);
+        }
+      }
+    }
+
+    if (currentLetter) {
+      loadSignedImage();
+    }
+  }, [currentLetter]);
 
   if (loading) {
     return (
@@ -69,7 +84,7 @@ export default function LetterDetailPage() {
     );
   }
 
-  if (!letter) {
+  if (!currentLetter) {
     return (
       <div className="min-h-screen bg-gray-200 p-4 flex items-center justify-center max-w-sm mx-auto font-sans text-xs text-gray-500">
         手紙が見つかりませんでした。
@@ -77,16 +92,24 @@ export default function LetterDetailPage() {
     );
   }
 
-  // テーブルのカラム名（title, body, open_at）に合わせた表示データの準備
-  const displayTitle = letter.title || "未来のあなたへ";
-  const displayBody = letter.body || "";
-  const displayDate = letter.open_at || "";
+  const displayTitle = currentLetter.title || "未来のあなたへ";
+  const displayBody = currentLetter.body || "";
+  const displayDate = currentLetter.open_at || "";
+
+  // 紐づくイベントID、または手紙自身のIDを取得（community_idは除外）
+  const targetId = currentLetter.event_id || currentLetter.id;
 
   return (
-    <div className="min-h-screen bg-gray-200 p-4 flex flex-col justify-center max-w-sm mx-auto font-sans">
+    <div className="min-h-screen bg-gray-200 p-4 flex flex-col justify-center max-w-sm mx-auto font-sans space-y-4">
+      {/* 複数ある場合の件数カウント表示（例: 1 / 2通目） */}
+      {letters.length > 1 && (
+        <div className="text-center text-xs font-bold text-stone-500">
+          {currentIndex + 1} / {letters.length} 通目の手紙
+        </div>
+      )}
+
       {/* 手紙の便箋エリア */}
       <div className="bg-[#FFFDF9] rounded-2xl p-6 shadow-md border border-amber-100 min-h-[360px] flex flex-col justify-between relative overflow-hidden">
-        
         {/* 本文エリア */}
         <div className="space-y-6">
           <h1 className="text-base font-bold text-gray-800 border-b pb-2 border-amber-100">
@@ -115,14 +138,14 @@ export default function LetterDetailPage() {
           </p>
         </div>
 
-        {/* イベントがある場合の「予定調整へ」リンク */}
-        {letter.event_id && (
-          <div className="pt-6 flex justify-end">
+        {/* IDが存在する場合の「日程調整へ進む」ボタン */}
+        {targetId && (
+          <div className="pt-6 flex justify-end z-10">
             <Link
-              href={`/events/${letter.event_id}`}
-              className="text-xs text-gray-600 border-b border-gray-400 pb-0.5 hover:text-black flex items-center space-x-1"
+              href={`/events/${targetId}`}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
             >
-              <span>予定調整へ</span>
+              <span>📅 日程調整へ進む</span>
               <span>➔</span>
             </Link>
           </div>
@@ -131,6 +154,26 @@ export default function LetterDetailPage() {
         {/* 封筒の下部グラフィック演出 */}
         <div className="absolute bottom-0 left-0 right-0 h-3 bg-amber-100/40 pointer-events-none" />
       </div>
+
+      {/* 複数通ある場合の「前へ」「次へ」切り替えナビゲーション */}
+      {letters.length > 1 && (
+        <div className="flex justify-between items-center px-2 pt-2">
+          <button
+            onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+            disabled={currentIndex === 0}
+            className="px-3 py-1.5 text-xs bg-white rounded-lg shadow-sm border border-stone-200 disabled:opacity-30 disabled:cursor-not-allowed font-medium text-stone-700"
+          >
+            ← 前の手紙
+          </button>
+          <button
+            onClick={() => setCurrentIndex((prev) => Math.min(letters.length - 1, prev + 1))}
+            disabled={currentIndex === letters.length - 1}
+            className="px-3 py-1.5 text-xs bg-white rounded-lg shadow-sm border border-stone-200 disabled:opacity-30 disabled:cursor-not-allowed font-medium text-stone-700"
+          >
+            次の手紙 →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
