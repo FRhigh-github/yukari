@@ -24,6 +24,9 @@ import { useRef, useState } from "react";
 import type { PointerEvent, ReactNode } from "react";
 // Supabase(データベース)とつながる窓口を作る関数(手書き機能と同じもの)
 import { createClient } from "@/lib/supabase/client";
+import HorizontalScroller from "@/components/HorizontalScroller";
+// 選べるフォントのうち、Google Fonts から読み込むもの
+import { WEB_FONTS } from "./fonts";
 
 // =====================================================
 // 保存に使う設定
@@ -45,11 +48,70 @@ const SWIPE_SEND_DISTANCE = 120;
 const PAPER_COLOR = "#fdfbf5"; // 紙の色
 const TEXT_COLOR = "#292524"; // 文字の色(Tailwind の stone-800)
 const LINK_COLOR = "#44403c"; // URL の文字の色(Tailwind の stone-700)
-const ITEM_WIDTH = 208; // 置いたものの横幅(Tailwind の w-52 = 208px)
+const ITEM_WIDTH = 208; // 置いたものの最初の横幅(Tailwind の w-52 = 208px)
 const ITEM_PADDING = 8; // 置いたものの内側の余白(Tailwind の p-2 = 8px)
-const CONTENT_WIDTH = ITEM_WIDTH - ITEM_PADDING * 2; // 中身を置ける横幅
-const FONT = "14px Arial, Helvetica, sans-serif"; // 文字の大きさと種類(text-sm = 14px)
-const LINE_HEIGHT = 24; // 1行の高さ(leading-6 = 24px)
+
+// ===== 文字の見た目の選択肢 =====
+
+// 文字の大きさ(px)。四つ角を引っぱって、この間で変えられます。
+// 最初は 14px(これまでの大きさ)。10px より小さいと読めないので、そこを下限にしています
+const FONT_SIZE_MIN = 10;
+const FONT_SIZE_MAX = 72;
+
+// フォント。
+// 最初の3つは、iPhone に最初から入っているもの(無い端末では、後ろに書いたものが代わりに使われます)。
+// そのあとは Google Fonts から読み込むもので、どの端末でも同じ見た目になります(fonts.ts)
+const FONTS = [
+  { key: "gothic", label: "ゴシック", family: `"Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif` },
+  { key: "mincho", label: "明朝", family: `"Hiragino Mincho ProN", "Yu Mincho", serif` },
+  { key: "maru", label: "丸文字", family: `"Hiragino Maru Gothic ProN", "Zen Maru Gothic", sans-serif` },
+  ...WEB_FONTS,
+];
+
+// 文字の色。日本の伝統色の名前をつけて、色の並び(黒→赤→黄→緑→青→紫→茶)にしています。
+// 紅と金は、アプリの水引の色(globals.css)と同じです
+const COLORS = [
+  { label: "墨", value: TEXT_COLOR },
+  { label: "鼠", value: "#78716c" },
+  { label: "白", value: "#ffffff" },
+  { label: "紅", value: "#b7282e" },
+  { label: "朱", value: "#d9482b" },
+  { label: "桜", value: "#e89aae" },
+  { label: "橙", value: "#ea8a2e" },
+  { label: "山吹", value: "#f0b323" },
+  { label: "金", value: "#c2a14d" },
+  { label: "若草", value: "#8fb04a" },
+  { label: "緑", value: "#3f6212" },
+  { label: "浅葱", value: "#2a9fb0" },
+  { label: "空", value: "#6fa8dc" },
+  { label: "藍", value: "#1e3a8a" },
+  { label: "藤", value: "#9b86c2" },
+  { label: "紫", value: "#6b3fa0" },
+  { label: "茶", value: "#7b4a2a" },
+];
+
+// 写真の横幅(px)の、いちばん小さい / 大きい値
+const PHOTO_MIN_WIDTH = 80;
+const PHOTO_MAX_WIDTH = 360;
+
+// 写真の高さ(px)の、いちばん小さい / 大きい値(上下の〇で変えるとき)
+const PHOTO_MIN_HEIGHT = 40;
+const PHOTO_MAX_HEIGHT = 600;
+
+// テキスト・URL の横幅(px)の、いちばん小さい / 大きい値。
+// 横幅を広げると、そのぶん1行に入る文字が増えて、改行の位置が変わります
+const TEXT_MIN_WIDTH = 60;
+const TEXT_MAX_WIDTH = 360;
+
+// 1行の高さ。文字の大きさに合わせて伸ばします(14px のとき、これまでと同じ 24px)
+function lineHeightOf(fontSize: number) {
+  return Math.round((fontSize * 12) / 7);
+}
+
+// フォントの名前(key)から、実際に使う書体の指定を取り出します
+function fontFamilyOf(key: string) {
+  return FONTS.find((f) => f.key === key)?.family ?? FONTS[0].family;
+}
 
 // =====================================================
 // 型(データの形)の決まりごと
@@ -68,6 +130,17 @@ type Item = {
   text: string; // テキストの文字
   imageSrc: string; // 写真の画像
   url: string; // URL
+  width: number; // 横幅(px)
+  // 写真の高さ(px)。null のときは、元の写真の比率のままの高さです。
+  // 左右や上下の〇で形を変えると、ここに数が入ります
+  photoHeight: number | null;
+  // テキスト・URL の枠の高さ(px)。null のときは、中身の行数ぴったりの高さです。
+  // 上下の〇で広げると、ここに数が入ります(中身より低くはなりません)
+  boxHeight: number | null;
+  rotation: number; // 回した角度(度)。時計回りがプラス
+  fontSize: number; // 文字の大きさ(px)。テキストと URL で使います
+  fontKey: string; // フォントの名前(FONTS の key)
+  color: string; // 文字の色
 };
 
 // イベント(日程調整)のデータの形です。紙の上のものとは別に覚えておきます。
@@ -75,6 +148,27 @@ type EventPlan = {
   name: string; // イベント名(events.name に入れる)
   dates: string[]; // 候補日の一覧(event_date_options.event_date に入れる)
 };
+
+// 枠についている〇(引っぱる所)の場所。
+//   四つ角 … "tl" = 左上、"tr" = 右上、"bl" = 左下、"br" = 右下
+//   辺の中点 … "t" = 上、"b" = 下、"l" = 左、"r" = 右
+type Handle = "tl" | "tr" | "bl" | "br" | "t" | "b" | "l" | "r";
+
+// 〇の一覧です。
+//   position … 置く位置。44px の当たり判定の真ん中が、枠の角や辺の中点に来るようにずらしています
+//   cursor   … PC で〇の上にのせたときのマウスの形(↔ や ↕ のやじるしになります)
+// 辺の中点を後ろに書いているのは、小さい文字で〇どうしが重なったとき、
+// 中点のほうを上にして、つかめるようにするためです
+const HANDLES: { handle: Handle; position: string; cursor: string }[] = [
+  { handle: "tl", position: "-left-[22px] -top-[22px]", cursor: "cursor-nwse-resize" },
+  { handle: "tr", position: "-right-[22px] -top-[22px]", cursor: "cursor-nesw-resize" },
+  { handle: "bl", position: "-bottom-[22px] -left-[22px]", cursor: "cursor-nesw-resize" },
+  { handle: "br", position: "-bottom-[22px] -right-[22px]", cursor: "cursor-nwse-resize" },
+  { handle: "t", position: "-top-[22px] left-1/2 -translate-x-1/2", cursor: "cursor-ns-resize" },
+  { handle: "b", position: "-bottom-[22px] left-1/2 -translate-x-1/2", cursor: "cursor-ns-resize" },
+  { handle: "l", position: "-left-[22px] top-1/2 -translate-y-1/2", cursor: "cursor-ew-resize" },
+  { handle: "r", position: "-right-[22px] top-1/2 -translate-y-1/2", cursor: "cursor-ew-resize" },
+];
 
 // 新しく1つ作る関数です。
 function createItem(id: number, type: ItemType, x: number, y: number): Item {
@@ -86,6 +180,14 @@ function createItem(id: number, type: ItemType, x: number, y: number): Item {
     text: "",
     imageSrc: "",
     url: "",
+    width: ITEM_WIDTH,
+    photoHeight: null,
+    boxHeight: null,
+    rotation: 0,
+    fontSize: 14,
+    fontKey: "gothic",
+    // URL は、これまでどおり少しだけ薄い色から始めます
+    color: type === "url" ? LINK_COLOR : TEXT_COLOR,
   };
 }
 
@@ -100,6 +202,9 @@ const LinkIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 
 // カレンダーのアイコン(イベント用)
 const CalendarIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4" /><path d="M16 3v4" /></svg>;
+
+// 回転のアイコン(くるっと回る矢印)
+const RotateIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M20 12a8 8 0 1 1-2.34-5.66" /><path d="M20 4v5h-5" /></svg>;
 
 // 紙飛行機のアイコン(「未来へ送る」ボタン用)
 const SendIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" className="h-4 w-4"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>;
@@ -226,6 +331,46 @@ export default function LetterPage() {
   const dragRef = useRef<{ id: number; offsetX: number; offsetY: number } | null>(
     null
   );
+
+  // いま〇を引っぱって、大きさを変えている最中の情報(していないときは null)。
+  // 押した瞬間の大きさを覚えておき、そこから指がどれだけ動いたかで計算します
+  const resizeRef = useRef<{
+    id: number;
+    handle: Handle;
+    isPhoto: boolean;
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startItemX: number;
+    startItemY: number;
+    startFontSize: number;
+    startBoxHeight: number; // 枠ぜんたいの高さ
+    startPhotoHeight: number; // 写真の高さ(テキストのときは使いません)
+    startContentHeight: number; // テキストの中身だけの高さ(枠をこれより低くしないため)
+    hasBoxHeight: boolean; // テキストの枠の高さを、上下の〇で決めてあるか
+    rotation: number; // 置いたものが回っている角度(度)
+  } | null>(null);
+
+  // いま回転のボタンを引っぱって、回している最中の情報(していないときは null)
+  //   centerX / centerY … 置いたものの真ん中(画面の中の位置)。ここを軸に回します
+  //   startAngle        … 押した瞬間の「真ん中から見た指の角度」
+  const rotateRef = useRef<{
+    id: number;
+    centerX: number;
+    centerY: number;
+    startAngle: number;
+    startRotation: number;
+    // 紙の中での、置いたものの真ん中(点線を引く位置)
+    paperX: number;
+    paperY: number;
+  } | null>(null);
+
+  // 回している最中に、まっすぐ(0度・90度・180度)になったら出す点線の位置。
+  // 出していないときは null です(画面に出すので useState)
+  const [rotateGuide, setRotateGuide] = useState<{ x: number; y: number } | null>(null);
+
+  // 紙の下の帯で、いま開いているタブ("font" = 書体、"color" = 色)
+  const [styleTab, setStyleTab] = useState<"font" | "color">("font");
 
   // ----- 1つ追加する -----
   function addItem(type: ItemType) {
@@ -355,6 +500,212 @@ export default function LetterPage() {
   }
 
   // =====================================================
+  // 枠の〇を引っぱって、大きさや形を変える
+  // =====================================================
+  //
+  //   四つ角 … 縦横の比率を保ったまま、拡大・縮小(テキストは文字も大きくなる)
+  //   左右   … 横幅だけ変える(テキストは改行の位置が変わる)
+  //   上下   … 高さだけ変える(テキストは枠が縦に広がる。中身より低くはならない)
+
+  // ----- 〇を押した瞬間 -----
+  function handleResizeDown(e: PointerEvent<HTMLButtonElement>, item: Item, handle: Handle) {
+    // ボタンの親 = 置いたものの枠。いまの高さを、画面から測ります
+    const box = e.currentTarget.parentElement;
+    if (box === null) {
+      return;
+    }
+    const img = box.querySelector("img");
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+    resizeRef.current = {
+      id: item.id,
+      handle,
+      isPhoto: item.type === "photo",
+      startX: e.clientX,
+      startY: e.clientY,
+      startWidth: item.width,
+      startItemX: item.x,
+      startItemY: item.y,
+      startFontSize: item.fontSize,
+      startBoxHeight: box.offsetHeight,
+      startPhotoHeight: img === null ? 0 : img.offsetHeight,
+      // 中身(入力欄など)の高さ + 上下の余白
+      startContentHeight:
+        (box.firstElementChild instanceof HTMLElement ? box.firstElementChild.offsetHeight : 0) +
+        ITEM_PADDING * 2,
+      hasBoxHeight: item.boxHeight !== null,
+      rotation: item.rotation,
+    };
+  }
+
+  // ----- 〇を引っぱっている間 -----
+  function handleResizeMove(e: PointerEvent<HTMLButtonElement>) {
+    const r = resizeRef.current;
+    if (r === null) {
+      return;
+    }
+    const h = r.handle;
+
+    // ▼ 置いたものが回っているときは、指の動きを「枠の向き」に直してから計算します。
+    //   (45度回っている枠の右の〇は、画面の右ではなく、ななめ右下に引っぱるため)
+    const rad = (r.rotation * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const moveX = e.clientX - r.startX;
+    const moveY = e.clientY - r.startY;
+    const localX = moveX * cos + moveY * sin;
+    const localY = -moveX * sin + moveY * cos;
+
+    // 外向き(大きくなる向き)に動いたぶんをプラスにします。
+    // 右の〇なら右へ、左の〇なら左へ動かすと大きくなります
+    const isLeft = h === "tl" || h === "bl" || h === "l";
+    const isTop = h === "tl" || h === "tr" || h === "t";
+    const dx = localX * (isLeft ? -1 : 1);
+    const dy = localY * (isTop ? -1 : 1);
+
+    // 新しい枠の横幅と高さ、ほかに変えるもの
+    let width = r.startWidth;
+    let height = r.startBoxHeight;
+    let changes: Partial<Item> = {};
+
+    if (h === "l" || h === "r") {
+      // ▼ 左右の〇:横幅だけ変えます
+      const min = r.isPhoto ? PHOTO_MIN_WIDTH : TEXT_MIN_WIDTH;
+      const max = r.isPhoto ? PHOTO_MAX_WIDTH : TEXT_MAX_WIDTH;
+      width = Math.max(min, Math.min(max, r.startWidth + dx));
+      // 写真は高さをそのまま残し、横にだけ広げます(はみ出たぶんは切り取って見せます)
+      changes = r.isPhoto ? { photoHeight: r.startPhotoHeight } : {};
+    } else if (h === "t" || h === "b") {
+      // ▼ 上下の〇:高さだけ変えます
+      if (r.isPhoto) {
+        const photoHeight = Math.max(
+          PHOTO_MIN_HEIGHT,
+          Math.min(PHOTO_MAX_HEIGHT, r.startPhotoHeight + dy)
+        );
+        height = r.startBoxHeight + (photoHeight - r.startPhotoHeight);
+        changes = { photoHeight };
+      } else {
+        // テキスト・URL は枠を縦に広げます。中身より低くはしません
+        height = Math.max(r.startContentHeight, r.startBoxHeight + dy);
+        changes = { boxHeight: height };
+      }
+    } else {
+      // ▼ 四つ角:縦横の比率を保って、拡大・縮小します
+      // 写真は中身(写真そのもの)の大きさで、テキストは枠ぜんたいの大きさで比べます
+      const baseWidth = r.isPhoto ? r.startWidth - ITEM_PADDING * 2 : r.startWidth;
+      const baseHeight = r.isPhoto ? r.startPhotoHeight : r.startBoxHeight;
+
+      // 縦の動きは、比率で割って「横幅にするとどれだけか」に直し、
+      // 横と縦、大きく動いたほうに合わせます(ななめに引いても自然に伸びるように)
+      const dyAsWidth = (dy * baseWidth) / baseHeight;
+      const grow = Math.abs(dx) > Math.abs(dyAsWidth) ? dx : dyAsWidth;
+
+      // 何倍にするか。小さくなりすぎ・大きくなりすぎないように、範囲に収めます
+      let scale = (baseWidth + grow) / baseWidth;
+      if (r.isPhoto) {
+        scale = Math.max(PHOTO_MIN_WIDTH / r.startWidth, Math.min(PHOTO_MAX_WIDTH / r.startWidth, scale));
+      } else {
+        scale = Math.max(FONT_SIZE_MIN / r.startFontSize, Math.min(FONT_SIZE_MAX / r.startFontSize, scale));
+      }
+
+      width = r.isPhoto ? baseWidth * scale + ITEM_PADDING * 2 : r.startWidth * scale;
+      height = r.startBoxHeight + baseHeight * (scale - 1);
+      // 写真は高さを、テキストは文字の大きさを、同じ倍率で変えます
+      changes = r.isPhoto
+        ? { photoHeight: r.startPhotoHeight * scale }
+        : {
+            fontSize: Math.round(r.startFontSize * scale * 10) / 10,
+            // 枠の高さを決めてあるときは、それも同じ倍率にします
+            boxHeight: r.hasBoxHeight ? r.startBoxHeight * scale : null,
+          };
+    }
+
+    // ▼ 反対側の辺や角が動かないように、置く位置を直します。
+    //   枠は真ん中を軸に回っているので、「真ん中がどれだけずれるか」を
+    //   枠の向きで考えてから、画面の向きに戻して計算します
+    const shiftX = ((width - r.startWidth) / 2) * (isLeft ? -1 : 1);
+    const shiftY = ((height - r.startBoxHeight) / 2) * (isTop ? -1 : 1);
+    const centerX = r.startItemX + r.startWidth / 2 + shiftX * cos - shiftY * sin;
+    const centerY = r.startItemY + r.startBoxHeight / 2 + shiftX * sin + shiftY * cos;
+
+    updateItem(r.id, {
+      ...changes,
+      width,
+      x: centerX - width / 2,
+      y: centerY - height / 2,
+    });
+  }
+
+  // ----- 〇を離した瞬間 -----
+  function handleResizeUp() {
+    resizeRef.current = null;
+  }
+
+  // =====================================================
+  // 回転のボタンを引っぱって、回す
+  // =====================================================
+
+  // 真ん中から見た、指の角度(度)
+  function angleFrom(centerX: number, centerY: number, e: PointerEvent<HTMLButtonElement>) {
+    return (Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180) / Math.PI;
+  }
+
+  // ----- 回転のボタンを押した瞬間 -----
+  function handleRotateDown(e: PointerEvent<HTMLButtonElement>, item: Item) {
+    // このボタンが入っている「置いたものの枠」を探し、その真ん中を回す軸にします
+    const box = e.currentTarget.closest("[data-item-id]");
+    if (box === null) {
+      return;
+    }
+    const rect = box.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+    rotateRef.current = {
+      id: item.id,
+      centerX,
+      centerY,
+      startAngle: angleFrom(centerX, centerY, e),
+      startRotation: item.rotation,
+      paperX: centerX - (paperRef.current?.getBoundingClientRect().left ?? 0),
+      paperY: centerY - (paperRef.current?.getBoundingClientRect().top ?? 0),
+    };
+  }
+
+  // ----- 回している間 -----
+  function handleRotateMove(e: PointerEvent<HTMLButtonElement>) {
+    const r = rotateRef.current;
+    if (r === null) {
+      return;
+    }
+    // 押した瞬間から、指が真ん中のまわりを何度まわったか
+    let rotation = r.startRotation + angleFrom(r.centerX, r.centerY, e) - r.startAngle;
+    // -180〜180 の間に直します
+    rotation = ((((rotation + 180) % 360) + 360) % 360) - 180;
+
+    // まっすぐ(0度)や、真横(90度)の近くでは、ぴたっと止まるようにします。
+    // 指で少しだけ傾いてしまうのを防ぐためです
+    let isStraight = false;
+    for (const snap of [-180, -90, 0, 90, 180]) {
+      if (Math.abs(rotation - snap) < 5) {
+        rotation = snap;
+        isStraight = true;
+      }
+    }
+    updateItem(r.id, { rotation });
+
+    // まっすぐのときだけ、真ん中を通る縦と横の点線を出して、そろったことを知らせます
+    setRotateGuide(isStraight ? { x: r.paperX, y: r.paperY } : null);
+  }
+
+  // ----- 回転のボタンを離した瞬間 -----
+  function handleRotateUp() {
+    rotateRef.current = null;
+    setRotateGuide(null);
+  }
+
+  // =====================================================
   // 紙を PNG 画像にする
   // =====================================================
   //
@@ -394,8 +745,6 @@ export default function LetterPage() {
     ctx.fillStyle = PAPER_COLOR;
     ctx.fillRect(0, 0, width, height);
 
-    // 文字の設定(ここで決めたものが、下の fillText で使われます)
-    ctx.font = FONT;
     // textBaseline = "middle" … 指定した高さが、文字の縦の真ん中になる
     ctx.textBaseline = "middle";
 
@@ -405,15 +754,38 @@ export default function LetterPage() {
       // 中身を描き始める位置(置いた位置 + 内側の余白)
       const left = item.x + ITEM_PADDING;
       const top = item.y + ITEM_PADDING;
+      // 中身を置ける横幅(置いたものの横幅 - 左右の余白)
+      const contentWidth = item.width - ITEM_PADDING * 2;
+      // 文字の設定(ここで決めたものが、下の fillText で使われます)
+      ctx.font = `${item.fontSize}px ${fontFamilyOf(item.fontKey)}`;
+      const lineHeight = lineHeightOf(item.fontSize);
+
+      // ▼ Google Fonts のフォントは、選んだときに読み込むので、まだ届いていないことがあります。
+      //   届く前に描くと、ちがうフォントで画像になってしまうので、ここで待ちます
+      if (item.type !== "photo") {
+        await document.fonts.load(ctx.font, item.type === "text" ? item.text : item.url);
+      }
+
+      // ▼ 回っているときは、枠の真ん中を軸に、紙ごと回してから描きます。
+      //   save / restore で、次のものを描くときには元の向きに戻します。
+      //   枠の高さは、画面に出ている枠から測ります(中身の行数などで決まるため)
+      const box = paper.querySelector<HTMLElement>(`[data-item-id="${item.id}"]`);
+      const boxHeight = box?.offsetHeight ?? 0;
+      const centerX = item.x + item.width / 2;
+      const centerY = item.y + boxHeight / 2;
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate((item.rotation * Math.PI) / 180);
+      ctx.translate(-centerX, -centerY);
 
       // ===== テキスト =====
       if (item.type === "text") {
-        ctx.fillStyle = TEXT_COLOR;
-        const lines = wrapText(ctx, item.text, CONTENT_WIDTH);
+        ctx.fillStyle = item.color;
+        const lines = wrapText(ctx, item.text, contentWidth);
         // .forEach((line, i) => ...) は、配列の1つ1つに処理をするくり返しです
         lines.forEach((line, i) => {
           // i 行目の縦の真ん中 = 上端 + 行の高さの半分 + 行の高さ × i
-          ctx.fillText(line, left, top + LINE_HEIGHT / 2 + LINE_HEIGHT * i);
+          ctx.fillText(line, left, top + lineHeight / 2 + lineHeight * i);
         });
       }
 
@@ -424,20 +796,30 @@ export default function LetterPage() {
         img.src = item.imageSrc;
         // decode() は「画像の読み込みが終わるまで待つ」関数です
         await img.decode();
-        // 横幅を CONTENT_WIDTH にそろえ、縦は元の写真の比率のままにします
-        const h = (CONTENT_WIDTH * img.naturalHeight) / img.naturalWidth;
-        ctx.drawImage(img, left, top, CONTENT_WIDTH, h);
+        // 高さを決めていないときは、元の写真の比率のままの高さにします
+        const h = item.photoHeight ?? (contentWidth * img.naturalHeight) / img.naturalWidth;
+
+        // ▼ 画面の object-cover と同じく、枠いっぱいに広げて、はみ出たぶんを切り取ります。
+        //   枠が写真より横長なら上下を、縦長なら左右を、真ん中を残して切ります
+        const scale = Math.max(contentWidth / img.naturalWidth, h / img.naturalHeight);
+        const sw = contentWidth / scale; // 写真から切り出す横幅
+        const sh = h / scale; // 写真から切り出す高さ
+        const sx = (img.naturalWidth - sw) / 2;
+        const sy = (img.naturalHeight - sh) / 2;
+        ctx.drawImage(img, sx, sy, sw, sh, left, top, contentWidth, h);
       }
 
       // ===== URL =====
       if (item.type === "url" && item.url.trim() !== "") {
-        ctx.fillStyle = LINK_COLOR;
-        const t = fitText(ctx, item.url, CONTENT_WIDTH);
-        const centerY = top + LINE_HEIGHT / 2;
-        ctx.fillText(t, left, centerY);
-        // 下線(文字の少し下に、高さ1pxの細い四角を塗る)
-        ctx.fillRect(left, centerY + 8, ctx.measureText(t).width, 1);
+        ctx.fillStyle = item.color;
+        const t = fitText(ctx, item.url, contentWidth);
+        const textCenterY = top + lineHeight / 2;
+        ctx.fillText(t, left, textCenterY);
+        // 下線(文字の少し下に、高さ1pxの細い四角を塗る)。文字が大きいほど下にずらします
+        ctx.fillRect(left, textCenterY + item.fontSize * 0.6, ctx.measureText(t).width, 1);
       }
+
+      ctx.restore();
     }
 
     // ----- PNG にする -----
@@ -451,6 +833,9 @@ export default function LetterPage() {
   // =====================================================
   // 未来へ送る(保存する)
   // =====================================================
+
+  // いま選んでいるもの(何も選んでいないときは undefined)
+  const selectedItem = items.find((it) => it.id === selectedId);
 
   // 紙の上に、中身の入ったものが1つでもあるか
   const hasContent = items.some(
@@ -658,19 +1043,36 @@ export default function LetterPage() {
   // 紙の上のものの中身を、種類ごとに作る
   // =====================================================
   function renderBody(item: Item) {
+    // 選んだ大きさ・フォント・色を、そのまま style にします
+    // (Tailwind のクラスは、あらかじめ決めた値しか使えないため)
+    const textStyle = {
+      fontSize: item.fontSize,
+      fontFamily: fontFamilyOf(item.fontKey),
+      color: item.color,
+      lineHeight: `${lineHeightOf(item.fontSize)}px`,
+    };
+
     // ===== テキスト =====
     if (item.type === "text") {
       return (
         <textarea
           rows={1}
           value={item.text}
+          // 文字の大きさを変えたときにも、高さを合わせ直すためです
+          // (onChange だけだと、文字を打ったときにしか高さが変わりません)
+          ref={(el) => {
+            if (el !== null) {
+              autoResize(el);
+            }
+          }}
+          style={textStyle}
           autoFocus
           onChange={(e) => {
             autoResize(e.target);
             updateItem(item.id, { text: e.target.value });
           }}
           placeholder="テキストを入力"
-          className="block w-full resize-none overflow-hidden bg-transparent text-sm leading-6 outline-none placeholder:text-stone-300"
+          className="block w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-stone-300"
         />
       );
     }
@@ -696,7 +1098,14 @@ export default function LetterPage() {
         );
       }
       return (
-        <img src={item.imageSrc} alt="選んだ写真" draggable={false} className="block w-full" />
+        // object-cover = 枠の形が写真と違っても、ゆがめずに、はみ出たぶんを切り取って見せる
+        <img
+          src={item.imageSrc}
+          alt="選んだ写真"
+          draggable={false}
+          className="block w-full object-cover"
+          style={{ height: item.photoHeight ?? "auto" }}
+        />
       );
     }
 
@@ -704,7 +1113,7 @@ export default function LetterPage() {
 
     if (selectedId !== item.id && item.url !== "") {
       return (
-        <span className="flex items-center gap-1 text-sm text-stone-700">
+        <span className="flex items-center gap-1" style={textStyle}>
           {LinkIcon}
           <span className="truncate underline">{item.url}</span>
         </span>
@@ -719,7 +1128,7 @@ export default function LetterPage() {
 
     return (
       <div>
-        <div className="flex items-center gap-1 text-sm text-stone-700">
+        <div className="flex items-center gap-1" style={textStyle}>
           {LinkIcon}
           <input
             type="url"
@@ -761,7 +1170,8 @@ export default function LetterPage() {
     // h-full = 親(layout の main)の高さにぴったり合わせる。
     // 以前の min-h-screen と h-[78vh] は、下タブのぶんだけ親より高くなり、
     // 画面がスクロールしてしまっていました。
-    <main className="flex h-full justify-center overflow-hidden bg-[#f3ede2] text-stone-800">
+    // relative = 下の封筒を、ブラウザ全体ではなくこの画面の中に重ねるための基準
+    <main className="relative flex h-full justify-center overflow-hidden bg-[#f3ede2] text-stone-800">
       {/* ===== スマホの幅の入れ物 ===== */}
       {/* pb は、下に重なっている下タブのぶんの逃げです。
           この画面には下タブが出ているので、4px だけだと
@@ -787,42 +1197,196 @@ export default function LetterPage() {
             return (
               <div
                 key={item.id}
+                // 回転や画像を作るときに、この枠を探し出すための目印
+                data-item-id={item.id}
                 onPointerDown={(e) => handlePointerDown(e, item)}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
-                className={`absolute w-52 cursor-move select-none p-2 ${
+                className={`absolute cursor-move select-none p-2 ${
                   isSelected ? "outline outline-1 outline-stone-700" : ""
                 }`}
-                style={{ left: item.x, top: item.y, touchAction: "none" }}
+                style={{
+                  left: item.x,
+                  top: item.y,
+                  width: item.width,
+                  // テキスト・URL の枠の高さ(上下の〇で広げたとき)
+                  minHeight: item.type !== "photo" ? (item.boxHeight ?? undefined) : undefined,
+                  // 真ん中を軸に回します(transform の軸は、何も書かなければ真ん中です)
+                  transform: item.rotation !== 0 ? `rotate(${item.rotation}deg)` : undefined,
+                  touchAction: "none",
+                }}
               >
                 {renderBody(item)}
 
                 {isSelected && (
                   <>
-                    {/* 四隅の小さな〇(今は飾りです) */}
-                    <span className="pointer-events-none absolute -left-1.5 -top-1.5 h-3 w-3 rounded-full border border-stone-700 bg-white" />
-                    <span className="pointer-events-none absolute -right-1.5 -top-1.5 h-3 w-3 rounded-full border border-stone-700 bg-white" />
-                    <span className="pointer-events-none absolute -bottom-1.5 -left-1.5 h-3 w-3 rounded-full border border-stone-700 bg-white" />
-                    <span className="pointer-events-none absolute -bottom-1.5 -right-1.5 h-3 w-3 rounded-full border border-stone-700 bg-white" />
+                    {/* ▼ 枠の上に、回転と削除のボタンを並べます。
+                        枠から細い点線でつなぎ、どの枠のボタンか分かるようにしています。
+                        見た目は 28px の丸ですが、押せる範囲は 44px あります */}
+                    <span className="pointer-events-none absolute -top-8 left-1/2 h-6 -translate-x-1/2 border-l border-dotted border-stone-700" />
+                    <div className="absolute -top-[68px] left-1/2 flex -translate-x-1/2">
+                      {/* 回転:押したまま、枠のまわりをぐるっと動かすと回ります */}
+                      <button
+                        type="button"
+                        aria-label="回転"
+                        onPointerDown={(e) => handleRotateDown(e, item)}
+                        onPointerMove={handleRotateMove}
+                        onPointerUp={handleRotateUp}
+                        onPointerCancel={handleRotateUp}
+                        className="flex h-11 w-11 cursor-grab items-center justify-center active:cursor-grabbing"
+                        style={{ touchAction: "none" }}
+                      >
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-stone-700 bg-white text-stone-700 shadow-sm">
+                          {RotateIcon}
+                        </span>
+                      </button>
+                      {/* 削除 */}
+                      <button
+                        type="button"
+                        onClick={() => deleteItem(item.id)}
+                        aria-label="削除"
+                        className="flex h-11 w-11 items-center justify-center"
+                      >
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-stone-700 bg-white text-xs text-stone-700 shadow-sm">
+                          ×
+                        </span>
+                      </button>
+                    </div>
 
-                    {/* 枠の上の点線(×ボタンとつなぐ線) */}
-                    <span className="pointer-events-none absolute -top-5 left-1/2 h-4 -translate-x-1/2 border-l border-dotted border-stone-700" />
-
-                    {/* 削除ボタン */}
-                    <button
-                      type="button"
-                      onClick={() => deleteItem(item.id)}
-                      aria-label="削除"
-                      className="absolute -top-11 left-1/2 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border border-stone-700 bg-white text-xs"
-                    >
-                      ×
-                    </button>
+                    {/* 枠の〇(四つ角と、辺の中点)。引っぱると大きさや形が変わります。
+                        見た目は 12px ですが、押せる範囲は 44px あります */}
+                    {HANDLES.filter((h) => {
+                      // 写真をまだ選んでいないときは、大きさを変えられないので、
+                      // 四つ角だけを飾りとして出します
+                      if (item.type === "photo" && item.imageSrc === "") {
+                        return h.handle.length === 2;
+                      }
+                      return true;
+                    }).map((h) =>
+                      item.type === "photo" && item.imageSrc === "" ? (
+                        <span
+                          key={h.handle}
+                          className={`pointer-events-none absolute flex h-11 w-11 items-center justify-center ${h.position}`}
+                        >
+                          <span className="h-3 w-3 rounded-full border border-stone-700 bg-white" />
+                        </span>
+                      ) : (
+                        <button
+                          key={h.handle}
+                          type="button"
+                          aria-label="大きさを変える"
+                          onPointerDown={(e) => handleResizeDown(e, item, h.handle)}
+                          onPointerMove={handleResizeMove}
+                          onPointerUp={handleResizeUp}
+                          onPointerCancel={handleResizeUp}
+                          className={`absolute flex h-11 w-11 items-center justify-center ${h.position} ${h.cursor}`}
+                          style={{ touchAction: "none" }}
+                        >
+                          <span className="h-3 w-3 rounded-full border border-stone-700 bg-white" />
+                        </button>
+                      )
+                    )}
                   </>
                 )}
               </div>
             );
           })}
+
+          {/* ----- テキスト・URL を選んでいるときの道具 ----- */}
+          {/* 文字の大きさは、写真と同じく四つ角を引っぱって変えます */}
+          {selectedItem !== undefined && selectedItem.type !== "photo" && (
+            <>
+              {/* ===== 書体と色:紙の下の帯 =====
+                  手紙の紙と同じ生成り色に、金の細いふち。
+                  「書体」と「色」をタブで切り替えて、片方ずつ出します */}
+              <div className="absolute inset-x-2 bottom-7 z-10 rounded-lg bg-[#fdfbf5] px-2 pb-1 shadow-sm ring-1 ring-kin/50">
+                {/* 下線つきのタブ。カード作り(CardComposer)のタブと同じ見た目です */}
+                <div className="flex border-b border-kin/30">
+                  {(["font", "color"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setStyleTab(tab)}
+                      // h-11 = 押せる範囲 44px。
+                      // 下線は選んでいないときも透明で引いておき、切り替えても高さが変わらないようにします
+                      className={`-mb-px h-11 flex-1 border-b-2 text-sm font-bold ${
+                        styleTab === tab ? "border-kin text-kin" : "border-transparent text-stone-400"
+                      }`}
+                    >
+                      {tab === "font" ? "書体" : "色"}
+                    </button>
+                  ))}
+                </div>
+
+                {/* タブの中身の高さを固定します。
+                    固定しないと、切り替えるたびに帯の高さが変わって、紙の上で上下に動いてしまいます */}
+                <div className="flex h-[3.75rem] items-center">
+                  {styleTab === "font" ? (
+                    // ===== 書体:見本の「あ」と名前を書いた札を、横に並べます =====
+                    <HorizontalScroller className="w-full">
+                      {FONTS.map((f) => (
+                        <button
+                          key={f.key}
+                          type="button"
+                          onClick={() => updateItem(selectedItem.id, { fontKey: f.key })}
+                          className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md ${
+                            selectedItem.fontKey === f.key
+                              ? "bg-white text-kin ring-1 ring-kin"
+                              : "text-stone-700"
+                          }`}
+                        >
+                          {/* 見本の字は、そのフォントで書きます */}
+                          <span className="text-xl leading-none" style={{ fontFamily: f.family }}>
+                            あ
+                          </span>
+                          <span className="whitespace-nowrap text-[10px] text-stone-500">{f.label}</span>
+                        </button>
+                      ))}
+                    </HorizontalScroller>
+                  ) : (
+                    // ===== 色:色見本の四角を、横に並べます =====
+                    // 名前は画面に出しませんが、読み上げ用に aria-label に残しています
+                    <HorizontalScroller className="w-full">
+                      {COLORS.map((c) => (
+                        <button
+                          key={c.value}
+                          type="button"
+                          onClick={() => updateItem(selectedItem.id, { color: c.value })}
+                          aria-label={c.label}
+                          // 押せる範囲は 44px
+                          className="flex h-11 w-11 shrink-0 items-center justify-center"
+                        >
+                          {/* border = 白い色でも、紙の上で四角が見えるように、うすい線でふちどります */}
+                          <span
+                            className={`h-7 w-7 rounded-sm border border-black/10 ${
+                              selectedItem.color === c.value ? "ring-1 ring-kin ring-offset-2" : ""
+                            }`}
+                            style={{ backgroundColor: c.value }}
+                          />
+                        </button>
+                      ))}
+                    </HorizontalScroller>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ----- 回転がまっすぐになったときの点線 ----- */}
+          {/* 置いたものの真ん中を通る、横と縦の線です。紙の端から端まで引きます */}
+          {rotateGuide !== null && (
+            <>
+              <span
+                className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-beni"
+                style={{ top: rotateGuide.y }}
+              />
+              <span
+                className="pointer-events-none absolute inset-y-0 z-10 border-l border-dashed border-beni"
+                style={{ left: rotateGuide.x }}
+              />
+            </>
+          )}
 
           {/* ----- 右上の黒い丸ボタン ----- */}
           <div className="absolute right-3 top-3 flex flex-col gap-3">
@@ -868,9 +1432,12 @@ export default function LetterPage() {
         </button>
 
         {/* ===== エラーの表示 ===== */}
-        {/* 紙の大きさが変わらないよう、absolute で紙の下に重ねて出します */}
+        {/* 紙の大きさが変わらないよう、absolute で重ねて出します。
+            「未来へ送る」ボタンは紙の下に 20px 食いこんでいるので、
+            紙の下には、ボタンの左に高さ 24px(h-6)のすき間ができます。そこに1行で出します。
+            bottom は外側の枠の pb と同じ値 = ボタンの下端にそろえるためです */}
         {errorText !== null && (
-          <p className="absolute bottom-16 left-4 right-4 rounded-lg bg-white/90 p-2 text-sm text-red-600 shadow">
+          <p className="absolute bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-4 right-40 flex h-6 items-center text-xs font-bold text-red-600">
             {errorText}
           </p>
         )}
@@ -881,8 +1448,10 @@ export default function LetterPage() {
       {/* 紙(paperRef)を消さないよう、別の画面にせず上に重ねています */}
       {/* ===================================================== */}
       {showEnvelope && (
-        // 全画面で重ねるので、下タブもこの間は隠れます(不透明にして透けないようにする)
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#f3ede2]">
+        // absolute = この画面(main)の中だけに重ねます。
+        // 前は fixed で、スマホ幅の枠を越えてブラウザ全体を覆ってしまっていました。
+        // 不透明にして、後ろの紙が透けないようにしています
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#f3ede2]">
           <div className="flex w-full max-w-[430px] flex-col items-center gap-6 px-4">
             {/* 日付が入るまでは、スワイプできないことを伝える */}
             <p className={`text-sm ${canSwipe ? "text-stone-700" : "text-stone-400"}`}>
