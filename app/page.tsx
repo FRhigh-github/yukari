@@ -88,8 +88,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         // flex-1 = 残りの高さを全部つかう。
         // 上から引っぱって取り直す動き（PullToRefresh）は外しました。
         // 指1本で模様を動かす操作と、同じ動きでぶつかるためです。
-        // pb は、下タブと2つのボタンが重なっているぶんの逃げです。
-        <div className="min-h-0 flex-1 px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)]">
+        // 余白（px / pb）は付けません。付けると、そこで模様が切れて見えるためです。
+        // 下タブとボタンに重なるぶんは、MemberCircles の中で中心を上にずらして逃がしています。
+        <div className="min-h-0 flex-1">
           <MemberCircles members={members} currentUserId={user.id} />
         </div>
       )}

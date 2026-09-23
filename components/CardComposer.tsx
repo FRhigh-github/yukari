@@ -291,7 +291,12 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
                 </p>
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.src} alt="" className="w-full" draggable={false} />
+                <img
+                  src={item.src}
+                  alt=""
+                  className="w-full"
+                  draggable={false}
+                />
               )}
             </div>
           ))}
@@ -300,7 +305,8 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
 
       {/* ▼ 下半分：道具 */}
       <div className="shrink-0 border-t border-stone-200 bg-white">
-        <div className="flex">
+        {/* 下線つきのタブ。選んでいるものだけ金の線と文字になります */}
+        <div className="flex border-b border-kin/30">
           <TabButton
             label="背景"
             isActive={tab === "background"}
@@ -319,68 +325,74 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
         </div>
 
         <div className="space-y-3 p-4">
-          {tab === "background" ? (
-            <HorizontalScroller>
-              {CARD_KINDS.map((item) => (
+          {/* ▼ タブの中身の高さを固定します。
+              中身の量がタブごとに違うので、固定しないと
+              切り替えるたびに下の道具ぜんたいの高さが変わって、カードが上下に動いてしまいます。
+              いちばん背の高い「テキスト」（ボタン＋入力欄）に合わせています */}
+          <div className="min-h-[7.5rem]">
+            {tab === "background" ? (
+              <HorizontalScroller>
+                {CARD_KINDS.map((item) => (
+                  <button
+                    key={item.kind}
+                    type="button"
+                    onClick={() => setKind(item.kind)}
+                    className={`shrink-0 cursor-pointer rounded-lg ${
+                      item.kind === kind ? "ring-2 ring-orange-400" : ""
+                    }`}
+                  >
+                    <CardTemplate
+                      kind={item.kind}
+                      name={item.label}
+                      className="h-16 w-12"
+                      plain
+                    />
+                  </button>
+                ))}
+              </HorizontalScroller>
+            ) : null}
+
+            {tab === "text" ? (
+              <div className="space-y-2">
                 <button
-                  key={item.kind}
                   type="button"
-                  onClick={() => setKind(item.kind)}
-                  className={`shrink-0 cursor-pointer rounded-lg ${
-                    item.kind === kind ? "ring-2 ring-orange-400" : ""
-                  }`}
+                  onClick={addText}
+                  className="w-full rounded-xl border border-stone-200 py-2.5 text-sm text-stone-700"
                 >
-                  <CardTemplate
-                    kind={item.kind}
-                    name={item.label}
-                    className="h-16 w-12"
-                    plain
-                  />
+                  ＋ 文字を置く
                 </button>
-              ))}
-            </HorizontalScroller>
-          ) : null}
 
-          {tab === "text" ? (
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={addText}
-                className="w-full rounded-xl border border-stone-200 py-2.5 text-sm text-stone-700"
-              >
-                ＋ 文字を置く
-              </button>
+                {selected?.type === "text" ? (
+                  <textarea
+                    value={selected.text}
+                    onChange={(event) =>
+                      updateSelected({ text: event.target.value })
+                    }
+                    className="h-16 w-full resize-none rounded-xl border border-stone-200 p-3 text-sm focus:outline-none"
+                  />
+                ) : (
+                  <p className="text-xs text-stone-400">
+                    カードの上の文字を押すと、ここで書き換えられます。
+                  </p>
+                )}
+              </div>
+            ) : null}
 
-              {selected?.type === "text" ? (
-                <textarea
-                  value={selected.text}
-                  onChange={(event) =>
-                    updateSelected({ text: event.target.value })
-                  }
-                  className="h-16 w-full resize-none rounded-xl border border-stone-200 p-3 text-sm focus:outline-none"
+            {tab === "image" ? (
+              <label className="block w-full rounded-xl border border-stone-200 py-2.5 text-center text-sm text-stone-700">
+                ＋ 写真を置く
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) addImage(file);
+                  }}
                 />
-              ) : (
-                <p className="text-xs text-stone-400">
-                  カードの上の文字を押すと、ここで書き換えられます。
-                </p>
-              )}
-            </div>
-          ) : null}
-
-          {tab === "image" ? (
-            <label className="block w-full rounded-xl border border-stone-200 py-2.5 text-center text-sm text-stone-700">
-              ＋ 写真を置く
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) addImage(file);
-                }}
-              />
-            </label>
-          ) : null}
+              </label>
+            ) : null}
+          </div>
 
           {/* 選んでいるものの大きさ変更と削除 */}
           {selected ? (
@@ -471,10 +483,11 @@ function TabButton({ label, isActive, onClick }: TabButtonProps) {
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 py-3 text-xs ${
-        isActive
-          ? "border-b-2 border-stone-800 font-bold text-stone-800"
-          : "text-stone-400"
+      // 下線は選んでいないときも透明で引いておきます。
+      // 選んだときだけ線を足すと、その2px ぶんタブの高さが変わってしまうためです。
+      // h-11 = 44px。押せる範囲を iOS の基準に合わせています
+      className={`-mb-px h-11 flex-1 cursor-pointer border-b-2 text-sm font-bold ${
+        isActive ? "border-kin text-kin" : "border-transparent text-stone-400"
       }`}
     >
       {label}

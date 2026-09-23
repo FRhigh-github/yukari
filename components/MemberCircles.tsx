@@ -44,6 +44,10 @@ const MAX_ZOOM = 2.5;
 // 動かしたときは、指を離してもアイコンを押したことにしません
 const DRAG_THRESHOLD = 6;
 
+// 下タブと、右下・左下のボタンが重なる高さ（px）。
+// 模様は画面の下の端まで描きますが、中心はこのぶん上にずらして、ボタンに隠れないようにします
+const BOTTOM_COVER = 112;
+
 // 蜂の巣の並びで、k 番目の輪にある場所を、真上から時計回りに並べて返します。
 // 六角形の6つの角を順にたどり、角と角のあいだを k 等分して場所を置いていきます。
 function hexRing(k: number) {
@@ -140,7 +144,7 @@ export default function MemberCircles({
     MAX_ZOOM,
     Math.max(
       MIN_ZOOM,
-      Math.min(size.width, size.height) / 2 / (newsRing * GAP + ICON_RADIUS),
+      Math.min(size.width, size.height - BOTTOM_COVER) / 2 / (newsRing * GAP + ICON_RADIUS),
     ),
   );
 
@@ -256,7 +260,7 @@ export default function MemberCircles({
       <div
         className="absolute inset-0"
         style={{
-          transform: `translate(${view.moveX}px, ${view.moveY}px) scale(${scale})`,
+          transform: `translate(${view.moveX}px, ${view.moveY - BOTTOM_COVER / 2}px) scale(${scale})`,
         }}
       >
         {/* ▼ 水引の花の輪。アイコンより先に描いて、後ろに回します */}

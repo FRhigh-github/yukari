@@ -68,11 +68,12 @@ export default async function CardInboxPage({
       : (drawingUrls?.find((item) => item.path === path)?.signedUrl ?? null);
 
   return (
-    <main className="relative min-h-full p-5 pb-24">
+    // 色はホームにそろえています（生成りの背景・金のふち・紅は「カードを作る」だけ）
+    <main className="relative min-h-full bg-[#faf9f6] px-4 pb-[calc(env(safe-area-inset-bottom)+8rem)] pt-4">
       <Link href="/" className="text-sm text-stone-500">
         ← 戻る
       </Link>
-      <h1 className="mb-3 mt-2 text-xl font-bold text-stone-800">カード</h1>
+      <h1 className="mb-3 mt-2 border-b border-kin/30 pb-2 text-xl font-bold text-stone-800">カード</h1>
 
       <div className="mb-4 flex gap-2">
         <BoxTab label="届いた" href="/cards/inbox" isActive={!isSent} />
@@ -84,8 +85,8 @@ export default async function CardInboxPage({
           {isSent ? "まだ送っていません。" : "まだ届いていません。"}
         </p>
       ) : (
-        // 2列に並べます
-        <ul className="grid grid-cols-2 gap-4 pb-24">
+        // 2列に並べます。下の余白は main の pb でまとめて取っています
+        <ul className="grid grid-cols-2 gap-4">
           {cards.map((card) => {
             const background = backgrounds?.find(
               (item) => item.id === card.template_id,
@@ -112,9 +113,10 @@ export default async function CardInboxPage({
         </ul>
       )}
 
+      {/* 下タブ（約110px）より上に浮かせて出します */}
       <Link
         href="/cards"
-        className="fixed bottom-24 left-1/2 ml-[6rem] -translate-x-1/2 rounded-full bg-stone-700 px-5 py-2.5 text-xs font-bold text-white shadow-lg"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+8rem)] left-1/2 ml-[6rem] flex h-11 -translate-x-1/2 items-center rounded-full bg-beni px-5 text-sm font-bold text-white ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6]"
       >
         カードを作る
       </Link>
@@ -132,8 +134,11 @@ function BoxTab({ label, href, isActive }: BoxTabProps) {
   return (
     <Link
       href={href}
-      className={`rounded-full px-4 py-2 text-xs ${
-        isActive ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-600"
+      // h-11 = 44px。押せる範囲を iOS の基準に合わせています
+      className={`flex h-11 items-center rounded-full border px-5 text-sm ${
+        isActive
+          ? "border-kin bg-white font-bold text-kin"
+          : "border-transparent text-stone-500"
       }`}
     >
       {label}

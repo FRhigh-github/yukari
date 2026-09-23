@@ -90,18 +90,18 @@ export default function CommunitySettings({
     <div className="space-y-6">
       {isOwner ? (
         <section>
-          <h2 className="mb-2 text-sm font-bold text-stone-600">名前を変える</h2>
+          <h2 className="mb-2 text-sm font-bold text-kin">名前を変える</h2>
           <form onSubmit={handleRename} className="flex gap-2">
             <input
               required
               maxLength={40}
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="flex-1 rounded-xl border border-stone-200 px-4 py-2.5 text-sm focus:outline-none"
+              className="h-11 flex-1 rounded-xl border border-kin/30 bg-white px-4 text-[17px] focus:border-kin focus:outline-none"
             />
             <button
               type="submit"
-              className="shrink-0 rounded-xl bg-stone-800 px-4 text-sm font-bold text-white"
+              className="h-11 shrink-0 rounded-xl border border-kin bg-white px-4 text-sm font-bold text-kin"
             >
               保存
             </button>
@@ -120,14 +120,14 @@ export default function CommunitySettings({
               <button
                 type="button"
                 onClick={handleLeave}
-                className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white"
+                className="h-11 flex-1 rounded-xl bg-beni text-sm font-bold text-white"
               >
                 退出する
               </button>
               <button
                 type="button"
                 onClick={() => setIsConfirming(false)}
-                className="flex-1 rounded-xl border border-stone-300 py-2.5 text-sm text-stone-600"
+                className="h-11 flex-1 rounded-xl border border-stone-300 bg-white text-sm text-stone-600"
               >
                 やめる
               </button>
@@ -137,7 +137,7 @@ export default function CommunitySettings({
           <button
             type="button"
             onClick={() => setIsConfirming(true)}
-            className="text-xs text-red-600"
+            className="h-11 text-xs text-beni"
           >
             このコミュニティから退出する
           </button>

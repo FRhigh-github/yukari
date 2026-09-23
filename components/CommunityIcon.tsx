@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { shrinkImage } from "@/lib/image";
+import ImageCropper from "@/components/ImageCropper";
 import CameraBadge from "@/components/CameraBadge";
 
 type CommunityIconProps = {
@@ -42,23 +42,21 @@ export default function CommunityIcon({
   // 結果の知らせ。isError でエラーかどうかを分けて色を変えます
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
-  const handlePick = async (file: File) => {
-    setMessage(null);
+  // 切り取り中の写真。null なら切り取り画面は出していません
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
-    // shrinkImage = 大きすぎる写真を小さくします。
-    // そのまま上げると、開くたびに何MBも読み込むことになります。
-    //
-    // ただし、ブラウザが読めない形式（iPhone の HEIC など）だと失敗します。
-    // 前はここで止まってしまい、何も起きないように見えていました。
-    // 失敗したときは、縮めずに元のファイルのまま進めます。
-    let blob: Blob = file;
-    try {
-      blob = await shrinkImage(file);
-    } catch {
-      blob = file;
-    }
+  // 写真を選んだら、まず切り取り画面を出します。
+  // 切り取った結果は 512px の正方形なので、ここで縮める（shrinkImage）必要はありません
+  const handlePick = (file: File) => {
+    setMessage(null);
+    setCropFile(file);
+  };
+
+  // 切り取りが終わったら、見た目だけ変えます（保存は「保存する」を押してから）
+  const handleCropped = (blob: Blob) => {
+    setCropFile(null);
     setPicked(blob);
-    // createObjectURL = 選んだ画像を、その場で表示できるURLにする命令
+    // createObjectURL = 画像を、その場で表示できるURLにする命令
     setPreview(URL.createObjectURL(blob));
   };
 
@@ -88,8 +86,8 @@ export default function CommunityIcon({
       const upload = await supabase.storage
         .from("avatars")
         .upload(path, blob, {
-          // 縮められなかったときは元の形式のままなので、ファイルに合わせます
-          contentType: blob.type || "image/jpeg",
+          // 切り取り画面が JPEG にして返すので、形式は決まっています
+          contentType: "image/jpeg",
           // upsert = 同じ名前があれば上書きする
           upsert: true,
         });
@@ -131,7 +129,7 @@ export default function CommunityIcon({
   // 四角にしているのは、上のバーで人の顔と見分けがつくようにするためです。
   const square = (
     <span
-      className={`block h-20 w-20 rounded-2xl bg-stone-200 bg-cover bg-center ${
+      className={`block h-20 w-20 rounded-2xl bg-stone-200 bg-cover ring-1 ring-kin/50 bg-center ${
         isSaving ? "opacity-50" : ""
       }`}
       style={
@@ -167,7 +165,7 @@ export default function CommunityIcon({
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-xl font-bold text-stone-800">{name}</h1>
           {message ? (
-            <p className={`mt-1 text-xs ${message.isError ? "text-red-600" : "text-stone-500"}`}>
+            <p className={`mt-1 text-xs ${message.isError ? "text-beni" : "text-stone-500"}`}>
               {message.text}
             </p>
           ) : (
@@ -186,7 +184,7 @@ export default function CommunityIcon({
             type="button"
             onClick={handleCancel}
             disabled={isSaving}
-            className="h-12 flex-1 cursor-pointer rounded-xl border border-stone-300 text-sm text-stone-600 disabled:opacity-50"
+            className="h-12 flex-1 cursor-pointer rounded-xl border border-stone-300 bg-white text-sm text-stone-600 disabled:opacity-50"
           >
             やめる
           </button>
@@ -194,11 +192,21 @@ export default function CommunityIcon({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="h-12 flex-[2] cursor-pointer rounded-xl bg-stone-800 text-sm font-bold text-white disabled:opacity-50"
+            className="h-12 flex-[2] cursor-pointer rounded-xl bg-beni text-sm font-bold text-white disabled:opacity-50"
           >
             {isSaving ? "保存中…" : "保存する"}
           </button>
         </div>
+      ) : null}
+
+      {/* 切り取り画面。グループのアイコンは四角なので round は付けません */}
+      {cropFile ? (
+        <ImageCropper
+          file={cropFile}
+          round={false}
+          onDone={handleCropped}
+          onCancel={() => setCropFile(null)}
+        />
       ) : null}
     </section>
   );

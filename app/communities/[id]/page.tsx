@@ -25,7 +25,7 @@ export default async function CommunityPage({
 
   if (community === null) {
     return (
-      <main className="p-6 pb-24">
+      <main className="min-h-full bg-[#faf9f6] p-4 pb-[calc(env(safe-area-inset-bottom)+8rem)]">
         <Link href="/" className="text-sm text-stone-500">
           ← ホーム
         </Link>
@@ -54,7 +54,9 @@ export default async function CommunityPage({
     "owner";
 
   return (
-    <main className="space-y-8 p-6 pb-24">
+    // 色はホームにそろえています（生成りの背景・金の見出しと線）。
+    // pb = 下タブ（約110px）に、いちばん下のボタンが隠れないための余白
+    <main className="min-h-full space-y-8 bg-[#faf9f6] p-4 pb-[calc(env(safe-area-inset-bottom)+8rem)]">
       <div>
         {/* この画面には、ホームの ⚙ から来ます。
             なので戻り先も、そのコミュニティを開いたホームにします。
@@ -73,7 +75,7 @@ export default async function CommunityPage({
       />
 
       <section>
-        <h2 className="mb-2 text-sm font-bold text-stone-600">招待コード</h2>
+        <h2 className="mb-2 text-sm font-bold text-kin">招待コード</h2>
         <InviteCode code={community.invite_code} communityName={community.name} />
         <p className="mt-2 text-xs text-stone-400">
           このコードを渡すと、相手はこのコミュニティに参加できます。
@@ -81,16 +83,16 @@ export default async function CommunityPage({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-bold text-stone-600">
+        <h2 className="mb-3 text-sm font-bold text-kin">
           メンバー（{memberIds.length}人）
         </h2>
 
-        <ul className="space-y-3">
+        <ul className="divide-y divide-kin/20 rounded-2xl border border-kin/30 bg-white px-4">
           {profiles?.map((profile) => (
-            <li key={profile.id} className="flex items-center gap-3">
+            <li key={profile.id} className="flex min-h-14 items-center gap-3">
               {/* アイコンは背景画像で置きます（読み込み失敗時に印が出ないため） */}
               <div
-                className="h-9 w-9 shrink-0 rounded-full bg-stone-200 bg-cover bg-center"
+                className="h-9 w-9 shrink-0 rounded-full bg-stone-200 bg-cover bg-center ring-1 ring-kin/50"
                 style={
                   profile.avatar_url
                     ? { backgroundImage: `url("${encodeURI(profile.avatar_url)}")` }
@@ -99,12 +101,13 @@ export default async function CommunityPage({
               />
               <Link
                 href={`/members/${profile.id}`}
-                className="text-sm text-stone-700"
+                // flex-1 と py-3 で、名前の行全体を押せるようにしています（44px 以上）
+                className="flex-1 py-3 text-[17px] text-stone-800"
               >
                 {profile.display_name ?? "名無し"}
               </Link>
               {isOwner(profile.id) ? (
-                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-500">
+                <span className="rounded-full border border-kin/60 px-2 py-0.5 text-[10px] text-kin">
                   作成者
                 </span>
               ) : null}

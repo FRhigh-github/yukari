@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import PostCard from "@/components/PostCard";
+import StoryViewer from "@/components/StoryViewer";
 import type { Reaction } from "@/components/ReactionBoard";
 
 // [id] という名前のフォルダにすると、URL の一部を受け取れます。
@@ -22,14 +21,14 @@ export default async function MemberPage({
   // single() = 1件だけ取ってくる（配列ではなく、そのものが返ります）
   const [{ data: profile }, { data: posts }, { data: reactions }] =
     await Promise.all([
-      supabase.from("profiles").select("display_name").eq("id", id).single(),
+      supabase.from("profiles").select("display_name, avatar_url").eq("id", id).single(),
       // 列は使うものだけ並べます。
       // select("*") だと、誰かが列を足した瞬間に、
       // 知らないうちに取ってくる量が増えます。
       // limit は、報告が増えたときに一気に読み込まないための上限です。
       supabase
         .from("posts")
-        .select("id, title, body, image_url, created_at")
+        .select("id, title, body, image_url, created_at, community_id")
         .eq("author_id", id)
         .order("created_at", { ascending: false })
         .limit(30),
@@ -99,33 +98,24 @@ export default async function MemberPage({
             ?.display_name ?? null,
       })) ?? [];
 
+  // ▼ ストーリーのように、画面いっぱいで1枚ずつ見せます（StoryViewer）。
+  //   「〇〇さんのご報告」という見出しは置きません。上にアイコンと名前が出るためです。
   return (
-    <main className="p-6 pb-24">
-      <Link href="/" className="text-sm text-stone-500">
-        ← 戻る
-      </Link>
-
-      <h1 className="mb-4 mt-2 text-xl font-bold text-stone-800">
-        {profile?.display_name ?? "名無し"} さんのご報告
-      </h1>
-
-      {posts?.length === 0 ? (
-        <p className="text-sm text-stone-500">まだご報告はありません。</p>
-      ) : (
-        posts?.map((post, index) => (
-          <PostCard
-            key={post.id}
-            id={post.id}
-            title={post.title}
-            body={post.body}
-            createdAt={post.created_at}
-            imageUrl={findImageUrl(post.image_url)}
-            reactions={getReactions(post.id)}
-            // 一番上の写真だけ、後回しにせずすぐ読みます
-            isFirst={index === 0}
-          />
-        ))
-      )}
-    </main>
+    <StoryViewer
+      authorId={id}
+      authorName={profile?.display_name ?? "名無し"}
+      avatarUrl={profile?.avatar_url ?? null}
+      posts={
+        posts?.map((post) => ({
+          id: post.id,
+          title: post.title,
+          body: post.body,
+          createdAt: post.created_at,
+          imageUrl: findImageUrl(post.image_url),
+          communityId: post.community_id,
+          reactions: getReactions(post.id),
+        })) ?? []
+      }
+    />
   );
 }

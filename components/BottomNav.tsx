@@ -108,6 +108,10 @@ export default function BottomNav() {
 
   // null を返すと何も表示されません
   if (HIDE_NAV.includes(pathname)) return null;
+  // ご報告のストーリー画面（/members/xxx）も、画面いっぱいに使うので出しません。
+  // id が人ごとに違うので、上の一覧ではなく「形」で見分けます。
+  // /members/xxx/profile は2段深いので、ここには当てはまりません
+  if (/^\/members\/[^/]+$/.test(pathname)) return null;
 
   return (
     // 外側の枠。ここで画面の端からの距離を作ります。
