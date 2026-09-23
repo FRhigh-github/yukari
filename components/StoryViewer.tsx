@@ -36,7 +36,12 @@ type StoryViewerProps = {
   posts: StoryPost[];
 };
 
-export default function StoryViewer({ authorId, authorName, avatarUrl, posts }: StoryViewerProps) {
+export default function StoryViewer({
+  authorId,
+  authorName,
+  avatarUrl,
+  posts,
+}: StoryViewerProps) {
   const router = useRouter();
   // いま何枚目か。0 がいちばん新しいご報告です
   const [index, setIndex] = useState(0);
@@ -62,7 +67,11 @@ export default function StoryViewer({ authorId, authorName, avatarUrl, posts }: 
       const rect = event.currentTarget.getBoundingClientRect();
       const isRight = event.clientX - rect.left > rect.width / 2;
       // 端まで来たら、それ以上は進みません
-      setIndex(isRight ? Math.min(posts.length - 1, index + 1) : Math.max(0, index - 1));
+      setIndex(
+        isRight
+          ? Math.min(posts.length - 1, index + 1)
+          : Math.max(0, index - 1),
+      );
     }
   };
 
@@ -78,17 +87,30 @@ export default function StoryViewer({ authorId, authorName, avatarUrl, posts }: 
         onPointerUp={handlePointerUp}
       >
         {post?.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={post.id}
-            src={post.imageUrl}
-            alt=""
-            draggable={false}
-            fetchPriority="high"
-            // object-contain = 写真を切らずに全部見せます。
-            // 画面と形が違う写真は上下や左右が余るので、その余白は後ろの灰色で埋めます
-            className="h-full w-full object-contain"
-          />
+          <>
+            {/* ▼ 後ろに、同じ写真を大きくぼかして敷きます。
+                写真と画面の形が違うと上下か左右が余りますが、
+                そこを灰色の帯ではなく写真の色でなじませるためです（インスタと同じやり方） */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={post.imageUrl}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-2xl"
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={post.id}
+              src={post.imageUrl}
+              alt=""
+              draggable={false}
+              fetchPriority="high"
+              // object-contain = 写真を切らずに全部見せます。
+              // 画面と形が違う写真で余ったところは、後ろのぼかした写真が見えます
+              className="relative h-full w-full object-contain"
+            />
+          </>
         ) : null}
         {/* 上と下を暗くして、白い文字を読めるようにします */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/60 to-transparent" />
@@ -115,9 +137,15 @@ export default function StoryViewer({ authorId, authorName, avatarUrl, posts }: 
           >
             <span
               className="h-9 w-9 shrink-0 rounded-full bg-stone-400 bg-cover bg-center ring-2 ring-kin"
-              style={avatarUrl ? { backgroundImage: `url("${encodeURI(avatarUrl)}")` } : undefined}
+              style={
+                avatarUrl
+                  ? { backgroundImage: `url("${encodeURI(avatarUrl)}")` }
+                  : undefined
+              }
             />
-            <span className="truncate text-sm font-bold text-white">{authorName}</span>
+            <span className="truncate text-sm font-bold text-white">
+              {authorName}
+            </span>
             {post ? (
               <span className="shrink-0 text-xs text-white/70">
                 {new Date(post.createdAt).toLocaleDateString("ja-JP")}
@@ -142,8 +170,12 @@ export default function StoryViewer({ authorId, authorName, avatarUrl, posts }: 
             <ReactionBoard reactions={post.reactions} />
           </div>
           <h2 className="mb-1 text-2xl font-bold text-white">{post.title}</h2>
-          <p className="line-clamp-4 text-sm leading-relaxed text-white/85">{post.body}</p>
-          <p className="mt-4 text-center text-xs text-white/70">↑ 上にスワイプしてお祝いを書く</p>
+          <p className="line-clamp-4 text-sm leading-relaxed text-white/85">
+            {post.body}
+          </p>
+          <p className="mt-4 text-center text-xs text-white/70">
+            ↑ 上にスワイプしてお祝いを書く
+          </p>
         </div>
       ) : (
         <p className="absolute inset-0 flex items-center justify-center text-sm text-white/70">

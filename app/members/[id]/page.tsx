@@ -1,5 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import StoryViewer from "@/components/StoryViewer";
+import type { Viewport } from "next";
+
+// ▼ 画面のいちばん上（時計や電池が並ぶ帯）の色を、この画面だけ暗くします。
+//   iPhone の Safari は、この色で上の帯を塗ります。
+//   アプリ全体（layout.tsx）では白なので、そのままだと写真の上に白い帯が出てしまいます。
+export const viewport: Viewport = {
+  themeColor: "#1c1917",
+};
 import type { Reaction } from "@/components/ReactionBoard";
 
 // [id] という名前のフォルダにすると、URL の一部を受け取れます。

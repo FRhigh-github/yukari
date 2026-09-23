@@ -113,7 +113,7 @@ export default function PostForm({ communities }: PostFormProps) {
 
         {/* 画像を添付。input は隠して、label 全体を押せるようにしています */}
         {/* ▼ 写真を選んだら、ここがそのまま「見え方のお試し（プレビュー）」になります。
-              見る側のストーリー画面（StoryViewer）と同じ 9:16 の形・灰色の余白・文字の重なり方です。
+              見る側のストーリー画面（StoryViewer）と同じ 9:16 の形・余白のぼかし・文字の重なり方です。
               押すと写真を選び直せます */}
         <label
           className={`relative mx-auto flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl ${
@@ -130,6 +130,14 @@ export default function PostForm({ communities }: PostFormProps) {
           />
           {imageFile ? (
             <>
+              {/* 見る側と同じく、後ろにぼかした同じ写真を敷いて余白をなじませます */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={URL.createObjectURL(imageFile)}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-xl"
+              />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={URL.createObjectURL(imageFile)}
