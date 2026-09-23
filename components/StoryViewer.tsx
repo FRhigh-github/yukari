@@ -9,7 +9,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactionBoard, { type Reaction } from "@/components/ReactionBoard";
 import ReactionCardSheet from "@/components/ReactionCardSheet";
@@ -49,6 +49,18 @@ export default function StoryViewer({
   const startRef = useRef<{ x: number; y: number } | null>(null);
 
   const post = posts[index];
+
+  // ▼ この画面を開いている間だけ、一番上の帯（時計や電池が並ぶところ）を暗くします。
+  //   iPhone の Safari は、<meta name="theme-color"> の色でこの帯を塗ります。
+  //   画面ごとの設定（viewport）で変えると、ホームに戻っても黒いまま残ってしまったので、
+  //   開いたときに変えて、閉じるときに元の色へ戻すやり方にしています。
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta === null) return;
+    const before = meta.getAttribute("content") ?? "#faf9f6";
+    meta.setAttribute("content", "#1c1917");
+    return () => meta.setAttribute("content", before);
+  }, []);
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     const start = startRef.current;

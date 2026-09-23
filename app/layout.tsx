@@ -29,7 +29,9 @@ export const viewport: Viewport = {
   // ノッチ（画面上の切り欠き）の下まで表示を広げます。
   // 代わりに、文字が隠れないよう globals.css で余白を足しています。
   viewportFit: "cover",
-  themeColor: "#ffffff",
+  // 一番上（時計や電池が並ぶ帯）の色。ホームの背景と同じ生成り色にしています。
+  // ストーリー画面（StoryViewer）を開いている間だけ、そちらで暗い色に変えます
+  themeColor: "#faf9f6",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

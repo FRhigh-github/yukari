@@ -77,7 +77,7 @@ function TabIcon({ path, isCurrent }: TabIconProps) {
     //   transition = 台が出たり消えたりするときに、パッと変わらず少しなめらかにします。
     <span
       className={`flex h-10 w-14 items-center justify-center rounded-full transition-all duration-200 ${
-        isActive ? "bg-white/90 shadow-md" : ""
+        isActive ? "bg-white shadow-md ring-1 ring-kin/40" : ""
       }`}
     >
       <svg
@@ -126,9 +126,11 @@ export default function BottomNav() {
           rounded-2xl で角を丸め、shadow-lg で影を落とすと、
           画面から少し持ち上がっているように見えます。 */}
       {/* backdrop-blur = 後ろにあるものをぼかす指定。
-          bg-stone-200/70 の「/70」は 70% の濃さ、という意味です。
-          この2つで、後ろが透けるすりガラスになります。 */}
-      <nav className="pointer-events-auto flex items-center justify-around rounded-2xl bg-stone-200/70 px-2 py-1.5 shadow-lg backdrop-blur-xl">
+          bg-[#faf9f6]/85 の「/85」は 85% の濃さ、という意味です。
+          この2つで、後ろが透けるすりガラスになります。
+          色は灰色ではなく、ホームの背景と同じ生成り色にして、金の細いふち（ring-kin）を付けています。
+          選択中の白い台にも金のふちを付けて、生成りの上でも見分けられるようにしています。 */}
+      <nav className="pointer-events-auto flex items-center justify-around rounded-2xl bg-[#faf9f6]/85 px-2 py-1.5 shadow-lg ring-1 ring-kin/40 backdrop-blur-xl">
         {TABS.map((tab) => {
           const isActive = pathname === tab.href;
 
