@@ -20,9 +20,17 @@ type MemberCircleProps = {
   member: Member;
   x: number;
   y: number;
+  // 名前を出さないとき true。
+  // 水引の輪の中に置くと、名前が紐に重なって読めなくなるためです。
+  hideName?: boolean;
 };
 
-export default function MemberCircle({ member, x, y }: MemberCircleProps) {
+export default function MemberCircle({
+  member,
+  x,
+  y,
+  hideName,
+}: MemberCircleProps) {
   // 数え終わるまでの時計。取り消すときに止めるので、持っておきます
   const timerRef = useRef<number | null>(null);
 
@@ -104,6 +112,7 @@ export default function MemberCircle({ member, x, y }: MemberCircleProps) {
         </div>
 
         {/* 名前。truncate = 長いときは「…」で切る */}
+        {hideName ? null : (
         <span
           className={`w-full truncate text-center text-[10px] leading-tight ${
             member.hasNews ? "font-bold text-stone-700" : "text-stone-400"
@@ -111,6 +120,7 @@ export default function MemberCircle({ member, x, y }: MemberCircleProps) {
         >
           {member.displayName ?? "名無し"}
         </span>
+        )}
       </Link>
 
       {/* ▼ 長押しで出る小さなプロフィール */}

@@ -23,7 +23,15 @@ const TABS = [
   {
     href: "/cards",
     label: "カード",
-    path: <path d="M4 3h16v18H4zM8 3v3h8V3" />,
+    // 横長のカードに、小さなハートを1つ。
+    // 前は縦長の四角に留め具が付いた形で、クリップボードに見えていました。
+    // 横長にすると「カード」らしくなり、ハートで「気持ちを送るもの」だと分かります。
+    path: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M12 15.5s-3.5-2.1-3.5-4.4A1.9 1.9 0 0 1 12 10a1.9 1.9 0 0 1 3.5 1.1c0 2.3-3.5 4.4-3.5 4.4z" />
+      </>
+    ),
   },
   {
     href: "/",
@@ -61,20 +69,37 @@ function TabIcon({ path, isCurrent }: TabIconProps) {
   const isActive = isCurrent || pending;
 
   return (
-    <svg
-      viewBox="0 0 24 24"
-      width="24"
-      height="24"
-      // 選ばれているタブだけ、中を塗りつぶします
-      fill={isActive ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={isActive ? "text-stone-900" : "text-stone-500"}
+    // ▼ 選ばれているタブの後ろに、白い台を敷きます。
+    //   影(shadow-md)を付けると、その1つだけがバーから
+    //   ふわっと持ち上がって見えます（Instagram の下タブと同じ見せ方）。
+    //   色を変えるだけより「いまここにいる」がはっきりします。
+    //
+    //   transition = 台が出たり消えたりするときに、パッと変わらず少しなめらかにします。
+    <span
+      className={`flex h-10 w-14 items-center justify-center rounded-full transition-all duration-200 ${
+        isActive ? "bg-white/90 shadow-md" : ""
+      }`}
     >
-      {path}
-    </svg>
+      <svg
+        viewBox="0 0 24 24"
+        width="24"
+        height="24"
+        // 中は塗りません。塗ると線の形がつぶれて、何の絵か分かりにくくなるためです。
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        // 色は水引から取っています（globals.css）。
+        //   ふだん   = 紅(beni)
+        //   選択中   = 金(kin)
+        // stroke を currentColor にしてあるので、
+        // ここで文字色を変えるだけで線の色が変わります。
+        className={isActive ? "text-kin" : "text-beni"}
+      >
+        {path}
+      </svg>
+    </span>
   );
 }
 
@@ -108,11 +133,12 @@ export default function BottomNav() {
               key={tab.href}
               href={tab.href}
               // 文字は出さないので、代わりに aria-label で名前を持たせます。
-              // h-11 w-11 = 44px。押せる範囲を iOS の基準に合わせています。
+              // h-11 = 44px。押せる範囲を iOS の基準に合わせています。
+              // 横は、中の白い台(w-14)が入るように広げてあります。
               aria-label={tab.label}
               // active:scale-90 = 指で押しているあいだ、少し縮みます。
               // 押せたことがその場で分かるので、待ち時間が気になりにくくなります。
-              className="flex h-11 w-11 items-center justify-center transition-transform active:scale-90"
+              className="flex h-11 w-16 items-center justify-center transition-transform active:scale-90"
             >
               <TabIcon path={tab.path} isCurrent={isActive} />
             </Link>
