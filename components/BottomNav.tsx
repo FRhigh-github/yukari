@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 // 下タブを出さない画面。ここに URL を足せば、その画面ではタブが消えます。
 // /cards/new は下に道具の棚があるので、重ねると送信ボタンが隠れます。
@@ -103,10 +104,39 @@ function TabIcon({ path, isCurrent }: TabIconProps) {
   );
 }
 
+// 文字を打つ欄かどうか。写真を選ぶ欄やつまみ（range）はキーボードが出ないので外します
+function isTypingField(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (target instanceof HTMLTextAreaElement) return true;
+  if (target instanceof HTMLInputElement) {
+    return !["file", "range", "checkbox", "radio", "button", "submit"].includes(target.type);
+  }
+  return false;
+}
+
 export default function BottomNav() {
   const pathname = usePathname(); // 例: '/post' のような文字列が入る
 
+  // ▼ 文字を打っている間は、下タブを隠します。
+  //   iPhone はキーボードが出ると、画面の下の端がキーボードの上まで上がってきます。
+  //   下タブは下の端に貼り付いているので、一緒に上がってきて、入力欄やボタンに重なっていました。
+  //   focusin / focusout = 画面のどこかの入力欄に、指が入った / 離れたときの合図
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    const handleFocusIn = (event: FocusEvent) => setIsTyping(isTypingField(event.target));
+    const handleFocusOut = () => setIsTyping(false);
+    document.addEventListener("focusin", handleFocusIn);
+    document.addEventListener("focusout", handleFocusOut);
+    return () => {
+      document.removeEventListener("focusin", handleFocusIn);
+      document.removeEventListener("focusout", handleFocusOut);
+    };
+  }, []);
+
   // null を返すと何も表示されません
+  if (isTyping) return null;
   if (HIDE_NAV.includes(pathname)) return null;
   // ご報告のストーリー画面（/members/xxx）も、画面いっぱいに使うので出しません。
   // id が人ごとに違うので、上の一覧ではなく「形」で見分けます。

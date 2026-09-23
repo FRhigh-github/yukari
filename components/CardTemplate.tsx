@@ -46,7 +46,7 @@ export default function CardTemplate({
       }}
     >
       {plain ? null : (
-        <span className="w-full truncate bg-white/60 px-2 py-1 text-center text-[10px] font-bold">
+        <span className="w-full truncate bg-white/60 px-2 py-1 text-center text-xs font-bold">
           {name}
         </span>
       )}

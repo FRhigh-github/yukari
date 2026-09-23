@@ -73,7 +73,7 @@ export default function ReceivedCard({
         <p className="mt-2 truncate text-sm font-bold text-stone-800">
           {partnerName ?? "名無し"} <span className="font-normal text-kin">{suffix}</span>
         </p>
-        <p className="text-[10px] text-stone-400">
+        <p className="text-xs text-stone-400">
           {new Date(sentAt).toLocaleDateString("ja-JP")}
         </p>
       </button>

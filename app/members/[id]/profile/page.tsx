@@ -5,6 +5,7 @@
 // ホームでアイコンを長押し →「プロフィールを見る」で来ます。
 
 import Link from "next/link";
+import PostGrid from "@/components/PostGrid";
 import { createClient } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
 import RecoveryCodeButton from "@/components/RecoveryCodeButton";
@@ -98,33 +99,17 @@ export default async function MemberProfilePage({
         ご報告
       </h2>
 
-      {posts?.length === 0 ? (
-        <p className="p-5 text-sm text-stone-500">まだご報告はありません。</p>
-      ) : (
-        <ul>
-          {posts?.map((post) => (
-            <li key={post.id} className="border-b border-stone-100">
-              <Link
-                href={`/members/${id}`}
-                className="flex items-center gap-3 p-4"
-              >
-                <span className="min-w-0 flex-1 truncate text-sm text-stone-700">
-                  {post.title}
-                </span>
-
-                {findImageUrl(post.image_url) ? (
-                  <span
-                    className="h-14 w-20 shrink-0 rounded-lg bg-stone-100 bg-cover bg-center"
-                    style={{
-                      backgroundImage: `url("${findImageUrl(post.image_url)}")`,
-                    }}
-                  />
-                ) : null}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* 縦長の写真を3列に並べます（ご報告の一覧と同じ見た目）。押すとストーリーで開きます */}
+      <PostGrid
+        memberId={id}
+        posts={
+          posts?.map((post) => ({
+            id: post.id,
+            title: post.title,
+            imageUrl: findImageUrl(post.image_url),
+          })) ?? []
+        }
+      />
     </main>
   );
 }

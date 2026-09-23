@@ -24,7 +24,7 @@ export default function KnotMark({ caption }: KnotMarkProps) {
       />
 
       {caption ? (
-        <p className="text-[10px] tracking-[0.22em] text-[#767a72]">
+        <p className="text-xs tracking-[0.22em] text-[#767a72]">
           {caption}
         </p>
       ) : null}

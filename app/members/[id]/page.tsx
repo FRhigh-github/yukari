@@ -1,5 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
-import StoryViewer from "@/components/StoryViewer";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
+import MemberPosts from "@/components/MemberPosts";
 import { getSignedUrls } from "@/lib/signedUrls";
 import type { Reaction } from "@/components/ReactionBoard";
 
@@ -7,8 +7,11 @@ import type { Reaction } from "@/components/ReactionBoard";
 // 例: /members/abc123 → id は "abc123"
 export default async function MemberPage({
   params,
+  searchParams,
 }: PageProps<"/members/[id]">) {
   const { id } = await params;
+  // ?post=<ご報告の id> = プロフィールの一覧で押したご報告。そこからストーリーで開きます
+  const { post: openPostId } = await searchParams;
   const supabase = await createClient();
 
   // ▼ 待ち時間の話
@@ -18,9 +21,10 @@ export default async function MemberPage({
   // お互いを必要としないものは Promise.all でまとめて出し、
   // 「次に進むのに必要なもの」が揃った時点で先へ進みます。
 
-  // 1回目：この3つは、どれも id だけで取れます
+  // 1回目：この4つは、どれも id だけで取れます
   // single() = 1件だけ取ってくる（配列ではなく、そのものが返ります）
-  const [{ data: profile }, { data: posts }, { data: reactions }] =
+  // getCurrentUserId = 自分か確かめるため（自分のご報告だけ、長押しで消せるようにします）。通信なしで済みます
+  const [{ data: profile }, { data: posts }, { data: reactions }, myId] =
     await Promise.all([
       supabase.from("profiles").select("display_name, avatar_url").eq("id", id).single(),
       // 列は使うものだけ並べます。
@@ -44,6 +48,7 @@ export default async function MemberPage({
         .select("id, post_id, from_user, drawing_url, posts!inner(author_id)")
         .eq("posts.author_id", id)
         .order("created_at", { ascending: false }),
+      getCurrentUserId(supabase),
     ]);
 
   // posts に入っているのは「保管庫のどこに置いたか」という場所だけです。
@@ -96,11 +101,13 @@ export default async function MemberPage({
             ?.display_name ?? null,
       })) ?? [];
 
-  // ▼ ストーリーのように、画面いっぱいで1枚ずつ見せます（StoryViewer）。
-  //   「〇〇さんのご報告」という見出しは置きません。上にアイコンと名前が出るためです。
+  // ▼ インスタのリールの一覧のように、縦長の写真を3列に並べます（MemberPosts）。
+  //   押すと、そこからストーリー（StoryViewer）で大きく見られます。
   return (
-    <StoryViewer
+    <MemberPosts
       authorId={id}
+      isMine={myId === id}
+      openPostId={typeof openPostId === "string" ? openPostId : null}
       authorName={profile?.display_name ?? "名無し"}
       avatarUrl={profile?.avatar_url ?? null}
       posts={

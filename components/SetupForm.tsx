@@ -135,7 +135,7 @@ export default function SetupForm({
       </label>
 
       <label className="block">
-        <span className="text-[10px] text-stone-500">お名前</span>
+        <span className="text-xs text-stone-500">お名前</span>
         <div className="border-b border-stone-200 py-1.5">
           <input
             required
@@ -149,12 +149,12 @@ export default function SetupForm({
       </label>
 
       {/* 本名をお願いする理由を添えます。理由なく求めると、入れてもらえません */}
-      <p className="-mt-2 text-[10px] text-stone-400">
+      <p className="-mt-2 text-xs text-stone-400">
         大切な人に見つけてもらうところなので、なるべく本名でお願いします
       </p>
 
       <div>
-        <span className="text-[10px] text-stone-500">誕生日</span>
+        <span className="text-xs text-stone-500">誕生日</span>
         <div className="py-1.5">
           <BirthdayPicker value={birthday} onChange={setBirthday} />
         </div>

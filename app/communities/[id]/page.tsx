@@ -111,7 +111,7 @@ export default async function CommunityPage({
                 {profile.display_name ?? "名無し"}
               </Link>
               {isOwner(profile.id) ? (
-                <span className="rounded-full border border-kin/60 px-2 py-0.5 text-[10px] text-kin">
+                <span className="rounded-full border border-kin/60 px-2 py-0.5 text-xs text-kin">
                   作成者
                 </span>
               ) : null}

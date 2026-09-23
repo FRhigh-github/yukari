@@ -121,7 +121,7 @@ export default function MemberCircle({
         {/* 名前。truncate = 長いときは「…」で切る */}
         {hideName ? null : (
         <span
-          className={`w-full truncate text-center text-[10px] leading-tight ${
+          className={`w-full truncate text-center text-xs leading-tight ${
             member.hasNews ? "font-bold text-stone-700" : "text-stone-400"
           }`}
         >

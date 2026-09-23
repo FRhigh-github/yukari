@@ -1,7 +1,9 @@
 // ホーム画面に出す中身を、DB から取ってくる処理です。
 // page.tsx に全部書くと長くなるので、こちらに分けています。
 
+import { cookies } from "next/headers";
 import { createClient, getCurrentUserId } from "@/lib/supabase/server";
+import { SEEN_COOKIE, parseSeen } from "@/lib/seenPosts";
 
 export type Member = {
   id: string;
@@ -126,7 +128,16 @@ export async function getHomeData(selectedId: string | null) {
     .select("id, display_name, avatar_url, birthday, mood")
     .in("id", memberIds);
 
-  const recentAuthorIds = recentPosts?.map((post) => post.author_id) ?? [];
+  // ▼ 光らせるのは「まだ見ていない新しいご報告がある人」だけです（lib/seenPosts.ts）。
+  //   その人の最新のご報告の日時と、見たところまでの日時を比べます。
+  //   recentPosts は新しい順なので、その人が最初に出てきた行が最新です。
+  const seen = parseSeen((await cookies()).get(SEEN_COOKIE)?.value);
+  const hasUnseen = (authorId: string) => {
+    const latest = recentPosts?.find((post) => post.author_id === authorId);
+    if (!latest) return false;
+    const seenAt = seen[authorId];
+    return seenAt === undefined || new Date(latest.created_at) > new Date(seenAt);
+  };
 
   // ▼ 「今日 N件の報告」を出すための数です。
   //   上で取ってきた新しい投稿20件を、そのまま数え直しているだけなので、
@@ -145,7 +156,7 @@ export async function getHomeData(selectedId: string | null) {
       id: profile.id,
       displayName: profile.display_name,
       avatarUrl: profile.avatar_url,
-      hasNews: recentAuthorIds.includes(profile.id),
+      hasNews: hasUnseen(profile.id),
       birthday: profile.birthday,
       mood: profile.mood,
     })) ?? [];

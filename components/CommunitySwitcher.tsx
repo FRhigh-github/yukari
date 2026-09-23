@@ -91,7 +91,7 @@ export default function CommunitySwitcher({
               <span className="truncate text-[17px] font-bold text-stone-800">
                 {pressedName ?? currentName}
               </span>
-              <span className="shrink-0 text-[10px] text-kin">▼</span>
+              <span className="shrink-0 text-xs text-kin">▼</span>
             </span>
             <span className="block truncate text-xs text-stone-400">
               {memberCount}人

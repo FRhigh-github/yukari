@@ -104,7 +104,6 @@ export default function ImageCropper({ file, round, onDone, onCancel }: ImageCro
   return (
     // 画面いっぱいにかぶせます。z-50 で下タブより手前に出します
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-black/90 px-4">
-      <p className="text-sm text-white/80">指で動かして、位置を合わせてください</p>
 
       {/* ▼ 切り取り枠。touch-none = 指の動きで画面がスクロールしないようにします */}
       <div

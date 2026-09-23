@@ -169,10 +169,12 @@ export default function ReactionCardSheet({
         {/* ▼ つまみ。ここを上に引くと送れます。
             カードの中は「書く」場所なので、スワイプはここ（とカードの外）で受け取ります */}
         <div className="mx-auto mb-2 flex h-16 max-w-[40vh] flex-col items-center justify-center gap-1 rounded-2xl bg-white/70 text-kin ring-1 ring-kin/40 backdrop-blur">
-          <span className="h-1 w-10 rounded-full bg-kin/70" />
-          <span className="text-sm font-bold">
-            {isSending ? "送っています…" : "↑ ここを上にスワイプして送る"}
-          </span>
+          {/* 言葉は出さず、上向きの印だけにしています。送っている間だけ文字を出します */}
+          {isSending ? (
+            <span className="text-sm font-bold">送っています…</span>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-8 w-8 animate-bounce"><path d="M6 15l6-6 6 6" /></svg>
+          )}
         </div>
 
         {/* ▼ カード。ご祝儀袋と同じく、白い台紙に金のふちです */}
@@ -209,7 +211,6 @@ export default function ReactionCardSheet({
         {errorText ? (
           <p className="mt-2 text-center text-xs font-bold text-beni">{errorText}</p>
         ) : null}
-        <p className="mt-2 text-center text-xs text-stone-500">下を押すか、下にスワイプでやめる</p>
       </div>
     </div>
   );
