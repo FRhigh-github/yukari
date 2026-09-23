@@ -54,12 +54,29 @@ export default function StoryViewer({
   //   iPhone の Safari は、<meta name="theme-color"> の色でこの帯を塗ります。
   //   画面ごとの設定（viewport）で変えると、ホームに戻っても黒いまま残ってしまったので、
   //   開いたときに変えて、閉じるときに元の色へ戻すやり方にしています。
+  //
+  //   ただ、新しい iPhone の Safari は theme-color を見ずに、
+  //   「ページの背景色」を見て帯を塗ることがあります。
+  //   そのため、html と body の背景色も一緒に暗くしています。
   useEffect(() => {
+    const dark = "#1c1917";
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta === null) return;
-    const before = meta.getAttribute("content") ?? "#faf9f6";
-    meta.setAttribute("content", "#1c1917");
-    return () => meta.setAttribute("content", before);
+    const beforeMeta = meta?.getAttribute("content") ?? "#faf9f6";
+    const html = document.documentElement;
+    const body = document.body;
+    const beforeHtml = html.style.backgroundColor;
+    const beforeBody = body.style.backgroundColor;
+
+    meta?.setAttribute("content", dark);
+    html.style.backgroundColor = dark;
+    body.style.backgroundColor = dark;
+
+    // 閉じるときに、全部元に戻します
+    return () => {
+      meta?.setAttribute("content", beforeMeta);
+      html.style.backgroundColor = beforeHtml;
+      body.style.backgroundColor = beforeBody;
+    };
   }, []);
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
