@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getHomeData } from "@/lib/home";
 import CommunitySwitcher from "@/components/CommunitySwitcher";
 import PullToRefresh from "@/components/PullToRefresh";
+import MemberCircles from "@/components/MemberCircles";
 import RecoveryNotice from "@/components/RecoveryNotice";
 import HintOverlay from "@/components/HintOverlay";
 import NotificationToggle from "@/components/NotificationToggle";
@@ -81,19 +82,22 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           label="コミュニティに参加する"
         />
       ) : (
-        // ▼ いまは何も置いていない、まっさらな状態です。
-        //   梅結びの模様（components/MizuhikiHome.tsx）は外してあります。使うときはここに戻します。
+        // ▼ メンバーのアイコンを、自分を中心にした同心円に並べます（MemberCircles）。
+        //   ばらばらに散らす版（components/MemberScatter.tsx）と、
+        //   梅結びの模様（components/MizuhikiHome.tsx）は、いまは使っていません。
         //
         // flex-1 = 残りの高さを全部つかう。上から引っぱると、中身を取り直せます。
         // pb は、下タブと2つのボタンが重なっているぶんの逃げです。
         <div className="min-h-0 flex-1 px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)]">
           <PullToRefresh>
-            <div className="h-full" />
+            <MemberCircles members={members} currentUserId={user.id} />
           </PullToRefresh>
         </div>
       )}
 
-      {/* ▼ 下の2つのボタン。どちらも「アイコン＋言葉」の同じ形にそろえます。
+      {/* ▼ 下の2つのボタン。どちらもアイコンだけの丸いボタンです。
+            言葉を添えると、よく見るテンプレートの形になってしまうため、外しています。
+            何のボタンかは aria-label（読み上げ用の名前）で伝えます。
             アイコンは下タブと同じ描き方（線の太さ2・角は丸く・塗りなし）です。
 
             色は水引の紅・金と、白・グレーだけにしています。
@@ -106,12 +110,13 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {/* 左下：届いたカードを見る「ふみばこ」（文箱＝手紙を入れておく和の箱） */}
       <Link
         href="/cards/inbox"
-        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-4 z-30 flex h-12 items-center gap-2 rounded-full border border-kin/60 bg-white pl-4 pr-5 text-sm font-bold text-stone-700 shadow-md"
+        aria-label="ふみばこ（届いたカード）"
+        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-kin/60 bg-white shadow-md"
       >
         <svg
           viewBox="0 0 24 24"
-          width="20"
-          height="20"
+          width="22"
+          height="22"
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
@@ -124,18 +129,18 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <path d="M3 12v7h18v-7l-2.5-6h-13z" />
           <path d="M9 9h6" />
         </svg>
-        ふみばこ
       </Link>
 
       {/* 右下：ご報告を書く */}
       <Link
         href="/post"
-        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-4 z-30 flex h-12 items-center gap-2 rounded-full bg-beni pl-4 pr-5 text-sm font-bold text-white shadow-md ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6]"
+        aria-label="報告する"
+        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-beni text-white shadow-md ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6]"
       >
         <svg
           viewBox="0 0 24 24"
-          width="20"
-          height="20"
+          width="24"
+          height="24"
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
@@ -146,7 +151,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <path d="M4 20h4L19 9l-4-4L4 16z" />
           <path d="M14 6l4 4" />
         </svg>
-        報告する
       </Link>
     </div>
   );

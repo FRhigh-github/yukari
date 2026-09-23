@@ -83,9 +83,9 @@ export default function MemberCircle({
         {/* 外側の輪。報告がある人だけ光らせます */}
         <div
           className={`relative rounded-full p-[2.5px] ${
-            member.hasNews
-              ? "bg-gradient-to-tr from-amber-400 via-orange-500 to-pink-500"
-              : "bg-stone-200"
+            // 報告がある人は、水引の紅から金へのグラデーションの輪。ない人は、控えめな金の細い輪
+            // via-kin via-45% = 真ん中あたりで、もう金になるようにします（紅と金の半々に見えるように）
+            member.hasNews ? "bg-gradient-to-tr from-beni via-kin via-45% to-[#e3c77f]" : "bg-kin/40"
           }`}
         >
           <div className="rounded-full bg-white p-[2px]">
