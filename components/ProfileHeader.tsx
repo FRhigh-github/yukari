@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import { MOODS } from "@/lib/mood";
+import MoodIcon from "@/components/MoodIcon";
 
 type ProfileHeaderProps = {
   displayName: string | null;
@@ -43,8 +44,8 @@ export default function ProfileHeader({
 
         {/* 気持ちの印。アイコンの右下に重ねます */}
         {selectedMood ? (
-          <span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-white text-sm shadow">
-            {selectedMood.emoji}
+          <span className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow">
+            <MoodIcon value={selectedMood.value} className="h-5 w-5" />
           </span>
         ) : null}
       </div>

@@ -11,7 +11,14 @@
 // 絵は SVG という「文字で書ける画像」で作ります。
 // 画像ファイルを用意しなくても、コードだけで模様が描けるためです。
 
-export type CardKind = "newyear" | "summer" | "birthday" | "custom";
+export type CardKind =
+  | "newyear"
+  | "summer"
+  | "birthday"
+  | "wedding"
+  | "baby"
+  | "thanks"
+  | "custom";
 
 // はがきと同じ縦横比
 export const CARD_WIDTH = 900;
@@ -22,6 +29,9 @@ export const TEXT_COLORS: Record<CardKind, string> = {
   newyear: "#8c2f2f",
   summer: "#1f5d73",
   birthday: "#a03a67",
+  wedding: "#8a1d22",
+  baby: "#4f6b8a",
+  thanks: "#7a5a1e",
   custom: "#6b6257",
 };
 
@@ -79,6 +89,45 @@ const patterns: Record<CardKind, string> = {
       .join("")}
   `,
 
+  // 結婚祝い：紅白の水引の帯と、金の輪（アプリの水引の色と同じ紅・金）
+  wedding: `
+    <rect x="0" y="520" width="900" height="16" fill="#b7282e" opacity="0.8"/>
+    <rect x="0" y="544" width="900" height="16" fill="#ffffff" opacity="0.95"/>
+    <rect x="0" y="568" width="900" height="6" fill="#c2a14d" opacity="0.8"/>
+    <circle cx="450" cy="545" r="90" fill="none" stroke="#c2a14d" stroke-width="10" opacity="0.8"/>
+    <circle cx="450" cy="545" r="60" fill="none" stroke="#b7282e" stroke-width="10" opacity="0.8"/>
+    ${SCATTER.map(
+      ([x, y]) => `<circle cx="${x}" cy="${y}" r="10" fill="#c2a14d" opacity="0.35"/>`,
+    ).join("")}
+  `,
+
+  // 出産祝い：やわらかい水玉と、ふんわりした雲
+  baby: `
+    ${SCATTER.map(
+      ([x, y], i) =>
+        `<circle cx="${x}" cy="${y}" r="${30 + (i % 3) * 14}" fill="${
+          ["#bcd7f2", "#f7d7e3", "#fdebb3"][i % 3]
+        }" opacity="0.7"/>`,
+    ).join("")}
+    <path d="M0 1200 Q150 1120 300 1200 T600 1200 T900 1200 L900 1350 L0 1350 Z" fill="#ffffff" opacity="0.8"/>
+  `,
+
+  // ありがとう：角に金の四角い枠と、小さな花
+  thanks: `
+    <rect x="60" y="60" width="780" height="1230" rx="24" fill="none" stroke="#c2a14d" stroke-width="6" opacity="0.7"/>
+    <rect x="84" y="84" width="732" height="1182" rx="16" fill="none" stroke="#c2a14d" stroke-width="2" opacity="0.5"/>
+    ${[[160, 160], [740, 160], [160, 1190], [740, 1190]]
+      .map(([x, y]) =>
+        [0, 72, 144, 216, 288]
+          .map(
+            (a) =>
+              `<ellipse cx="${x}" cy="${y - 22}" rx="12" ry="22" fill="#e8a0a8" opacity="0.7" transform="rotate(${a} ${x} ${y})"/>`,
+          )
+          .join(""),
+      )
+      .join("")}
+  `,
+
   // その他：便箋のような、薄い横罫線
   custom: `
     ${Array.from({ length: 14 })
@@ -94,6 +143,9 @@ const gradients: Record<CardKind, [string, string]> = {
   newyear: ["#fdf3e7", "#f0c9a0"],
   summer: ["#f2fbfd", "#bfe4ef"],
   birthday: ["#fff6fa", "#f9d3e2"],
+  wedding: ["#fffaf5", "#f6e3cf"],
+  baby: ["#f7fbff", "#e3eefb"],
+  thanks: ["#fffdf6", "#f5ecd4"],
   custom: ["#fbf8f1", "#ece5d6"],
 };
 

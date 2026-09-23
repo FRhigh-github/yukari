@@ -85,30 +85,45 @@ export default function ReactionBoard({ reactions }: ReactionBoardProps) {
           fixed inset-0 = 画面全体をおおう。
           z-50 で一番手前に出します。 */}
       {isOpen ? (
+        // ▼ 届いたお祝いを、机の上に手紙を広げたように並べます。
+        //   生成り色のすりガラスの上に、白い台紙を2列で、少しずつ傾けて置きます。
+        //   absolute = アプリの枠(スマホ幅)の中だけに重ねます。どこを押しても閉じます
         <div
           onClick={() => setIsOpen(false)}
-          className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/70 p-6"
+          className="absolute inset-0 z-50 overflow-y-auto overscroll-contain bg-[#faf9f6]/90 backdrop-blur-md"
         >
-          <div className="mx-auto flex max-w-sm flex-col items-center gap-4 py-10">
-            {reactions.map((reaction) => (
-              <div key={reaction.id} className="bg-white p-2 shadow-xl">
-                <div
-                  className="h-56 w-56 bg-white bg-contain bg-center bg-no-repeat"
-                  style={
-                    reaction.imageUrl
-                      ? {
-                          backgroundImage: `url("${encodeURI(reaction.imageUrl)}")`,
-                        }
-                      : undefined
-                  }
-                />
-                <p className="mt-1 text-center text-xs text-stone-500">
-                  {reaction.authorName ?? "名無し"}
-                </p>
-              </div>
-            ))}
+          <div className="px-5 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-[calc(env(safe-area-inset-top)+1.5rem)]">
+            {/* 上に、水引の色の細い線と、お祝いの数 */}
+            <div className="mb-6 flex items-center gap-3">
+              <span className="h-px flex-1 bg-kin/50" />
+              <span className="text-lg font-bold text-kin">お祝い {reactions.length}</span>
+              <span className="h-px flex-1 bg-kin/50" />
+            </div>
 
-            <p className="text-xs text-white/70">どこかを押すと閉じます</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-6">
+              {reactions.map((reaction, index) => (
+                <div
+                  key={reaction.id}
+                  className="bg-white p-2 pb-1 shadow-lg ring-1 ring-kin/30"
+                  style={{
+                    // 1枚ずつ少しだけ傾けます（毎回同じ角度になるよう、順番で決めています）
+                    transform: `rotate(${ROTATIONS[index % ROTATIONS.length] * 0.6}deg)`,
+                  }}
+                >
+                  <div
+                    className="aspect-square w-full bg-white bg-contain bg-center bg-no-repeat"
+                    style={
+                      reaction.imageUrl
+                        ? { backgroundImage: `url("${encodeURI(reaction.imageUrl)}")` }
+                        : undefined
+                    }
+                  />
+                  <p className="truncate py-1 text-center text-sm text-kin">
+                    {reaction.authorName ?? "名無し"}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}

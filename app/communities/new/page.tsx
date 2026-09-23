@@ -32,9 +32,6 @@ export default async function NewCommunityPage({
         <h1 className="mt-2 text-xl font-bold text-stone-800">
           コミュニティを作る
         </h1>
-        <p className="mt-2 text-xs text-stone-400">
-          作ると招待コードが出ます。それを渡すと、相手も入れます。
-        </p>
       </div>
 
       <CommunityCreateForm />

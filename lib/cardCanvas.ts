@@ -24,9 +24,10 @@ export type CardItem =
 const OUT_WIDTH = CARD_WIDTH;
 const OUT_HEIGHT = CARD_HEIGHT;
 
-// 画面でのカードの文字サイズは 14px、カード幅は 260px くらいなので、
-// その比率をそのまま書き出しサイズに当てはめます。
-const FONT_RATIO = 14 / 260;
+// ▼ 文字の大きさと、置いたものの内側の余白は「カードの幅に対する割合」で決めています。
+//   画面（CardComposer.tsx）でも同じ割合を使うので、見たままの位置・大きさで書き出されます。
+export const FONT_RATIO = 14 / 260;
+export const ITEM_PADDING_RATIO = 0.02;
 
 export async function renderCardToBlob(
   kind: CardKind,
@@ -44,18 +45,21 @@ export async function renderCardToBlob(
   ctx.drawImage(background, 0, 0, OUT_WIDTH, OUT_HEIGHT);
 
   // 置いたものを、下から順に描いていきます
+  const padding = OUT_WIDTH * ITEM_PADDING_RATIO;
+
   for (const item of items) {
-    const x = item.x * OUT_WIDTH;
-    const y = item.y * OUT_HEIGHT;
+    // 置いたものの枠の左上から、内側の余白ぶんだけ入った所が、中身の左上です
+    const x = item.x * OUT_WIDTH + padding;
+    const y = item.y * OUT_HEIGHT + padding;
+    const contentWidth = item.width * OUT_WIDTH - padding * 2;
 
     if (item.type === "image") {
       // src は選んだ写真の中身そのもの（data:...）なので、
       // 読み込みを待ってから描きます
       const image = await loadImage(item.src);
-      const width = item.width * OUT_WIDTH;
       // 縦は元の比率のまま
-      const height = (width / image.width) * image.height;
-      ctx.drawImage(image, x, y, width, height);
+      const height = (contentWidth / image.width) * image.height;
+      ctx.drawImage(image, x, y, contentWidth, height);
       continue;
     }
 
@@ -63,10 +67,24 @@ export async function renderCardToBlob(
     ctx.textBaseline = "top";
     ctx.font = `bold ${Math.round(OUT_WIDTH * FONT_RATIO)}px sans-serif`;
 
-    // 改行で分けて、1行ずつ下にずらして描きます。
-    // canvas は「ここで折り返す」をやってくれないので、自分で分けます。
+    // ▼ 枠の幅で折り返して、1行ずつ下にずらして描きます。
+    //   canvas は「ここで折り返す」をやってくれないので、1文字ずつ足していき、
+    //   はみ出したところで次の行に送ります（画面の折り返しと合わせるため）
     const lineHeight = Math.round(OUT_WIDTH * FONT_RATIO * 1.5);
-    item.text.split("\n").forEach((line, index) => {
+    const lines: string[] = [];
+    for (const paragraph of item.text.split("\n")) {
+      let line = "";
+      for (const ch of paragraph) {
+        if (line !== "" && ctx.measureText(line + ch).width > contentWidth) {
+          lines.push(line);
+          line = ch;
+        } else {
+          line += ch;
+        }
+      }
+      lines.push(line);
+    }
+    lines.forEach((line, index) => {
       ctx.fillText(line, x, y + index * lineHeight);
     });
   }

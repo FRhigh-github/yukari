@@ -16,6 +16,9 @@ export const CARD_KINDS: { kind: CardKind; label: string }[] = [
   { kind: "summer", label: "暑中見舞い" },
   { kind: "newyear", label: "年賀状" },
   { kind: "birthday", label: "バースデーカード" },
+  { kind: "wedding", label: "結婚祝い" },
+  { kind: "baby", label: "出産祝い" },
+  { kind: "thanks", label: "ありがとう" },
   { kind: "custom", label: "その他" },
 ];
 

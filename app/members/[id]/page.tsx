@@ -11,7 +11,9 @@ export default async function MemberPage({
 }: PageProps<"/members/[id]">) {
   const { id } = await params;
   // ?post=<ご報告の id> = プロフィールの一覧で押したご報告。そこからストーリーで開きます
-  const { post: openPostId } = await searchParams;
+  // ?back=<URL> = 「戻る」を押したときの行き先（コミュニティの設定から来たときなど）。無ければホーム
+  // ?view=story = ホームから来たとき。一覧を挟まず、最新のご報告からストーリーで開きます
+  const { post: openPostId, back, view } = await searchParams;
   const supabase = await createClient();
 
   // ▼ 待ち時間の話
@@ -108,6 +110,10 @@ export default async function MemberPage({
       authorId={id}
       isMine={myId === id}
       openPostId={typeof openPostId === "string" ? openPostId : null}
+      startInStory={view === "story"}
+      // アプリの中の画面（"/" で始まり、"//" ではない）だけを受け付けます。
+      // よそのサイトの URL を入れられて、戻るで飛ばされるのを防ぐためです
+      backHref={typeof back === "string" && back.startsWith("/") && !back.startsWith("//") ? back : "/"}
       authorName={profile?.display_name ?? "名無し"}
       avatarUrl={profile?.avatar_url ?? null}
       posts={

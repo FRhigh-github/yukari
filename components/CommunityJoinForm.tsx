@@ -24,7 +24,7 @@ export default function CommunityJoinForm({
 
     // join_community は schema.sql で用意してある DB 側の関数です。
     // 招待コードから該当のコミュニティを探して、自分を登録してくれます。
-    const { error } = await supabase.rpc("join_community", {
+    const { data: joinedId, error } = await supabase.rpc("join_community", {
       code: code.trim().toUpperCase(),
     });
 
@@ -37,7 +37,8 @@ export default function CommunityJoinForm({
     // 「参加しました」とだけ出して同じ画面に残ると、
     // 次に何をすればいいのか分からなくなるためです。
     // 初めての人（/start から来た人）には、ホームで一言だけ案内を出します
-    router.push(isFirstTime ? "/?tour=1" : "/");
+    // 入ったコミュニティのホームを出します(?c= で、どのコミュニティかを伝えます)
+    router.push(isFirstTime ? "/?tour=1" : `/?c=${joinedId}`);
     router.refresh();
   };
 
@@ -49,17 +50,17 @@ export default function CommunityJoinForm({
         value={code}
         onChange={(event) => setCode(event.target.value)}
         // uppercase = 入力した文字を大文字で表示します
-        className="w-full rounded-xl border border-stone-200 px-4 py-3 text-center text-sm uppercase tracking-widest focus:outline-none"
+        className="h-12 w-full rounded-xl border border-kin/40 bg-white px-4 text-center text-base uppercase tracking-widest focus:border-kin focus:outline-none"
       />
 
       <button
         type="submit"
-        className="w-full rounded-xl border border-stone-300 py-3 text-sm font-bold text-stone-700"
+        className="h-12 w-full rounded-xl border border-kin bg-white text-sm font-bold text-kin"
       >
         参加する
       </button>
 
-      {message ? <p className="text-xs text-stone-500">{message}</p> : null}
+      {message ? <p className="text-xs text-beni">{message}</p> : null}
     </form>
   );
 }

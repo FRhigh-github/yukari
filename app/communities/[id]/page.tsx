@@ -34,7 +34,7 @@ export default async function CommunityPage({
 
   if (community === null) {
     return (
-      <main className="min-h-full bg-[#faf9f6] p-4 pb-[calc(env(safe-area-inset-bottom)+8rem)]">
+      <main className="min-h-full bg-[#faf9f6] p-4 pb-[calc(env(safe-area-inset-bottom)+2rem)]">
         <Link href="/" className="text-sm text-stone-500">
           ← ホーム
         </Link>
@@ -59,8 +59,8 @@ export default async function CommunityPage({
 
   return (
     // 色はホームにそろえています（生成りの背景・金の見出しと線）。
-    // pb = 下タブ（約110px）に、いちばん下のボタンが隠れないための余白
-    <main className="min-h-full space-y-8 bg-[#faf9f6] p-4 pb-[calc(env(safe-area-inset-bottom)+8rem)]">
+    // この画面では下タブを出していないので(BottomNav.tsx)、下の余白は iPhone の横棒のぶんだけです
+    <main className="min-h-full space-y-8 bg-[#faf9f6] p-4 pb-[calc(env(safe-area-inset-bottom)+2rem)]">
       <div>
         {/* この画面には、ホームの ⚙ から来ます。
             なので戻り先も、そのコミュニティを開いたホームにします。
@@ -81,9 +81,6 @@ export default async function CommunityPage({
       <section>
         <h2 className="mb-2 text-sm font-bold text-kin">招待コード</h2>
         <InviteCode code={community.invite_code} communityName={community.name} />
-        <p className="mt-2 text-xs text-stone-400">
-          このコードを渡すと、相手はこのコミュニティに参加できます。
-        </p>
       </section>
 
       <section>
@@ -93,28 +90,32 @@ export default async function CommunityPage({
 
         <ul className="divide-y divide-kin/20 rounded-2xl border border-kin/30 bg-white px-4">
           {profiles?.map((profile) => (
-            <li key={profile.id} className="flex min-h-14 items-center gap-3">
-              {/* アイコンは背景画像で置きます（読み込み失敗時に印が出ないため） */}
-              <div
-                className="h-9 w-9 shrink-0 rounded-full bg-stone-200 bg-cover bg-center ring-1 ring-kin/50"
-                style={
-                  profile.avatar_url
-                    ? { backgroundImage: `url("${encodeURI(profile.avatar_url)}")` }
-                    : undefined
-                }
-              />
+            <li key={profile.id}>
+              {/* ▼ 行ぜんたい（アイコン・名前）を押せるようにしています。
+                  開く画面は、ホームでアイコンを押したときと同じご報告の一覧です。
+                  ?back= で「戻る」を押したときの行き先をこの画面にします（前はホームへ飛ばされていました） */}
               <Link
-                href={`/members/${profile.id}`}
-                // flex-1 と py-3 で、名前の行全体を押せるようにしています（44px 以上）
-                className="flex-1 py-3 text-[17px] text-stone-800"
+                href={`/members/${profile.id}?back=/communities/${community.id}`}
+                className="flex min-h-14 items-center gap-3 py-2"
               >
-                {profile.display_name ?? "名無し"}
-              </Link>
-              {isOwner(profile.id) ? (
-                <span className="rounded-full border border-kin/60 px-2 py-0.5 text-xs text-kin">
-                  作成者
+                {/* アイコンは背景画像で置きます（読み込み失敗時に印が出ないため） */}
+                <span
+                  className="h-10 w-10 shrink-0 rounded-full bg-stone-200 bg-cover bg-center ring-1 ring-kin/50"
+                  style={
+                    profile.avatar_url
+                      ? { backgroundImage: `url("${encodeURI(profile.avatar_url)}")` }
+                      : undefined
+                  }
+                />
+                <span className="flex-1 text-[17px] text-stone-800">
+                  {profile.display_name ?? "名無し"}
                 </span>
-              ) : null}
+                {isOwner(profile.id) ? (
+                  <span className="rounded-full border border-kin/60 px-2 py-0.5 text-xs text-kin">
+                    作成者
+                  </span>
+                ) : null}
+              </Link>
             </li>
           ))}
         </ul>

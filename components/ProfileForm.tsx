@@ -9,6 +9,7 @@ import ImageCropper from "@/components/ImageCropper";
 import CameraBadge from "@/components/CameraBadge";
 import { MOODS } from "@/lib/mood";
 import BirthdayPicker from "@/components/BirthdayPicker";
+import MoodIcon from "@/components/MoodIcon";
 
 type ProfileFormProps = {
   displayName: string;
@@ -195,13 +196,15 @@ export default function ProfileForm({
         </div>
       </Row>
 
-      {/* ▼ 気持ち。選択肢は lib/mood.ts にまとめてあります */}
+      {/* ▼ 気持ち。選択肢は lib/mood.ts にまとめてあります。
+       */}
+
       <Row label="ステータス">
         <div className="space-y-2">
           {MOODS.map((item) => (
             <MoodRow
               key={item.value}
-              emoji={item.emoji}
+              value={item.value}
               label={item.label}
               isSelected={selectedMood === item.value}
               onClick={() => setSelectedMood(item.value)}
@@ -221,7 +224,7 @@ export default function ProfileForm({
           type="button"
           onClick={handleSave}
           disabled={isSaving}
-          className="cursor-pointer rounded-full bg-stone-600 px-8 py-3 text-sm font-bold text-white disabled:opacity-40"
+          className="cursor-pointer rounded-full bg-beni px-8 py-3 text-sm font-bold text-white disabled:opacity-40"
         >
           {isSaving ? "保存中..." : "保存する"}
         </button>
@@ -252,12 +255,13 @@ function Row({
 
 // 気持ちの選択肢1つぶん。右端のマルが選択の印です。
 function MoodRow({
-  emoji,
+  value,
   label,
   isSelected,
   onClick,
 }: {
-  emoji?: string;
+  // 「選択しない」のときは無し（絵を出しません）
+  value?: string;
   label: string;
   isSelected: boolean;
   onClick: () => void;
@@ -266,14 +270,15 @@ function MoodRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full cursor-pointer items-center justify-end gap-2 text-sm text-stone-700"
+      // min-h-11 = 押せる範囲 44px
+      className="flex min-h-11 w-full cursor-pointer items-center justify-end gap-2 text-sm text-stone-700"
     >
-      {emoji ? <span>{emoji}</span> : null}
+      {value ? <MoodIcon value={value} className="h-5 w-5" /> : null}
       <span>{label}</span>
       {/* 中に点が入っていれば選択中 */}
-      <span className="flex h-4 w-4 items-center justify-center rounded-full border border-stone-300">
+      <span className="flex h-5 w-5 items-center justify-center rounded-full border border-kin/60">
         {isSelected ? (
-          <span className="h-2 w-2 rounded-full bg-stone-700" />
+          <span className="h-2.5 w-2.5 rounded-full bg-kin" />
         ) : null}
       </span>
     </button>

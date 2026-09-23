@@ -303,6 +303,35 @@ $$;
 
 
 -- ------------------------------------------------------------
+--  コミュニティの名前を、メンバーなら誰でも変えられる関数
+-- ------------------------------------------------------------
+--  アイコンと同じく、名前も「間違えても直せばいいもの」なので、作成者だけに限りません。
+--  表を直接書き換える許可(communities update)は作成者だけのままにして、
+--  名前だけを変えるこの関数を用意します（招待コードなどは変えられません）。
+create or replace function public.rename_community(target_community uuid, new_name text)
+returns void
+language plpgsql
+security definer
+set search_path to 'public'
+as $$
+begin
+  if not is_member(target_community) then
+    raise exception 'このコミュニティのメンバーではありません';
+  end if;
+
+  if new_name is null or length(trim(new_name)) = 0 or length(new_name) > 40 then
+    raise exception 'コミュニティ名は1〜40文字にしてください';
+  end if;
+
+  update communities set name = trim(new_name) where id = target_community;
+end;
+$$;
+
+revoke execute on function public.rename_community(uuid, text) from public, anon;
+grant execute on function public.rename_community(uuid, text) to authenticated;
+
+
+-- ------------------------------------------------------------
 --  5・11・13. 投稿とお祝い（posts / post_reactions）
 -- ------------------------------------------------------------
 create policy "posts for members"

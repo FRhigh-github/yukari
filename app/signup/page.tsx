@@ -84,7 +84,7 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={isSending}
-          className="w-full cursor-pointer rounded-full bg-stone-800 py-3 text-sm font-bold text-white disabled:opacity-40"
+          className="w-full cursor-pointer rounded-full bg-beni py-3 text-sm font-bold text-white disabled:opacity-40"
         >
           {isSending ? "登録中..." : "登録する"}
         </button>

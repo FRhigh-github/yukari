@@ -153,6 +153,31 @@ type EventPlan = {
   dates: string[]; // 候補日の一覧(event_date_options.event_date に入れる)
 };
 
+// 入力中の候補日1行ぶん。
+//   end が "" … その日1日だけ
+//   end が入っている … start から end までの「期間」。保存するときに1日ずつに分けます
+//   (DB の候補日は1日ずつの形なので、期間のまま入れる場所がないためです)
+type DateRow = { start: string; end: string; isRange: boolean };
+
+// 入力中のイベント。候補日だけ、期間を入れられる形で持ちます
+type EventDraft = { name: string; rows: DateRow[] };
+
+// 期間を1日ずつの一覧にします。長すぎる期間で候補日が何百個もできないよう、62日で止めます
+const MAX_RANGE_DAYS = 62;
+function expandRow(row: DateRow): string[] {
+  if (row.start === "") return [];
+  if (!row.isRange || row.end === "" || row.end <= row.start) return [row.start];
+  const days: string[] = [];
+  const day = new Date(`${row.start}T00:00:00`);
+  const last = new Date(`${row.end}T00:00:00`);
+  while (day <= last && days.length < MAX_RANGE_DAYS) {
+    // "sv-SE" = "2030-04-01" の形の文字にする書き方です
+    days.push(day.toLocaleDateString("sv-SE"));
+    day.setDate(day.getDate() + 1);
+  }
+  return days;
+}
+
 // 枠についている〇(引っぱる所)の場所。
 //   四つ角 … "tl" = 左上、"tr" = 右上、"bl" = 左下、"br" = 右下
 //   辺の中点 … "t" = 上、"b" = 下、"l" = 左、"r" = 右
@@ -287,7 +312,7 @@ export default function LetterPage() {
   const [eventPlan, setEventPlan] = useState<EventPlan | null>(null);
 
   // パネルで入力中のイベント(パネルを閉じているときは null)
-  const [draft, setDraft] = useState<EventPlan | null>(null);
+  const [draft, setDraft] = useState<EventDraft | null>(null);
 
   // ===== 開封日(何年何月何日の私たちへ) =====
   // 封筒の画面で、年・月・日を1つずつ選びます。最初は空(""＝未入力)。
@@ -422,10 +447,23 @@ export default function LetterPage() {
   function openEventPanel() {
     setSelectedId(null);
     if (eventPlan === null) {
-      setDraft({ name: "", dates: [""] });
+      setDraft({ name: "", rows: [{ start: "", end: "", isRange: false }] });
     } else {
-      setDraft({ name: eventPlan.name, dates: [...eventPlan.dates] });
+      // 決めたあとの候補日は1日ずつになっているので、1日ずつの行に戻して開きます
+      setDraft({
+        name: eventPlan.name,
+        rows: eventPlan.dates.map((d) => ({ start: d, end: "", isRange: false })),
+      });
     }
+  }
+
+  // ----- 候補日の行を1つだけ書き換える -----
+  function updateRow(index: number, changes: Partial<DateRow>) {
+    if (draft === null) return;
+    setDraft({
+      ...draft,
+      rows: draft.rows.map((row, i) => (i === index ? { ...row, ...changes } : row)),
+    });
   }
 
   // ----- パネルを閉じる(キャンセル) -----
@@ -434,7 +472,8 @@ export default function LetterPage() {
   }
 
   // 入力済みの候補日だけを取り出します(空の入力欄は除く)
-  const filledDates = draft === null ? [] : draft.dates.filter((d) => d !== "");
+  // (期間の行は、1日ずつに分けてから数えます)
+  const filledDates = draft === null ? [] : draft.rows.flatMap(expandRow);
 
   // 同じ日が2回入っていないかを調べます
   const hasDuplicate = new Set(filledDates).size !== filledDates.length;
@@ -759,6 +798,22 @@ export default function LetterPage() {
     // ----- 紙を塗る -----
     ctx.fillStyle = PAPER_COLOR;
     ctx.fillRect(0, 0, width, height);
+
+    // ----- 水引の飾り(画面の紙と同じ位置・同じ色) -----
+    // 金の二重線の枠。strokeRect = 四角の線だけを描く命令です
+    ctx.strokeStyle = "rgba(194, 161, 77, 0.7)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(8.5, 8.5, width - 17, height - 17);
+    ctx.strokeStyle = "rgba(194, 161, 77, 0.4)";
+    ctx.strokeRect(12.5, 12.5, width - 25, height - 25);
+    // 左下の紅白の結び目。画面と同じ絵(public/knot.svg)を、横幅 72px で描きます
+    const knot = new Image();
+    knot.src = "/knot.svg";
+    await knot.decode();
+    const knotHeight = (72 * knot.naturalHeight) / knot.naturalWidth;
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(knot, 10, height - 10 - knotHeight, 72, knotHeight);
+    ctx.globalAlpha = 1;
 
     // textBaseline = "middle" … 指定した高さが、文字の縦の真ん中になる
     ctx.textBaseline = "middle";
@@ -1217,6 +1272,18 @@ export default function LetterPage() {
           // min-h-0 = 中身が大きくても、枠からはみ出させない。
           className="relative min-h-0 flex-1 overflow-hidden bg-[#fdfbf5] shadow-md"
         >
+          {/* ▼ 水引の飾り。紙のふちに金の二重線、左下に紅白の結び目を置きます。
+              pointer-events-none = 飾りの上を押しても、紙を押したことになるようにします。
+              同じ飾りを、送る画像にも描いています(makeLetterPng の drawDecoration) */}
+          <div className="pointer-events-none absolute inset-[8px] rounded-sm border border-kin/70" />
+          <div className="pointer-events-none absolute inset-[12px] rounded-sm border border-kin/40" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/knot.svg"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-[10px] left-[10px] w-[72px] opacity-90"
+          />
           {/* ----- 置いたもの ----- */}
           {items.map((item) => {
             const isSelected = selectedId === item.id;
@@ -1492,11 +1559,12 @@ export default function LetterPage() {
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
-              className={`h-8 w-8 ${canSwipe ? "animate-bounce text-kin" : "text-stone-300"}`}
+              // 大きく・太くして、ひと目で「上へ」と分かるようにしています
+              strokeWidth="2.5"
+              className={`h-20 w-20 ${canSwipe ? "animate-bounce text-kin" : "text-stone-300"}`}
             >
               <path d="M12 19V5" />
               <path d="M5 12l7-7 7 7" />
@@ -1523,6 +1591,19 @@ export default function LetterPage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="#a8a29e" strokeWidth="0.6" className="absolute inset-0 h-full w-full" preserveAspectRatio="none">
                 <path d="M0 3l12 9 12-9" />
               </svg>
+              {/* 封筒に、ご祝儀袋のような紅・白・金の水引の帯と、真ん中に結び目をかけます */}
+              <div className="pointer-events-none absolute inset-x-0 top-[62%] flex flex-col gap-[2px]">
+                <span className="h-[3px] bg-beni" />
+                <span className="h-[3px] bg-white" />
+                <span className="h-[2px] bg-kin" />
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/knot.svg"
+                alt=""
+                aria-hidden="true"
+                className="pointer-events-none absolute left-1/2 top-[62%] w-24 -translate-x-1/2 -translate-y-1/2 drop-shadow"
+              />
               {isSending && (
                 <span className="relative rounded-full bg-beni px-4 py-2 text-sm text-white">
                   送信中…
@@ -1647,36 +1728,60 @@ export default function LetterPage() {
 
             {/* 候補日 */}
             <p className="mb-1 text-xs text-stone-500">イベント候補日</p>
-            {draft.dates.map((d, index) => (
-              <div key={index} className="mb-2 flex items-center gap-2">
-                <input
-                  type="date"
-                  value={d}
-                  onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      dates: draft.dates.map((old, i) =>
-                        i === index ? e.target.value : old
-                      ),
-                    })
-                  }
-                  className="min-w-0 flex-1 border-b border-stone-300 bg-transparent py-1 outline-none"
-                />
-                {draft.dates.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDraft({
-                        ...draft,
-                        dates: draft.dates.filter((_, i) => i !== index),
-                      })
-                    }
-                    aria-label="この候補日を消す"
-                    className="flex h-11 w-11 items-center justify-center text-stone-400"
-                  >
-                    ×
-                  </button>
-                )}
+            {draft.rows.map((row, index) => (
+              <div key={index} className="mb-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={row.start}
+                    onChange={(e) => updateRow(index, { start: e.target.value })}
+                    aria-label="候補日"
+                    className="h-11 min-w-0 flex-1 border-b border-stone-300 bg-transparent text-base outline-none"
+                  />
+                  {/* 期間のときだけ、終わりの日の欄を出します */}
+                  {row.isRange && (
+                    <>
+                      <span className="text-stone-400">〜</span>
+                      <input
+                        type="date"
+                        value={row.end}
+                        min={row.start}
+                        onChange={(e) => updateRow(index, { end: e.target.value })}
+                        aria-label="期間の終わりの日"
+                        className="h-11 min-w-0 flex-1 border-b border-stone-300 bg-transparent text-base outline-none"
+                      />
+                    </>
+                  )}
+                  {draft.rows.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDraft({ ...draft, rows: draft.rows.filter((_, i) => i !== index) })
+                      }
+                      aria-label="この候補日を消す"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center text-xl text-stone-400"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                {/* 1日 / 期間 の切り替え */}
+                <div className="mt-1 flex gap-1">
+                  {[false, true].map((isRange) => (
+                    <button
+                      key={String(isRange)}
+                      type="button"
+                      onClick={() => updateRow(index, { isRange, end: isRange ? row.end : "" })}
+                      className={`h-9 rounded-full px-3 text-sm ${
+                        row.isRange === isRange
+                          ? "bg-white font-bold text-kin ring-1 ring-kin"
+                          : "text-stone-400"
+                      }`}
+                    >
+                      {isRange ? "期間" : "1日"}
+                    </button>
+                  ))}
+                </div>
               </div>
             ))}
 
@@ -1686,7 +1791,9 @@ export default function LetterPage() {
 
             <button
               type="button"
-              onClick={() => setDraft({ ...draft, dates: [...draft.dates, ""] })}
+              onClick={() =>
+                setDraft({ ...draft, rows: [...draft.rows, { start: "", end: "", isRange: false }] })
+              }
               className="mb-6 h-11 rounded-full border border-kin/60 px-4 text-sm text-kin"
             >
               ＋ 候補日を追加

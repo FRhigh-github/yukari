@@ -36,18 +36,15 @@ export async function getHomeData(selectedId: string | null) {
   // 絞り込みを書いていないのに自分のぶんだけ返ります。
   // communities は RLS で「メンバーしか読めない」設定なので、DB 側が絞ってくれます。
   //
-  // time_capsules（未来への手紙）も、ここで一緒に聞きます。
-  // 前はホームが出たあとに画面側で聞いていたので、✈️ が遅れてポンと出ていました。
-  // RLS で「開封日を過ぎた手紙」しか返ってこないので、1件あれば届いている、ということです。
-  const [userId, { data: communities }, { data: letters }] = await Promise.all([
+  // ※ 未来への手紙（✈️）は、既読かどうかをブラウザに覚えさせているので、
+  //   画面側（MemberCircles.tsx）で聞いています。
+  const [userId, { data: communities }] = await Promise.all([
     getCurrentUserId(supabase),
     supabase.from("communities").select("id, name, icon_url"),
-    supabase.from("time_capsules").select("id").limit(1),
   ]);
 
   // 画面側は user.id だけを使うので、その形にそろえて返します
   const user = userId === null ? null : { id: userId };
-  const letterId = letters?.[0]?.id ?? null;
 
   if (user === null) {
     return {
@@ -57,7 +54,6 @@ export async function getHomeData(selectedId: string | null) {
       currentId: null,
       recoveryRequests: [],
       todayCount: 0,
-      letterId: null,
     };
   }
 
@@ -77,7 +73,6 @@ export async function getHomeData(selectedId: string | null) {
       currentId: null,
       recoveryRequests: [],
       todayCount: 0,
-      letterId: null,
     };
   }
 
@@ -181,6 +176,5 @@ export async function getHomeData(selectedId: string | null) {
     currentId,
     recoveryRequests,
     todayCount,
-    letterId,
   };
 }

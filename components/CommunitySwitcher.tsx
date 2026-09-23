@@ -9,6 +9,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import Loader from "@/components/Loader";
+import CommunityCreateForm from "@/components/CommunityCreateForm";
+import CommunityJoinForm from "@/components/CommunityJoinForm";
 
 export type Community = {
   id: string;
@@ -34,6 +36,9 @@ export default function CommunitySwitcher({
   todayCount,
 }: CommunitySwitcherProps) {
   const [isOpen, setIsOpen] = useState(false);
+  // 一覧の下で開いている入力欄。"create" = 作る、"join" = 招待コードで参加、null = 閉じている。
+  // 前は別の画面へ移っていましたが、名前やコードを1つ入れるだけなので、この場で済ませます
+  const [formMode, setFormMode] = useState<"create" | "join" | null>(null);
 
   // ▼ 押した直後に、チップの名前だけ先に変えておくための覚え書きです。
   //
@@ -137,20 +142,30 @@ export default function CommunitySwitcher({
               {/* 作る・参加する への入口も、同じ場所に置きます。
                 切り替えのために開いたついでに操作できるほうが早いためです。 */}
               <div className="mt-2 border-t border-stone-100 pt-2">
-                <Link
-                  href="/communities/new"
-                  onClick={() => setIsOpen(false)}
-                  className="flex h-12 cursor-pointer items-center px-5 text-sm text-stone-600"
+                <button
+                  type="button"
+                  onClick={() => setFormMode(formMode === "create" ? null : "create")}
+                  className="flex h-12 w-full cursor-pointer items-center px-5 text-sm text-stone-600"
                 >
                   ＋ コミュニティを新しく作る
-                </Link>
-                <Link
-                  href="/communities/join"
-                  onClick={() => setIsOpen(false)}
-                  className="flex h-12 cursor-pointer items-center px-5 text-sm text-stone-600"
+                </button>
+                {formMode === "create" ? (
+                  <div className="px-4 pb-3">
+                    <CommunityCreateForm inline />
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setFormMode(formMode === "join" ? null : "join")}
+                  className="flex h-12 w-full cursor-pointer items-center px-5 text-sm text-stone-600"
                 >
                   招待コードで参加する
-                </Link>
+                </button>
+                {formMode === "join" ? (
+                  <div className="px-4 pb-3">
+                    <CommunityJoinForm />
+                  </div>
+                ) : null}
               </div>
             </div>
           </>
@@ -199,7 +214,7 @@ function ListRow({ community, isSelected, onSelect, onClose }: ListRowProps) {
         <span className="truncate">{community.name}</span>
         {/* shrink-0 = ✓ は縮めない。縮むと名前とくっついて見えます */}
         {isSelected ? (
-          <span className="shrink-0 text-beni">✓</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label="いま見ている" className="h-5 w-5 shrink-0 text-beni"><path d="M5 12l5 5 9-10" /></svg>
         ) : null}
       </Link>
 
@@ -213,9 +228,10 @@ function ListRow({ community, isSelected, onSelect, onClose }: ListRowProps) {
       <Link
         href={`/communities/${community.id}`}
         onClick={onClose}
-        className="flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-full bg-stone-100 px-3 text-xs text-stone-500"
+        className="flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-full bg-stone-100 px-3 text-sm text-stone-500"
       >
-        <span>⚙</span>
+        {/* 歯車の絵(前は ⚙ の文字) */}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-4 w-4"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
         <span>設定</span>
       </Link>
     </div>

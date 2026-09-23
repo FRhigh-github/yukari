@@ -15,7 +15,7 @@ function Notice({ text, href, label }: { text: string; href: string; label: stri
       <p className="text-sm text-stone-500">{text}</p>
       <Link
         href={href}
-        className="rounded-full bg-stone-800 px-6 py-3 text-sm font-bold text-white"
+        className="rounded-full bg-beni px-6 py-3 text-sm font-bold text-white"
       >
         {label}
       </Link>
@@ -33,7 +33,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   // currentId = 実際に見ているコミュニティ。
   // ?c= が無いときは、getHomeData が一番上を選んで返してくれます。
-  const { user, communities, members, currentId, recoveryRequests, todayCount, letterId } =
+  const { user, communities, members, currentId, recoveryRequests, todayCount } =
     await getHomeData(selectedId);
 
   // ▼ ログインしていない人は、ここで追い返します。
@@ -55,7 +55,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {/* shrink-0 = 場所が足りなくてもこのバーは縮めない */}
       <header className="flex shrink-0 items-center gap-3 border-b border-kin/30 px-4 py-3">
         {/* 作る・参加する・設定への入口も、この中にまとめてあります */}
+        {/* key = 見ているコミュニティが変わったら、この部品を作り直します。
+            切り替えの中で「作る・参加する」を済ませたときに、開いたままの一覧を閉じるためです */}
         <CommunitySwitcher
+          key={currentId}
           communities={communities}
           selectedId={currentId}
           memberCount={members.length}
@@ -63,6 +66,15 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         />
 
         {/* 通知のオン・オフ。報告がある日は、鐘の右上に紅い点が出ます */}
+        {/* チャットの一覧へ（/chats）。ふきだしの線の絵だけのボタンです */}
+        <Link
+          href="/chats"
+          aria-label="チャット"
+          className="flex h-11 w-11 shrink-0 items-center justify-center text-kin"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" width="28" height="28"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
+        </Link>
+
         <NotificationToggle hasNews={todayCount > 0} />
       </header>
 
@@ -91,7 +103,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         // 余白（px / pb）は付けません。付けると、そこで模様が切れて見えるためです。
         // 下タブとボタンに重なるぶんは、MemberCircles の中で中心を上にずらして逃がしています。
         <div className="min-h-0 flex-1">
-          <MemberCircles members={members} currentUserId={user.id} letterId={letterId} />
+          <MemberCircles members={members} currentUserId={user.id} />
         </div>
       )}
 
@@ -101,7 +113,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             アイコンは下タブと同じ描き方（線の太さ2・角は丸く・塗りなし）です。
 
             色は水引の紅・金と、白・グレーだけにしています。
-              ふみばこ = 白地に金のふちとアイコン。見るだけの、控えめなボタン
+              ふみばこ = 白地に金のふちとアイコン。見るだけの、控えめなボタン（大きさは報告すると同じ 56px）
               報告する = 紅地。まわりに金の細い輪を回して、水引の紅白と金のように見せます
 
             下タブ（約76px）＋ iPhone下端の余白 の上に置きます。
@@ -113,12 +125,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         // ふみばこも中身まで先に取っておいて、押した瞬間に開くようにします（本番のときだけ動きます）
         prefetch={true}
         aria-label="ふみばこ（届いたカード）"
-        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-kin/60 bg-white shadow-md"
+        className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-4 z-30 flex h-14 w-14 items-center justify-center rounded-full border border-kin/60 bg-white shadow-md"
       >
         <svg
           viewBox="0 0 24 24"
-          width="22"
-          height="22"
+          width="24"
+          height="24"
           fill="none"
           stroke="currentColor"
           strokeWidth="2"

@@ -73,7 +73,7 @@ export default function LoginForm({ initialMessage }: LoginFormProps) {
         <button
           type="submit"
           disabled={isSending}
-          className="w-full cursor-pointer rounded-full bg-stone-800 py-3 text-sm font-bold text-white disabled:opacity-40"
+          className="w-full cursor-pointer rounded-full bg-beni py-3 text-sm font-bold text-white disabled:opacity-40"
         >
           {isSending ? "確認中..." : "ログイン"}
         </button>

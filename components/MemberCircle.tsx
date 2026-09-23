@@ -10,8 +10,9 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { MOODS } from "@/lib/mood";
+import { MOODS, SHOW_MOOD_ON_HOME } from "@/lib/mood";
 import type { Member } from "@/lib/home";
+import MoodIcon from "@/components/MoodIcon";
 
 // これだけ押し続けたら長押し（ミリ秒）
 const LONG_PRESS = 500;
@@ -61,7 +62,8 @@ export default function MemberCircle({
   return (
     <>
       <Link
-        href={`/members/${member.id}`}
+        // ?view=story = 一覧を挟まずに、いきなり全画面のストーリーで開きます
+        href={`/members/${member.id}?view=story`}
         // ▼ ホームに出ている全員ぶん、ご報告の中身まで先に取っておきます。
         //   ふつうは画面の「枠」しか先読みしないので、押してから DB に聞きに行く間、
         //   待ち画面が見えていました。先に取っておけば、押した瞬間に開きます。
@@ -110,10 +112,11 @@ export default function MemberCircle({
           </div>
 
           {/* 気持ちの印 */}
-          {/* 気持ちの印。顔にかぶらないよう、輪の外へ少し逃がしています */}
-          {mood ? (
+          {/* 気持ちの印。顔にかぶらないよう、輪の外へ少し逃がしています。
+              SHOW_MOOD_ON_HOME が false のあいだは出しません（lib/mood.ts） */}
+          {SHOW_MOOD_ON_HOME && mood ? (
             <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[8px] shadow-sm">
-              {mood.emoji}
+              <MoodIcon value={mood.value} className="h-3 w-3" />
             </span>
           ) : null}
         </div>
@@ -155,14 +158,15 @@ export default function MemberCircle({
             </p>
 
             {mood ? (
-              <p className="mt-1 text-xs text-stone-600">
-                {mood.emoji} {mood.label}
+              <p className="mt-1 flex items-center justify-center gap-1 text-sm text-stone-600">
+                <MoodIcon value={mood.value} className="h-4 w-4" />
+                {mood.label}
               </p>
             ) : null}
 
             <Link
               href={`/members/${member.id}/profile`}
-              className="mt-4 block rounded-full bg-stone-800 py-2.5 text-xs font-bold text-white"
+              className="mt-4 block rounded-full bg-beni py-2.5 text-xs font-bold text-white"
             >
               プロフィールを見る
             </Link>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import MemberCircle from "@/components/MemberCircle";
 import type { Member } from "@/lib/home";
+import { createClient } from "@/lib/supabase/client";
 
 // 水引の色（globals.css と同じ）
 const BENI = "#b7282e";
@@ -85,16 +86,11 @@ function layout(count: number) {
 type MemberCirclesProps = {
   members: Member[];
   currentUserId: string;
-  // 届いている未来への手紙の id。無ければ null。
-  // ホームのデータと一緒にサーバーで取ってきます（lib/home.ts）。
-  // 画面が出てから聞きに行くと、✈️ が遅れて出てくるためです
-  letterId: string | null;
 };
 
 export default function MemberCircles({
   members,
   currentUserId,
-  letterId,
 }: MemberCirclesProps) {
   const [hasLetter, setHasLetter] = useState(false);
   const [openableCount, setOpenableCount] = useState<number>(0);
@@ -302,21 +298,25 @@ export default function MemberCircles({
         }
       }}
     >
+      {/* ▼ 未来への手紙の入口。絵文字ではなく、ほかのボタンと同じ線の絵（紙飛行機）にしています。
+          白地に金のふち・金の絵で、ふみばこのボタンとそろえています。
+          読んでいない手紙があるときだけ、右上に紅い数字を出します */}
       {letterId ? (
         <Link
           href={`/letters/${letterId}`}
           onClick={handleMarkAsRead}
-          className="absolute right-4 top-4 z-50 rounded-full border border-stone-200 bg-white p-2 text-2xl shadow-md"
-          title="未来の手紙が届いています"
+          aria-label="未来への手紙"
+          className="absolute right-4 top-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-kin/60 bg-white text-kin shadow-md"
         >
-          <div className="relative leading-none">
-            ✈️
-            {openableCount > 0 ? (
-              <span className="absolute -top-1.5 -right-1.5 flex min-w-[20px] h-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm border-2 border-white">
-                {openableCount > 99 ? "99+" : openableCount}
-              </span>
-            ) : null}
-          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-6 w-6">
+            <path d="M22 2L11 13" />
+            <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+          </svg>
+          {openableCount > 0 ? (
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-beni px-1 text-xs font-bold text-white ring-2 ring-white">
+              {openableCount > 99 ? "99+" : openableCount}
+            </span>
+          ) : null}
         </Link>
       ) : null}
 

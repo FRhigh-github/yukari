@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Fragment } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Message = {
@@ -16,6 +16,7 @@ type Message = {
 
 export default function EventChatPage() {
   const params = useParams();
+  const router = useRouter();
   const rawId = params.id as string;
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -23,6 +24,8 @@ export default function EventChatPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [eventTitle, setEventTitle] = useState<string>("チャット");
   const [loading, setLoading] = useState(true);
+  // 送れなかったときの知らせ。前はブラウザの alert でしたが、画面の中に出します
+  const [errorText, setErrorText] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentUserIdRef = useRef<string | null>(null);
 
@@ -32,11 +35,12 @@ export default function EventChatPage() {
   const fetchUserName = async (userId: string): Promise<string> => {
     const { data } = await supabase
       .from("profiles")
-      .select("name, username")
+      // 名前の列は display_name です（前は無い列を読んでいて、全員「メンバー」と出ていました）
+      .select("display_name")
       .eq("id", userId)
       .maybeSingle();
 
-    return data?.name || data?.username || "メンバー";
+    return data?.display_name || "メンバー";
   };
 
   // メッセージ取得用関数
@@ -55,17 +59,17 @@ export default function EventChatPage() {
     }
 
     if (msgData && msgData.length > 0) {
-      const userIds = Array.from(new Set(msgData.map((m: any) => m.user_id)));
+      const userIds = Array.from(new Set(msgData.map((m: Message) => m.user_id)));
       const { data: profilesData } = await supabase
         .from("profiles")
-        .select("id, name, username")
+        .select("id, display_name")
         .in("id", userIds);
 
       const profileMap = new Map<string, string>(
-        (profilesData || []).map((p) => [p.id, p.name || p.username || "メンバー"])
+        (profilesData || []).map((p) => [p.id, p.display_name || "メンバー"])
       );
 
-      const formatted = msgData.map((m: any) => ({
+      const formatted = msgData.map((m: Message) => ({
         ...m,
         user_name: m.user_id === myId ? "自分" : profileMap.get(m.user_id) || "メンバー",
       }));
@@ -123,12 +127,34 @@ export default function EventChatPage() {
 
       const { data: eventData } = await supabase
         .from("events")
-        .select("title, name")
+        // events の名前の列は name だけです（title という列は無く、前は読むのに失敗して「チャット」のままでした）
+        .select("name")
         .eq("id", rawId)
         .maybeSingle();
 
       if (eventData) {
-        setEventTitle(eventData.title || eventData.name || "イベントチャット");
+        setEventTitle(eventData.name || "チャット");
+      }
+
+      // ▼ まだ日程の出欠に答えていない人は、先に答えてもらいます。
+      //   候補日があって、自分の回答が1つも無いときだけ、答える画面へ移します（?answer=1）
+      if (myId) {
+        const { data: options } = await supabase
+          .from("event_date_options")
+          .select("id")
+          .eq("event_id", rawId);
+        const optionIds = options?.map((option) => option.id) ?? [];
+        if (optionIds.length > 0) {
+          const { count } = await supabase
+            .from("event_responses")
+            .select("option_id", { count: "exact", head: true })
+            .eq("user_id", myId)
+            .in("option_id", optionIds);
+          if (count === 0) {
+            router.replace(`/events/${rawId}?answer=1`);
+            return;
+          }
+        }
       }
 
       await fetchMessages(myId);
@@ -159,7 +185,7 @@ export default function EventChatPage() {
     const senderId = user?.id || currentUserId;
 
     if (!senderId) {
-      alert("ログイン情報が確認できません。再度ログインしてください。");
+      setErrorText("ログインしてから、もう一度試してください");
       return;
     }
 
@@ -178,9 +204,10 @@ export default function EventChatPage() {
 
     if (error) {
       console.error("メッセージ送信エラー:", error.message);
-      alert(`メッセージの送信に失敗しました: ${error.message}`);
+      setErrorText("送れませんでした");
       setInputText(textToSend);
     } else if (data) {
+      setErrorText(null);
       const newMsgWithProfile: Message = {
         ...(data as Message),
         user_name: "自分",
@@ -193,114 +220,101 @@ export default function EventChatPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#FDFBF7] p-4 flex items-center justify-center max-w-sm mx-auto text-xs text-gray-500 font-sans">
-        チャットを読み込み中...
-      </div>
-    );
-  }
+  // 読み込み中は、生成り色の無地だけにします（文字を出すと、一瞬だけ見えてちらつくため）
+  if (loading) return <div className="h-full bg-[#faf9f6]" />;
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] max-w-sm mx-auto font-sans flex flex-col h-screen border-x border-gray-100">
-      {/* ヘッダー */}
-      <div className="bg-white border-b px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-10">
-        <Link href={`/events/${rawId}`} className="text-xs text-gray-500 font-bold hover:underline">
-          ＜ イベント詳細
+    // h-full = 親の高さぴったり。この画面は下タブを出さないので（BottomNav.tsx）、
+    // 入力欄を画面のいちばん下に置けます
+    <div className="flex h-full flex-col bg-[#faf9f6]">
+      {/* ▼ 上：戻る・イベント名 */}
+      <header className="flex shrink-0 items-center gap-1 border-b border-kin/30 px-2 py-1">
+        <Link href={`/events/${rawId}`} aria-label="戻る" className="flex h-11 w-11 shrink-0 items-center justify-center text-stone-700">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-7 w-7"><path d="M15 5l-7 7 7 7" /></svg>
         </Link>
-        <h1 className="text-xs font-bold text-gray-800 truncate max-w-[180px]">
-          💬 {eventTitle}
-        </h1>
-        <div className="w-12"></div>
-      </div>
+        <h1 className="min-w-0 flex-1 truncate text-lg font-bold text-stone-800">{eventTitle}</h1>
+      </header>
 
-      {/* メッセージ表示領域 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.length === 0 ? (
-          <div className="text-center text-xs text-gray-400 py-10">
-            まだメッセージはありません。<br />最初のメッセージを送ってみましょう！
-          </div>
-        ) : (
-          messages.map((msg, index) => {
-            const isMe = msg.user_id === currentUserId;
+      {/* ▼ メッセージ */}
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        {messages.map((msg, index) => {
+          const isMe = msg.user_id === currentUserId;
 
-            // 現在のメッセージの日付文字列（例: 2026/09/24）
-            const currentDateStr = new Date(msg.created_at).toLocaleDateString("ja-JP", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            });
+          // 日付が前のメッセージと変わったところに、日付の札を出します
+          const currentDateStr = new Date(msg.created_at).toLocaleDateString("ja-JP", {
+            month: "long",
+            day: "numeric",
+            weekday: "short",
+          });
+          const prevDateStr =
+            index > 0
+              ? new Date(messages[index - 1].created_at).toLocaleDateString("ja-JP", {
+                  month: "long",
+                  day: "numeric",
+                  weekday: "short",
+                })
+              : null;
+          const isNewDay = currentDateStr !== prevDateStr;
 
-            // 1つ前のメッセージの日付文字列
-            const prevDateStr =
-              index > 0
-                ? new Date(messages[index - 1].created_at).toLocaleDateString("ja-JP", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                : null;
-
-            // 日付が変わったかどうかの判定（先頭メッセージまたは日付が異なる場合）
-            const isNewDay = currentDateStr !== prevDateStr;
-
-            return (
-              <Fragment key={msg.id}>
-                {/* 日付が変わったタイミングで日付ヘッダーを表示 */}
-                {isNewDay && (
-                  <div className="flex justify-center my-3">
-                    <span className="bg-gray-200/80 text-gray-600 text-[10px] px-3 py-0.5 rounded-full font-medium">
-                      {currentDateStr}
-                    </span>
-                  </div>
-                )}
-
-                <div
-                  className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
-                >
-                  {!isMe && (
-                    <span className="text-[10px] text-gray-500 mb-1 ml-1 font-medium">
-                      {msg.user_name || "メンバー"}
-                    </span>
-                  )}
-                  <div
-                    className={`max-w-[75%] px-3 py-2 rounded-2xl text-xs break-words ${
-                      isMe
-                        ? "bg-amber-600 text-white rounded-br-none"
-                        : "bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm"
-                    }`}
-                  >
-                    {msg.content}
-                  </div>
-                  <span className="text-[9px] text-gray-400 mt-0.5 px-1">
-                    {new Date(msg.created_at).toLocaleTimeString("ja-JP", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+          return (
+            <Fragment key={msg.id}>
+              {isNewDay && (
+                <div className="my-3 flex justify-center">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs text-kin ring-1 ring-kin/40">
+                    {currentDateStr}
                   </span>
                 </div>
-              </Fragment>
-            );
-          })
-        )}
+              )}
+
+              <div className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                {!isMe && (
+                  <span className="mb-1 ml-1 text-sm text-kin">{msg.user_name || "メンバー"}</span>
+                )}
+                {/* 自分のふきだしは紅、ほかの人は白に金のふち */}
+                <div
+                  className={`max-w-[78%] break-words rounded-2xl px-4 py-2 text-base ${
+                    isMe
+                      ? "rounded-br-sm bg-beni text-white"
+                      : "rounded-bl-sm bg-white text-stone-800 ring-1 ring-kin/30"
+                  }`}
+                >
+                  {msg.content}
+                </div>
+                <span className="mt-0.5 px-1 text-xs text-stone-400">
+                  {new Date(msg.created_at).toLocaleTimeString("ja-JP", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            </Fragment>
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 送信フォーム */}
-      <form onSubmit={handleSendMessage} className="p-3 bg-white border-t flex gap-2 items-center mb-16">
+      {errorText ? <p className="px-4 pb-1 text-center text-sm text-beni">{errorText}</p> : null}
+
+      {/* ▼ 下：入力欄と送るボタン */}
+      <form
+        onSubmit={handleSendMessage}
+        className="flex shrink-0 items-center gap-2 border-t border-kin/30 bg-white px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+      >
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="メッセージを入力..."
-          className="flex-1 bg-gray-100 text-xs px-3 py-2 rounded-full focus:outline-none focus:ring-1 focus:ring-amber-500"
+          placeholder="メッセージ"
+          className="h-11 min-w-0 flex-1 rounded-full bg-[#faf9f6] px-4 text-base ring-1 ring-kin/30 focus:outline-none focus:ring-kin"
         />
+        {/* 送るボタンは紙飛行機の絵だけ。紅い丸で、押せる範囲は 44px */}
         <button
           type="submit"
           disabled={!inputText.trim()}
-          className="bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-full disabled:opacity-40 transition"
+          aria-label="送る"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-beni text-white disabled:opacity-40"
         >
-          送信
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-5 w-5"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>
         </button>
       </form>
     </div>

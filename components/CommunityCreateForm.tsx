@@ -10,7 +10,13 @@ import { createClient } from "@/lib/supabase/client";
 const makeInviteCode = () =>
   crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase();
 
-export default function CommunityCreateForm() {
+type CommunityCreateFormProps = {
+  // true = ホームの切り替えの中で使う。作ったら、そのコミュニティのホームを出します。
+  // false = 作る画面(/communities/new)で使う。作ったら、設定の画面(招待コードがある)へ移ります
+  inline?: boolean;
+};
+
+export default function CommunityCreateForm({ inline = false }: CommunityCreateFormProps) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +47,7 @@ export default function CommunityCreateForm() {
       return;
     }
 
-    router.push(`/communities/${id}`);
+    router.push(inline ? `/?c=${id}` : `/communities/${id}`);
     router.refresh();
   };
 
@@ -53,17 +59,17 @@ export default function CommunityCreateForm() {
         placeholder="コミュニティ名"
         value={name}
         onChange={(event) => setName(event.target.value)}
-        className="w-full rounded-xl border border-stone-200 px-4 py-3 text-sm focus:outline-none"
+        className="h-12 w-full rounded-xl border border-kin/40 bg-white px-4 text-base focus:border-kin focus:outline-none"
       />
 
       <button
         type="submit"
-        className="w-full rounded-xl bg-stone-800 py-3 text-sm font-bold text-white"
+        className="h-12 w-full rounded-xl bg-beni text-sm font-bold text-white"
       >
         作る
       </button>
 
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      {error ? <p className="text-xs text-beni">{error}</p> : null}
     </form>
   );
 }

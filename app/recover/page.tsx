@@ -149,7 +149,7 @@ export default function RecoverPage() {
             type="button"
             onClick={handleComplete}
             disabled={isSending}
-            className="w-full cursor-pointer rounded-full bg-stone-800 py-3 text-sm font-bold text-white disabled:opacity-40"
+            className="w-full cursor-pointer rounded-full bg-beni py-3 text-sm font-bold text-white disabled:opacity-40"
           >
             {isSending ? "確認中..." : "ログインする"}
           </button>
@@ -172,7 +172,7 @@ export default function RecoverPage() {
           <button
             type="submit"
             disabled={isSending}
-            className="w-full cursor-pointer rounded-full bg-stone-800 py-3 text-sm font-bold text-white disabled:opacity-40"
+            className="w-full cursor-pointer rounded-full bg-beni py-3 text-sm font-bold text-white disabled:opacity-40"
           >
             {isSending ? "確認中..." : "3つのコードで申請する"}
           </button>

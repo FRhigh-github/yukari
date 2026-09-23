@@ -23,7 +23,7 @@ export default function StartPage() {
         {/* 誘われて来た人のほうが多いはずなので、こちらを上に置きます */}
         <Link
           href="/communities/join?from=start"
-          className="block rounded-full bg-stone-800 py-3.5 text-center text-sm font-bold text-white"
+          className="block rounded-full bg-beni py-3.5 text-center text-sm font-bold text-white"
         >
           招待コードで参加する
         </Link>

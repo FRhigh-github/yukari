@@ -11,8 +11,7 @@ import CardBackgroundPicker from "@/components/CardBackgroundPicker";
 export default function CardsPage() {
   return (
     <main className="p-5 pb-24">
-      <h1 className="text-xl font-bold text-stone-800">メッセージカード</h1>
-      <p className="mb-3 mt-1 text-xs text-stone-500">背景をえらんでください</p>
+      <h1 className="mb-3 text-xl font-bold text-stone-800">メッセージカード</h1>
 
       <CardBackgroundPicker />
     </main>

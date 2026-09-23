@@ -76,7 +76,7 @@ function ToolButton({ label, isActive, onClick, children }: ToolButtonProps) {
       aria-pressed={isActive}
       // h-11 w-11 = 44px。iOS の「押せるものは44px以上」に合わせています
       className={`flex h-11 w-11 items-center justify-center rounded-full shadow-md ${
-        isActive ? "bg-stone-800 text-white" : "bg-white text-stone-600"
+        isActive ? "bg-white font-bold text-kin ring-1 ring-kin" : "bg-white text-stone-600"
       }`}
     >
       <svg
@@ -404,7 +404,7 @@ export default function DrawingPad({
             type="button"
             onClick={handleSend}
             disabled={!hasDrawn || isSending}
-            className="rounded-full bg-stone-800 px-4 py-2 text-xs font-bold text-white disabled:opacity-30"
+            className="rounded-full bg-beni px-4 py-2 text-xs font-bold text-white disabled:opacity-30"
           >
             {isSending ? "送信中..." : "送信"}
           </button>

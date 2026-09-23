@@ -32,8 +32,8 @@ export default function NotificationToggle({ hasNews }: NotificationToggleProps)
     >
       <svg
         viewBox="0 0 24 24"
-        width="24"
-        height="24"
+        width="30"
+        height="30"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
@@ -50,7 +50,7 @@ export default function NotificationToggle({ hasNews }: NotificationToggleProps)
 
       {/* 報告がある日は、鐘の右上に紅い点。オフのときは出しません */}
       {isOn && hasNews ? (
-        <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-beni" />
+        <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-beni" />
       ) : null}
     </button>
   );

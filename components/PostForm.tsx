@@ -101,12 +101,12 @@ export default function PostForm({ communities }: PostFormProps) {
 
   return (
     // 色はホームにそろえています（生成りの背景・金のふち・紅は「ご報告」ボタンだけ）
-    // pb = 下タブ（浮いている分も入れて約110px）に「ご報告」ボタンが隠れないための余白
+    // pb = iPhone の下の横棒のぶんの余白（この画面には下タブを出していません）
     //
     // ▼ 画面の高さぴったりに収めて、スクロールしないようにしています。
     //   h-full + flex-col で縦に並べ、写真の欄だけが「残りの高さ」を使います（flex-1）。
     //   前は写真を選ぶと欄が横幅から決まる大きさになり、画面からはみ出してスクロールできていました。
-    <div className="h-full overflow-hidden bg-[#faf9f6] px-4 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] pt-4">
+    <div className="h-full overflow-hidden bg-[#faf9f6] px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
       <form onSubmit={handleSubmit} className="flex h-full flex-col gap-3">
         {/* コミュニティ選択 */}
         <div className="relative shrink-0">

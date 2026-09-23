@@ -32,8 +32,9 @@ export default function ReactionCardSheet({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const swipeStartRef = useRef<number | null>(null);
-  // カードの枠。「カードより下を押したか」を調べるのに使います
+  // カードの枠とつまみ。「それ以外の所を押したか」を調べるのに使います
   const cardRef = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLDivElement>(null);
 
   const [hasDrawn, setHasDrawn] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -156,9 +157,20 @@ export default function ReactionCardSheet({
         const dy = event.clientY - start;
         if (dy < -SWIPE) handleSend();
         if (dy > SWIPE) onClose();
-        // ほとんど動かさずに、カードより下を押したら閉じます
-        const cardBottom = cardRef.current?.getBoundingClientRect().bottom ?? Infinity;
-        if (Math.abs(dy) < 10 && event.clientY > cardBottom) onClose();
+        // ▼ ほとんど動かさずに、カードとつまみ以外の所を押したら閉じます（上でも下でも）
+        const isInside = (box: DOMRect | undefined) =>
+          box !== undefined &&
+          event.clientX >= box.left &&
+          event.clientX <= box.right &&
+          event.clientY >= box.top &&
+          event.clientY <= box.bottom;
+        if (
+          Math.abs(dy) < 10 &&
+          !isInside(cardRef.current?.getBoundingClientRect()) &&
+          !isInside(handleRef.current?.getBoundingClientRect())
+        ) {
+          onClose();
+        }
       }}
     >
       <div
@@ -168,7 +180,7 @@ export default function ReactionCardSheet({
       >
         {/* ▼ つまみ。ここを上に引くと送れます。
             カードの中は「書く」場所なので、スワイプはここ（とカードの外）で受け取ります */}
-        <div className="mx-auto mb-2 flex h-16 max-w-[40vh] flex-col items-center justify-center gap-1 rounded-2xl bg-white/70 text-kin ring-1 ring-kin/40 backdrop-blur">
+        <div ref={handleRef} className="mx-auto mb-2 flex h-16 max-w-[58vh] flex-col items-center justify-center gap-1 rounded-2xl bg-white/70 text-kin ring-1 ring-kin/40 backdrop-blur">
           {/* 言葉は出さず、上向きの印だけにしています。送っている間だけ文字を出します */}
           {isSending ? (
             <span className="text-sm font-bold">送っています…</span>
@@ -178,8 +190,26 @@ export default function ReactionCardSheet({
         </div>
 
         {/* ▼ カード。ご祝儀袋と同じく、白い台紙に金のふちです */}
-        {/* max-w-[40vh] = 背の低い画面でも、カードが下にはみ出さないようにします */}
-        <div ref={cardRef} className="mx-auto max-w-[40vh] rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-kin">
+        {/* 画面の横幅いっぱいまで大きくして、書きやすくしています。
+            max-w-[58vh] = 背の低い画面でも、カードが下にはみ出さないようにします */}
+        <div ref={cardRef} className="relative mx-auto max-w-[58vh] rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-kin">
+          {/* ▼ ペンの印。ここに手書きできる、と言葉なしで伝えます。
+              書き始めたら、じゃまにならないように消します */}
+          {hasDrawn ? null : (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className="pointer-events-none absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 text-kin/50"
+            >
+              <path d="M4 20h4L19 9l-4-4L4 16z" />
+              <path d="M14 6l4 4" />
+            </svg>
+          )}
           <canvas
             ref={canvasRef}
             // このカードの中の動きは「書く」なので、外側のスワイプに伝えません

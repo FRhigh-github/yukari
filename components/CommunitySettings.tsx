@@ -31,21 +31,16 @@ export default function CommunitySettings({
 
     const supabase = createClient();
 
-    // ▼ 最後の .select() が大事です。
-    // RLS に止められても、Supabase は「エラー」ではなく
-    // 「0件変更しました」として返してきます。
-    // .select() を付けると、実際に変わった行が返ってくるので、
-    // 中身が空かどうかで成否を判定できます。
-    const { data: updated, error } = await supabase
-      .from("communities")
-      .update({ name })
-      .eq("id", communityId)
-      .select("id");
+    // ▼ 名前は、メンバーなら誰でも変えられます。
+    //   表を直接書き換えるのは作成者しかできないので、
+    //   名前だけを変える DB の関数（supabase/04_security.sql の rename_community）を呼びます
+    const { error } = await supabase.rpc("rename_community", {
+      target_community: communityId,
+      new_name: name,
+    });
 
-    if (error || updated?.length === 0) {
-      setMessage(
-        "変更できませんでした。supabase/policies_communities.sql をまだ流していないかもしれません",
-      );
+    if (error) {
+      setMessage("変更できませんでした");
       return;
     }
 
@@ -88,26 +83,25 @@ export default function CommunitySettings({
 
   return (
     <div className="space-y-6">
-      {isOwner ? (
-        <section>
-          <h2 className="mb-2 text-sm font-bold text-kin">名前を変える</h2>
-          <form onSubmit={handleRename} className="flex gap-2">
-            <input
-              required
-              maxLength={40}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="h-11 flex-1 rounded-xl border border-kin/30 bg-white px-4 text-[17px] focus:border-kin focus:outline-none"
-            />
-            <button
-              type="submit"
-              className="h-11 shrink-0 rounded-xl border border-kin bg-white px-4 text-sm font-bold text-kin"
-            >
-              保存
-            </button>
-          </form>
-        </section>
-      ) : null}
+      {/* 名前の変更は、メンバーなら誰でもできます */}
+      <section>
+        <h2 className="mb-2 text-sm font-bold text-kin">名前を変える</h2>
+        <form onSubmit={handleRename} className="flex gap-2">
+          <input
+            required
+            maxLength={40}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="h-11 flex-1 rounded-xl border border-kin/30 bg-white px-4 text-[17px] focus:border-kin focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="h-11 shrink-0 rounded-xl border border-kin bg-white px-4 text-sm font-bold text-kin"
+          >
+            保存
+          </button>
+        </form>
+      </section>
 
       <section>
         {isConfirming ? (

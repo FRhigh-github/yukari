@@ -28,9 +28,6 @@ export default async function JoinCommunityPage({
         <h1 className="mt-2 text-xl font-bold text-stone-800">
           招待コードで参加する
         </h1>
-        <p className="mt-2 text-xs text-stone-400">
-          作った人からもらった6文字を入れてください。
-        </p>
       </div>
 
       <CommunityJoinForm isFirstTime={isFirstTime} />

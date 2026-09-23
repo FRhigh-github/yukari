@@ -5,18 +5,12 @@ import { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-// 下タブを出さない画面。ここに URL を足せば、その画面ではタブが消えます。
-// /cards/new は下に道具の棚があるので、重ねると送信ボタンが隠れます。
-// 作っている最中の画面なので、/draw と同じくタブは出しません。
-const HIDE_NAV = [
-  "/login",
-  "/signup",
-  "/setup",
-  "/start",
-  "/recover",
-  "/draw",
-  "/cards/new",
-];
+// ▼ 下タブを出す画面。ここに書いた画面だけに出します。
+//   前は「出さない画面」を1つずつ足していく形で、戻るボタンのある画面（設定・手紙・日程調整など）にも
+//   要らない下タブが付いてきていました。
+//   タブの4つの行き先だけに出して、そこから入った先の画面では出しません
+//   （戻るボタンで帰る画面なので、タブがあると行き先が2通りになって迷うためです）。
+const SHOW_NAV = ["/", "/cards", "/letter", "/profile"];
 
 // アイコンは形（svg の中身）だけを持たせています。
 // 4つとも同じ大きさ・同じ線の太さなので、囲いの部分は下で1回だけ書きます。
@@ -137,11 +131,7 @@ export default function BottomNav() {
 
   // null を返すと何も表示されません
   if (isTyping) return null;
-  if (HIDE_NAV.includes(pathname)) return null;
-  // ご報告のストーリー画面（/members/xxx）も、画面いっぱいに使うので出しません。
-  // id が人ごとに違うので、上の一覧ではなく「形」で見分けます。
-  // /members/xxx/profile は2段深いので、ここには当てはまりません
-  if (/^\/members\/[^/]+$/.test(pathname)) return null;
+  if (!SHOW_NAV.includes(pathname)) return null;
 
   return (
     // 外側の枠。ここで画面の端からの距離を作ります。

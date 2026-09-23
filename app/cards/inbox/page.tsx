@@ -65,7 +65,7 @@ export default async function CardInboxPage({
 
   return (
     // 色はホームにそろえています（生成りの背景・金のふち・紅は「カードを作る」だけ）
-    <main className="relative min-h-full bg-[#faf9f6] px-4 pb-[calc(env(safe-area-inset-bottom)+8rem)] pt-4">
+    <main className="relative min-h-full bg-[#faf9f6] px-4 pb-[calc(env(safe-area-inset-bottom)+5rem)] pt-4">
       <Link href="/" className="text-sm text-stone-500">
         ← 戻る
       </Link>
@@ -109,10 +109,10 @@ export default async function CardInboxPage({
         </ul>
       )}
 
-      {/* 下タブ（約110px）より上に浮かせて出します */}
+      {/* 右下に浮かせて出します（この画面には下タブが無いので、下の端の近くに置けます） */}
       <Link
         href="/cards"
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+8rem)] left-1/2 ml-[6rem] flex h-11 -translate-x-1/2 items-center rounded-full bg-beni px-5 text-sm font-bold text-white ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6]"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] left-1/2 ml-[6rem] flex h-11 -translate-x-1/2 items-center rounded-full bg-beni px-5 text-sm font-bold text-white ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6]"
       >
         カードを作る
       </Link>

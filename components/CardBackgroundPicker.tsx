@@ -70,7 +70,7 @@ function KindChip({ label, isActive, onClick }: KindChipProps) {
       type="button"
       onClick={onClick}
       className={`shrink-0 cursor-pointer rounded-full px-4 py-2 text-xs ${
-        isActive ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-600"
+        isActive ? "bg-white font-bold text-kin ring-1 ring-kin" : "bg-stone-100 text-stone-600"
       }`}
     >
       {label}

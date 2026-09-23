@@ -4,12 +4,17 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
-import { renderCardToBlob, type CardItem } from "@/lib/cardCanvas";
+import {
+  renderCardToBlob,
+  FONT_RATIO,
+  ITEM_PADDING_RATIO,
+  type CardItem,
+} from "@/lib/cardCanvas";
+import { TEXT_COLORS } from "@/lib/cardBackground";
 import CardTemplate, {
   CARD_KINDS,
   type CardKind,
 } from "@/components/CardTemplate";
-import HorizontalScroller from "@/components/HorizontalScroller";
 
 export type Recipient = {
   userId: string;
@@ -23,7 +28,6 @@ type CardComposerProps = {
   initialKind: CardKind;
 };
 
-type Tab = "background" | "text" | "image";
 
 export default function CardComposer({ initialKind }: CardComposerProps) {
   const router = useRouter();
@@ -34,9 +38,12 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
   const draggingRef = useRef<string | null>(null);
 
   const [kind, setKind] = useState<CardKind>(initialKind);
-  const [items, setItems] = useState<CardItem[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("background");
+  // ▼ 最初から、文字の枠を1つ置いておきます（中身は空。薄く「ここに文字」と出ます）。
+  //   開いてすぐ書き始められるように、選んだ状態から始めます
+  const [items, setItems] = useState<CardItem[]>([
+    { id: "first-text", type: "text", x: 0.1, y: 0.12, width: 0.8, text: "" },
+  ]);
+  const [selectedId, setSelectedId] = useState<string | null>("first-text");
 
   // ▼ 送る相手は、この画面を開いた時点では取りに行きません。
   //   選ぶのは最後なので、先に取ると、絵を描き始めるまで待たされます。
@@ -97,10 +104,9 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
     const id = crypto.randomUUID();
     setItems((current) => [
       ...current,
-      { id, type: "text", x: 0.1, y: 0.1, width: 0.6, text: "ここに文字" },
+      { id, type: "text", x: 0.1, y: 0.4, width: 0.6, text: "" },
     ]);
     setSelectedId(id);
-    setTab("text");
   };
 
   const addImage = async (file: File) => {
@@ -218,12 +224,14 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       // ▼ card_sends.template_id は、DB側でまだ card_templates と結ばれています。
       //   画面では使わなくなったので、送るときだけ種類から1件引いてきます。
       //   （画面を開くときに引かないので、待ち時間には影響しません）
-      const { data: template } = await supabase
+      //   あとから足した背景（結婚祝いなど）は card_templates に行が無いので、
+      //   そのときは「その他（custom）」の行を代わりに使います
+      const { data: templates } = await supabase
         .from("card_templates")
-        .select("id")
-        .eq("kind", background.kind)
-        .limit(1)
-        .maybeSingle();
+        .select("id, kind")
+        .in("kind", [background.kind, "custom"]);
+      const template =
+        templates?.find((item) => item.kind === background.kind) ?? templates?.[0];
 
       // ▼ drawing_data には、置いたものの一覧を残します。
       //   後から作り直せるようにするためです。
@@ -257,244 +265,238 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
     }
   };
 
+  // ▼ 背景を、カードの上で左右にスライドして切り替えます。
+  //   カードの何もない所（背景）に触れて、横に大きく動かしたときだけ切り替えます
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const kindIndex = CARD_KINDS.findIndex((item) => item.kind === kind);
+  const changeKind = (step: number) => {
+    // % で端から端へぐるっと回ります（最後の次は最初）
+    const next = (kindIndex + step + CARD_KINDS.length) % CARD_KINDS.length;
+    setKind(CARD_KINDS[next].kind);
+  };
+
+  // 文字や写真の大きさ・位置は、カードの幅に対する割合で決めます（lib/cardCanvas.ts と同じ）。
+  // cqw = 「カードの横幅の1%」。カードに @container を付けているので使えます
+  const fontSize = `${FONT_RATIO * 100}cqw`;
+  const itemPadding = `${ITEM_PADDING_RATIO * 100}cqw`;
+
   return (
-    <div className="flex h-full flex-col">
-      {/* ▼ 上半分：カード。ここに置いたものが、そのまま送られます */}
-      <div className="flex flex-1 items-center justify-center overflow-hidden bg-stone-100 p-4">
+    <div className="flex h-full flex-col bg-[#faf9f6]">
+      {/* ▼ 上：カード。ここに置いたものが、そのまま送られます */}
+      <div className="flex min-h-0 flex-1 items-center justify-center p-4 pb-2">
         <div
           ref={cardRef}
+          onPointerDown={(event) => {
+            // 置いたものの上ではなく、背景に触れたときだけ
+            if (event.target !== event.currentTarget && !(event.target instanceof HTMLElement && event.target.dataset.cardBackground)) return;
+            swipeStartRef.current = { x: event.clientX, y: event.clientY };
+          }}
           onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
+          onPointerUp={(event) => {
+            handlePointerUp();
+            const start = swipeStartRef.current;
+            swipeStartRef.current = null;
+            if (start === null) return;
+            const dx = event.clientX - start.x;
+            const dy = event.clientY - start.y;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+              // 左へスライド → 次の背景、右へ → 前の背景
+              changeKind(dx < 0 ? 1 : -1);
+            } else if (Math.abs(dx) < 8 && Math.abs(dy) < 8) {
+              // 背景を軽く押したら、選んでいたものを外します
+              setSelectedId(null);
+            }
+          }}
+          // @container = 中の文字を「カードの幅の何%」で決められるようにする指定
           // touch-none = 指で動かしている間、画面がスクロールしないようにする
-          className="relative aspect-[2/3] h-full max-h-full touch-none overflow-hidden rounded-xl shadow-lg"
+          className="@container relative aspect-[2/3] h-full max-h-full max-w-full touch-none overflow-hidden rounded-xl shadow-lg ring-1 ring-kin/40"
         >
-          <CardTemplate
-            kind={background.kind}
-            name={background.label}
-            plain
-            className="absolute inset-0 h-full w-full"
-          />
+          <div data-card-background="1" className="absolute inset-0">
+            <CardTemplate
+              kind={background.kind}
+              name={background.label}
+              plain
+              className="pointer-events-none h-full w-full"
+            />
+          </div>
 
-          {items.map((item) => (
-            <div
-              key={item.id}
-              onPointerDown={handlePointerDown(item.id)}
-              className={`absolute cursor-move ${
-                item.id === selectedId ? "ring-2 ring-orange-400" : ""
-              }`}
-              style={{
-                left: `${item.x * 100}%`,
-                top: `${item.y * 100}%`,
-                width: `${item.width * 100}%`,
-              }}
+          {items.map((item) => {
+            const isSelected = item.id === selectedId;
+            return (
+              <div
+                key={item.id}
+                onPointerDown={(event) => {
+                  // 選んでいる文字の入力欄を押したときは、動かさずに文字を打てるようにします
+                  if (isSelected && event.target instanceof HTMLTextAreaElement) return;
+                  handlePointerDown(item.id)(event);
+                }}
+                className={`absolute cursor-move rounded ${
+                  item.type === "text"
+                    ? // 文字の枠は、いつも薄い点線で見せます（ここに文字が書ける、と分かるように）
+                      isSelected
+                      ? "outline-dashed outline-2 outline-kin"
+                      : "outline-dashed outline-1 outline-stone-400/60"
+                    : isSelected
+                      ? "outline outline-2 outline-kin"
+                      : ""
+                }`}
+                style={{
+                  left: `${item.x * 100}%`,
+                  top: `${item.y * 100}%`,
+                  width: `${item.width * 100}%`,
+                  padding: itemPadding,
+                }}
+              >
+                {item.type === "text" ? (
+                  // ▼ カードの上で、そのまま文字を打ちます。
+                  //   前は下の欄で打っていたので、キーボードが出るとカードが隠れていました。
+                  //   選んでいないときは readOnly にして、1回目に触れたときは動かせるようにします
+                  <textarea
+                    value={item.text}
+                    readOnly={!isSelected}
+                    placeholder="ここに文字"
+                    rows={Math.max(1, item.text.split("\n").length)}
+                    onChange={(event) =>
+                      setItems((current) =>
+                        current.map((it) =>
+                          it.id === item.id ? { ...it, text: event.target.value } : it,
+                        ),
+                      )
+                    }
+                    className="block w-full resize-none overflow-hidden bg-transparent font-bold leading-[1.5] outline-none placeholder:text-current placeholder:opacity-40"
+                    style={{ fontSize, color: TEXT_COLORS[background.kind] }}
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={item.src} alt="" className="block w-full" draggable={false} />
+                )}
+              </div>
+            );
+          })}
+
+          {/* ▼ 右上：文字・写真を置くボタン。未来への手紙（/letter）と同じ形です */}
+          <div className="absolute right-1 top-1 z-10 flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={addText}
+              aria-label="文字を置く"
+              className="flex h-11 w-11 items-center justify-center active:scale-90"
             >
-              {item.type === "text" ? (
-                // whitespace-pre-wrap = 改行をそのまま表示する
-                <p className="whitespace-pre-wrap break-words text-sm font-bold leading-snug">
-                  {item.text}
-                </p>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={item.src}
-                  alt=""
-                  className="w-full"
-                  draggable={false}
-                />
-              )}
-            </div>
-          ))}
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-kin shadow-sm ring-1 ring-kin/60">
+                <span className="font-serif text-xl font-bold">T</span>
+              </span>
+            </button>
+            <label
+              aria-label="写真を置く"
+              className="flex h-11 w-11 cursor-pointer items-center justify-center active:scale-90"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-kin shadow-sm ring-1 ring-kin/60">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5-8 8" /></svg>
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) addImage(file);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          </div>
         </div>
       </div>
 
-      {/* ▼ 下半分：道具 */}
-      <div className="shrink-0 border-t border-stone-200 bg-white">
-        {/* 下線つきのタブ。選んでいるものだけ金の線と文字になります */}
-        <div className="flex border-b border-kin/30">
-          <TabButton
-            label="背景"
-            isActive={tab === "background"}
-            onClick={() => setTab("background")}
-          />
-          <TabButton
-            label="テキスト"
-            isActive={tab === "text"}
-            onClick={() => setTab("text")}
-          />
-          <TabButton
-            label="画像"
-            isActive={tab === "image"}
-            onClick={() => setTab("image")}
-          />
-        </div>
-
-        <div className="space-y-3 p-4">
-          {/* ▼ タブの中身の高さを固定します。
-              中身の量がタブごとに違うので、固定しないと
-              切り替えるたびに下の道具ぜんたいの高さが変わって、カードが上下に動いてしまいます。
-              いちばん背の高い「テキスト」（ボタン＋入力欄）に合わせています */}
-          <div className="min-h-[7.5rem]">
-            {tab === "background" ? (
-              <HorizontalScroller>
-                {CARD_KINDS.map((item) => (
-                  <button
-                    key={item.kind}
-                    type="button"
-                    onClick={() => setKind(item.kind)}
-                    className={`shrink-0 cursor-pointer rounded-lg ${
-                      item.kind === kind ? "ring-2 ring-orange-400" : ""
-                    }`}
-                  >
-                    <CardTemplate
-                      kind={item.kind}
-                      name={item.label}
-                      className="h-16 w-12"
-                      plain
-                    />
-                  </button>
-                ))}
-              </HorizontalScroller>
-            ) : null}
-
-            {tab === "text" ? (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={addText}
-                  className="w-full rounded-xl border border-stone-200 py-2.5 text-sm text-stone-700"
-                >
-                  ＋ 文字を置く
-                </button>
-
-                {selected?.type === "text" ? (
-                  <textarea
-                    value={selected.text}
-                    onChange={(event) =>
-                      updateSelected({ text: event.target.value })
-                    }
-                    className="h-16 w-full resize-none rounded-xl border border-stone-200 p-3 text-sm focus:outline-none"
-                  />
-                ) : (
-                  <p className="text-xs text-stone-400">
-                    カードの上の文字を押すと、ここで書き換えられます。
-                  </p>
-                )}
-              </div>
-            ) : null}
-
-            {tab === "image" ? (
-              <label className="block w-full rounded-xl border border-stone-200 py-2.5 text-center text-sm text-stone-700">
-                ＋ 写真を置く
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) addImage(file);
-                  }}
-                />
-              </label>
-            ) : null}
-          </div>
-
-          {/* 選んでいるものの大きさ変更と削除 */}
+      {/* ▼ 下：道具。高さを固定して、選んだり外したりしてもカードが上下に動かないようにします */}
+      <div className="shrink-0 space-y-2 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+        <div className="flex h-11 items-center gap-3">
           {selected ? (
-            <div className="flex items-center gap-3">
+            <>
+              {/* 大きさ（横幅）のつまみ */}
               <input
                 type="range"
-                min={10}
-                max={90}
+                min={15}
+                max={95}
                 value={Math.round(selected.width * 100)}
                 onChange={(event) =>
                   updateSelected({ width: Number(event.target.value) / 100 })
                 }
-                className="flex-1"
+                aria-label="大きさ"
+                className="flex-1 accent-[#c2a14d]"
               />
               <button
                 type="button"
                 onClick={removeSelected}
-                className="text-xs text-red-600"
+                aria-label="消す"
+                className="flex h-11 w-11 items-center justify-center text-beni"
               >
-                削除
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 13h10l1-13" /><path d="M9 7V4h6v3" /></svg>
               </button>
-            </div>
-          ) : null}
-
-          {/* ▼ 相手えらびは、押してから出します。
-              まだ押していない間は、DBに聞きに行きません。 */}
-          {isPicking ? (
-            <div className="space-y-2">
-              {recipients === null ? (
-                <p className="py-3 text-center text-xs text-stone-400">
-                  相手をさがしています…
-                </p>
-              ) : (
-                <select
-                  value={target}
-                  onChange={(event) => setTarget(event.target.value)}
-                  className="w-full cursor-pointer rounded-xl border border-stone-200 px-4 py-3 text-sm text-stone-700 focus:outline-none"
-                >
-                  {recipients.length === 0 ? (
-                    <option value="">送れる相手がいません</option>
-                  ) : null}
-                  {recipients.map((recipient) => (
-                    <option
-                      key={`${recipient.userId}|${recipient.communityId}`}
-                      value={`${recipient.userId}|${recipient.communityId}`}
-                    >
-                      {recipient.displayName ?? "名無し"}（
-                      {recipient.communityName}）
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={isSending || recipients === null || target === ""}
-                className="w-full cursor-pointer rounded-full bg-stone-800 py-3 text-sm font-bold text-white disabled:opacity-40"
-              >
-                {isSending ? "送信中..." : "この人に送る"}
-              </button>
-            </div>
+            </>
           ) : (
+            // 何も選んでいないときは、いまの背景の名前と、何枚目かの点を出します
+            <div className="flex w-full items-center justify-center gap-3">
+              <span className="text-sm font-bold text-kin">{background.label}</span>
+              <span className="flex gap-1.5">
+                {CARD_KINDS.map((item) => (
+                  <span
+                    key={item.kind}
+                    className={`h-1.5 w-1.5 rounded-full ${item.kind === kind ? "bg-kin" : "bg-stone-300"}`}
+                  />
+                ))}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* ▼ 相手えらびは、押してから出します。
+            まだ押していない間は、DBに聞きに行きません。 */}
+        {isPicking ? (
+          <div className="space-y-2">
+            {recipients === null ? (
+              <p className="py-3 text-center text-sm text-stone-400">…</p>
+            ) : (
+              <select
+                value={target}
+                onChange={(event) => setTarget(event.target.value)}
+                className="h-12 w-full cursor-pointer rounded-xl border border-kin/40 bg-white px-4 text-base text-stone-700 focus:outline-none"
+              >
+                {recipients.length === 0 ? (
+                  <option value="">送れる相手がいません</option>
+                ) : null}
+                {recipients.map((recipient) => (
+                  <option
+                    key={`${recipient.userId}|${recipient.communityId}`}
+                    value={`${recipient.userId}|${recipient.communityId}`}
+                  >
+                    {recipient.displayName ?? "名無し"}（{recipient.communityName}）
+                  </option>
+                ))}
+              </select>
+            )}
+
             <button
               type="button"
-              onClick={openPicker}
-              className="w-full cursor-pointer rounded-full bg-stone-800 py-3 text-sm font-bold text-white"
+              onClick={handleSend}
+              disabled={isSending || recipients === null || target === ""}
+              className="h-12 w-full cursor-pointer rounded-full bg-beni text-base font-bold text-white ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6] disabled:opacity-40"
             >
-              カードを送る
+              {isSending ? "送信中..." : "この人に送る"}
             </button>
-          )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={openPicker}
+            className="h-12 w-full cursor-pointer rounded-full bg-beni text-base font-bold text-white ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6]"
+          >
+            カードを送る
+          </button>
+        )}
 
-          {error ? <p className="text-xs text-red-600">{error}</p> : null}
-        </div>
+        {error ? <p className="text-sm text-beni">{error}</p> : null}
       </div>
     </div>
-  );
-}
-
-type TabButtonProps = {
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-};
-
-function TabButton({ label, isActive, onClick }: TabButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      // 下線は選んでいないときも透明で引いておきます。
-      // 選んだときだけ線を足すと、その2px ぶんタブの高さが変わってしまうためです。
-      // h-11 = 44px。押せる範囲を iOS の基準に合わせています
-      className={`-mb-px h-11 flex-1 cursor-pointer border-b-2 text-sm font-bold ${
-        isActive ? "border-kin text-kin" : "border-transparent text-stone-400"
-      }`}
-    >
-      {label}
-    </button>
   );
 }

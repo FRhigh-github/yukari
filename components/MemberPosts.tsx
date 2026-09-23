@@ -27,6 +27,11 @@ type MemberPostsProps = {
   isMine: boolean;
   // 最初からストーリーで開いておくご報告の id（プロフィールの一覧から来たとき）。無ければ null
   openPostId: string | null;
+  // 「戻る」を押したときの行き先。ホームから来たときは "/"
+  backHref: string;
+  // true = 一覧を挟まずに、最新のご報告からストーリーで開く（ホームから来たとき）。
+  // このときはストーリーを閉じると、一覧ではなく来た画面（ホーム）へ戻ります
+  startInStory: boolean;
 };
 
 export default function MemberPosts({
@@ -36,11 +41,14 @@ export default function MemberPosts({
   posts,
   isMine,
   openPostId,
+  backHref,
+  startInStory,
 }: MemberPostsProps) {
   const router = useRouter();
   // ストーリーで開いているのが何枚目か。null なら一覧を見ている
   // プロフィールの一覧で押して来たときは、そのご報告を開いた状態から始めます
   const [openIndex, setOpenIndex] = useState<number | null>(() => {
+    if (startInStory && posts.length > 0) return 0;
     const index = posts.findIndex((post) => post.id === openPostId);
     return index === -1 ? null : index;
   });
@@ -59,9 +67,9 @@ export default function MemberPosts({
     timerRef.current = null;
   };
 
-  // ホームへ戻ります。refresh は、いま見たご報告が光らなくなるように、ホームを取り直すためです
-  const goHome = () => {
-    router.push("/");
+  // 来た画面へ戻ります。refresh は、いま見たご報告がホームで光らなくなるように、取り直すためです
+  const goBack = () => {
+    router.push(backHref);
     router.refresh();
   };
 
@@ -94,8 +102,8 @@ export default function MemberPosts({
       <header className="sticky top-0 z-10 flex items-center gap-1 border-b border-kin/30 bg-[#faf9f6]/90 px-2 py-1 backdrop-blur">
         <button
           type="button"
-          onClick={goHome}
-          aria-label="ホームへ戻る"
+          onClick={goBack}
+          aria-label="戻る"
           className="flex h-11 w-11 cursor-pointer items-center justify-center text-stone-700"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-7 w-7"><path d="M15 5l-7 7 7 7" /></svg>
@@ -179,7 +187,8 @@ export default function MemberPosts({
           avatarUrl={avatarUrl}
           posts={posts}
           initialIndex={openIndex}
-          onClose={() => setOpenIndex(null)}
+          // ホームから直接開いたときは、閉じたらホームへ。一覧から開いたときは一覧へ戻ります
+          onClose={() => (startInStory ? goBack() : setOpenIndex(null))}
         />
       ) : null}
 

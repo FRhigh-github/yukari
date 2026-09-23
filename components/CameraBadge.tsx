@@ -5,7 +5,7 @@
 
 export default function CameraBadge() {
   return (
-    <span className="absolute -bottom-0.5 -right-0.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-stone-700">
+    <span className="absolute -bottom-0.5 -right-0.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-kin">
       <svg
         viewBox="0 0 24 24"
         width="15"
