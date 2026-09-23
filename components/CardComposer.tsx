@@ -202,10 +202,14 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       // 画面に置いたものを、1枚の画像にします
       const blob = await renderCardToBlob(background.kind, items);
 
-      const path = `${crypto.randomUUID()}.jpg`;
+      // 置き場所は「自分の id / でたらめな id.jpg」。
+      // 自分の id のフォルダにしか置けない決まりにしているためです（supabase/04_security.sql）
+      const path = `${data.user.id}/${crypto.randomUUID()}.jpg`;
       const upload = await supabase.storage
         .from("cards")
-        .upload(path, blob, { contentType: "image/jpeg" });
+        // cacheControl = ブラウザに「この写真は1年間そのまま使い回してよい」と伝えます。
+        // ファイル名は毎回ちがう id なので、同じ名前の中身が変わることはありません
+        .upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
 
       if (upload.error) throw new Error(upload.error.message);
 

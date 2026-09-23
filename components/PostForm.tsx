@@ -16,6 +16,10 @@ export default function PostForm({ communities }: PostFormProps) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  // 選んだ写真を表示するためのURL。選んだときに1回だけ作ります。
+  // 前は描き直すたびに URL.createObjectURL を呼んでいたので、
+  // タイトルを1文字打つごとに新しいURLができて、写真を読み直していました
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   // 最初から1つ目を選んだ状態にしておきます
@@ -40,8 +44,12 @@ export default function PostForm({ communities }: PostFormProps) {
     setIsSending(true);
 
     const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
+    // getClaims() = ログインの証明書の署名を、この場で確かめる命令。
+    // getUser() と違って Supabase まで聞きに行かないので、送るまでの待ちが1回ぶん減ります
+    //（詳しくは lib/supabase/server.ts の getCurrentUserId）
+    const { data } = await supabase.auth.getClaims();
+    const userId = data?.claims.sub;
+    if (!userId) {
       router.push("/login");
       return;
     }
@@ -56,8 +64,14 @@ export default function PostForm({ communities }: PostFormProps) {
 
     const upload = await supabase.storage
       .from("posts")
-      .upload(`${crypto.randomUUID()}.jpg`, shrunk, {
+      // 置き場所は「自分の id / でたらめな id.jpg」。
+      // 置き場所の決まり（supabase/04_security.sql）で、
+      // 自分の id のフォルダにしか写真を置けないようにしているためです
+      .upload(`${userId}/${crypto.randomUUID()}.jpg`, shrunk, {
         contentType: "image/jpeg",
+        // cacheControl = ブラウザに「この写真は1年間そのまま使い回してよい」と伝えます。
+        // ファイル名は毎回ちがう id なので、同じ名前の中身が変わることはありません
+        cacheControl: "31536000",
       });
 
     if (upload.error) {
@@ -70,7 +84,7 @@ export default function PostForm({ communities }: PostFormProps) {
       title,
       body,
       image_url: upload.data.path,
-      author_id: data.user.id,
+      author_id: userId,
       community_id: communityId,
     });
 
@@ -88,10 +102,14 @@ export default function PostForm({ communities }: PostFormProps) {
   return (
     // 色はホームにそろえています（生成りの背景・金のふち・紅は「ご報告」ボタンだけ）
     // pb = 下タブ（浮いている分も入れて約110px）に「ご報告」ボタンが隠れないための余白
-    <div className="min-h-full bg-[#faf9f6] px-4 pb-[calc(env(safe-area-inset-bottom)+8rem)] pt-4">
-      <form onSubmit={handleSubmit} className="space-y-3">
+    //
+    // ▼ 画面の高さぴったりに収めて、スクロールしないようにしています。
+    //   h-full + flex-col で縦に並べ、写真の欄だけが「残りの高さ」を使います（flex-1）。
+    //   前は写真を選ぶと欄が横幅から決まる大きさになり、画面からはみ出してスクロールできていました。
+    <div className="h-full overflow-hidden bg-[#faf9f6] px-4 pb-[calc(env(safe-area-inset-bottom)+7.5rem)] pt-4">
+      <form onSubmit={handleSubmit} className="flex h-full flex-col gap-3">
         {/* コミュニティ選択 */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <select
             value={communityId}
             onChange={(event) => setCommunityId(event.target.value)}
@@ -101,7 +119,11 @@ export default function PostForm({ communities }: PostFormProps) {
               <option value="">参加しているコミュニティがありません</option>
             ) : null}
             {communities.map((community) => (
-              <option key={community.id} value={community.id} className="text-black">
+              <option
+                key={community.id}
+                value={community.id}
+                className="text-black"
+              >
                 {community.name}
               </option>
             ))}
@@ -115,53 +137,65 @@ export default function PostForm({ communities }: PostFormProps) {
         {/* ▼ 写真を選んだら、ここがそのまま「見え方のお試し（プレビュー）」になります。
               見る側のストーリー画面（StoryViewer）と同じ 9:16 の形・余白のぼかし・文字の重なり方です。
               押すと写真を選び直せます */}
-        <label
-          className={`relative mx-auto flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl ${
-            imageFile
-              ? "aspect-[9/16] w-2/3 bg-[#faf9f6] ring-1 ring-kin/60"
-              : "h-64 w-full border border-dashed border-kin/60 bg-white"
-          }`}
-        >
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
-          />
-          {imageFile ? (
-            <>
-              {/* 見る側と同じく、後ろにぼかした同じ写真を敷いて余白をなじませます */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={URL.createObjectURL(imageFile)}
-                alt=""
-                aria-hidden="true"
-                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-xl"
-              />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={URL.createObjectURL(imageFile)}
-                alt=""
-                className="absolute inset-0 h-full w-full object-contain"
-              />
-              {/* 下に白いもやをかけて、入力中のタイトルと本文を重ねて見せます */}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#faf9f6]/90 via-[#faf9f6]/50 to-transparent p-3 pt-12 text-left">
-                <p className="text-base font-bold text-stone-800">{title || "タイトル"}</p>
-                <p className="line-clamp-4 text-[10px] leading-relaxed text-stone-600">{body}</p>
-              </div>
-              <span className="absolute right-2 top-2 rounded-full bg-black/50 px-2 py-1 text-[10px] text-white">
-                押すと選び直せます
-              </span>
-            </>
-          ) : (
-            <div className="flex flex-col items-center gap-2 text-kin">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-kin text-2xl font-light">
+        {/* min-h-0 = flex の中で、中身より小さく縮めてよい、という指定。これが無いと縮まずにはみ出します */}
+        <div className="flex min-h-0 flex-1 justify-center">
+          <label
+            className={`relative flex h-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl ${
+              imageFile
+                ? // 高さを先に決めて、横幅は 9:16 になるように自動で決めます
+                  "aspect-[9/16] bg-[#faf9f6] ring-1 ring-kin/60"
+                : "w-full border border-dashed border-kin/60 bg-white"
+            }`}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                // 前に作ったURLは、もう使わないので片付けます（メモリを返す）
+                if (imageUrl) URL.revokeObjectURL(imageUrl);
+                setImageFile(file);
+                setImageUrl(file ? URL.createObjectURL(file) : null);
+              }}
+            />
+            {imageFile ? (
+              <>
+                {/* 見る側と同じく、後ろにぼかした同じ写真を敷いて余白をなじませます */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl ?? ""}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-xl"
+                />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl ?? ""}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-contain"
+                />
+                {/* 下に白いもやをかけて、入力中のタイトルと本文を重ねて見せます */}
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#faf9f6]/90 via-[#faf9f6]/50 to-transparent p-3 pt-12 text-left">
+                  <p className="text-base font-bold text-stone-800">
+                    {title || "タイトル"}
+                  </p>
+                  <p className="line-clamp-4 text-xs leading-relaxed text-stone-600">
+                    {body}
+                  </p>
+                </div>
+              </>
+            ) : (
+              // 言葉は出さず、大きな＋だけにしています（読み上げ用に aria-label を付けています）
+              <div
+                aria-label="写真を選ぶ"
+                className="flex h-16 w-16 items-center justify-center rounded-full border border-kin text-4xl font-light text-kin"
+              >
                 ＋
               </div>
-              <span className="text-sm text-stone-500">写真を選ぶ（必須）</span>
-            </div>
-          )}
-        </label>
+            )}
+          </label>
+        </div>
 
         <input
           type="text"
@@ -169,28 +203,32 @@ export default function PostForm({ communities }: PostFormProps) {
           placeholder="タイトルを入力"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          className="w-full rounded-xl border border-kin/30 bg-white px-4 py-3 text-[17px] font-bold text-stone-800 placeholder:font-normal placeholder:text-stone-400 focus:border-kin focus:outline-none"
+          className="w-full shrink-0 rounded-xl border border-kin/30 bg-white px-4 py-3 text-[17px] font-bold text-stone-800 placeholder:font-normal placeholder:text-stone-400 focus:border-kin focus:outline-none"
         />
 
         <textarea
           placeholder="本文を入力"
           value={body}
           onChange={(event) => setBody(event.target.value)}
-          className="h-32 w-full resize-none rounded-xl border border-kin/30 bg-white p-4 text-[17px] text-stone-700 placeholder:text-stone-400 focus:border-kin focus:outline-none"
+          className="h-24 w-full shrink-0 resize-none rounded-xl border border-kin/30 bg-white p-4 text-[17px] text-stone-700 placeholder:text-stone-400 focus:border-kin focus:outline-none"
         />
 
         {error ? (
           <p className="text-center text-xs text-beni">{error}</p>
         ) : null}
 
-        <div className="flex justify-end pt-2">
+        <div className="flex shrink-0 justify-end">
           <button
             type="submit"
             disabled={isSending}
             className="flex h-12 items-center gap-2 rounded-full bg-beni px-7 font-bold text-white ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6] disabled:opacity-40"
           >
             <span>{isSending ? "送信中..." : "ご報告"}</span>
-            <svg className="h-4 w-4 rotate-45" fill="currentColor" viewBox="0 0 20 20">
+            <svg
+              className="h-4 w-4 rotate-45"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
               <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
             </svg>
           </button>

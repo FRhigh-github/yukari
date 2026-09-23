@@ -33,7 +33,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   // currentId = 実際に見ているコミュニティ。
   // ?c= が無いときは、getHomeData が一番上を選んで返してくれます。
-  const { user, communities, members, currentId, recoveryRequests, todayCount } =
+  const { user, communities, members, currentId, recoveryRequests, todayCount, letterId } =
     await getHomeData(selectedId);
 
   // ▼ ログインしていない人は、ここで追い返します。
@@ -91,7 +91,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         // 余白（px / pb）は付けません。付けると、そこで模様が切れて見えるためです。
         // 下タブとボタンに重なるぶんは、MemberCircles の中で中心を上にずらして逃がしています。
         <div className="min-h-0 flex-1">
-          <MemberCircles members={members} currentUserId={user.id} />
+          <MemberCircles members={members} currentUserId={user.id} letterId={letterId} />
         </div>
       )}
 
@@ -110,6 +110,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {/* 左下：届いたカードを見る「ふみばこ」（文箱＝手紙を入れておく和の箱） */}
       <Link
         href="/cards/inbox"
+        // ふみばこも中身まで先に取っておいて、押した瞬間に開くようにします（本番のときだけ動きます）
+        prefetch={true}
         aria-label="ふみばこ（届いたカード）"
         className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-kin/60 bg-white shadow-md"
       >
@@ -134,6 +136,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {/* 右下：ご報告を書く */}
       <Link
         href="/post"
+        // 投稿画面も中身まで先に取っておいて、押した瞬間に開くようにします（本番のときだけ動きます）
+        prefetch={true}
         aria-label="報告する"
         className="absolute bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-beni text-white shadow-md ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6]"
       >

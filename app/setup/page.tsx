@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import SetupForm from "@/components/SetupForm";
 import KnotMark from "@/components/KnotMark";
 
@@ -18,9 +18,9 @@ export default async function SetupPage({
 
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 本人確認。通信なしで済みます（lib/supabase/server.ts の getCurrentUserId）
+  const userId = await getCurrentUserId(supabase);
+  const user = userId === null ? null : { id: userId };
 
   if (user === null) redirect("/login");
 

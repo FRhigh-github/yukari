@@ -40,6 +40,17 @@
   --color-beni: var(--mizuhiki-beni);
   --color-kin: var(--mizuhiki-kin);
   --color-gin: var(--mizuhiki-gin);
+
+  /* ▼ 文字の大きさを、アプリ全体で一段ずつ大きくしています。
+     Tailwind の最初の大きさ（text-xs = 12px, text-sm = 14px）は、
+     スマホで見ると「全体的に小さい」と感じる大きさでした。
+     ここで決め直すと、text-xs などを書いている所が全部そろって大きくなります。
+     見やすさを優先して、さらにもう一段上げました（iOS の「大きな文字」に近い大きさ）。 */
+  --text-xs: 0.875rem; /* 14px */
+  --text-sm: 1rem; /* 16px */
+  --text-base: 1.125rem; /* 18px */
+  --text-lg: 1.25rem; /* 20px */
+  --text-xl: 1.5rem; /* 24px */
 }
 
 /* ▼ ページ全体が動かないようにする

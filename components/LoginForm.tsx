@@ -83,7 +83,7 @@ export default function LoginForm({ initialMessage }: LoginFormProps) {
 
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-stone-200" />
-        <span className="text-[10px] text-stone-400">または</span>
+        <span className="text-xs text-stone-400">または</span>
         <span className="h-px flex-1 bg-stone-200" />
       </div>
 
@@ -118,7 +118,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-[10px] text-stone-500">{label}</span>
+      <span className="text-xs text-stone-500">{label}</span>
       <div className="border-b border-stone-200 py-1.5">{children}</div>
     </label>
   );

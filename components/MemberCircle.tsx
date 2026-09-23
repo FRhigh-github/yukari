@@ -62,6 +62,13 @@ export default function MemberCircle({
     <>
       <Link
         href={`/members/${member.id}`}
+        // ▼ ホームに出ている全員ぶん、ご報告の中身まで先に取っておきます。
+        //   ふつうは画面の「枠」しか先読みしないので、押してから DB に聞きに行く間、
+        //   待ち画面が見えていました。先に取っておけば、押した瞬間に開きます。
+        //   代わりにホームを開くたびに DB への問い合わせが人数ぶん増えますが、
+        //   一度取ったものは3分間使い回します（next.config.ts の staleTimes）。
+        //   （先読みは本番のときだけ動きます。npm run dev では動きません）
+        prefetch={true}
         onPointerDown={start}
         onPointerUp={cancel}
         onPointerLeave={cancel}
@@ -114,7 +121,7 @@ export default function MemberCircle({
         {/* 名前。truncate = 長いときは「…」で切る */}
         {hideName ? null : (
         <span
-          className={`w-full truncate text-center text-[10px] leading-tight ${
+          className={`w-full truncate text-center text-xs leading-tight ${
             member.hasNews ? "font-bold text-stone-700" : "text-stone-400"
           }`}
         >

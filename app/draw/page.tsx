@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import DrawingPad from "@/components/DrawingPad";
+import { getSignedUrls } from "@/lib/signedUrls";
 
 // searchParams = URL の ? より後ろ。await で中身が届くのを待ちます。
 export default async function DrawPage({ searchParams }: PageProps<"/draw">) {
@@ -34,12 +35,14 @@ export default async function DrawPage({ searchParams }: PageProps<"/draw">) {
   const imagePath = post?.image_url ?? null;
   const isExternal = imagePath?.startsWith("http") ?? false;
 
-  const { data: signed } =
-    imagePath !== null && !isExternal
-      ? await supabase.storage.from("posts").createSignedUrl(imagePath, 3600)
-      : { data: null };
+  // URL は lib/signedUrls.ts で作ります。
+  // 写真の置き場所は、ログインした人が直接は読めない決まりにしてあるためです（supabase/04_security.sql）
+  const findSignedImage = await getSignedUrls(
+    "posts",
+    imagePath !== null && !isExternal ? [imagePath] : [],
+  );
 
-  const postImageUrl = isExternal ? imagePath : (signed?.signedUrl ?? null);
+  const postImageUrl = isExternal ? imagePath : findSignedImage(imagePath);
 
   return (
     <DrawingPad

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import MemberCircle from "@/components/MemberCircle";
 import type { Member } from "@/lib/home";
-import { createClient } from "@/lib/supabase/client";
 
 // 水引の色（globals.css と同じ）
 const BENI = "#b7282e";
@@ -86,11 +85,16 @@ function layout(count: number) {
 type MemberCirclesProps = {
   members: Member[];
   currentUserId: string;
+  // 届いている未来への手紙の id。無ければ null。
+  // ホームのデータと一緒にサーバーで取ってきます（lib/home.ts）。
+  // 画面が出てから聞きに行くと、✈️ が遅れて出てくるためです
+  letterId: string | null;
 };
 
 export default function MemberCircles({
   members,
   currentUserId,
+  letterId,
 }: MemberCirclesProps) {
   const [hasLetter, setHasLetter] = useState(false);
   const [openableCount, setOpenableCount] = useState<number>(0);
@@ -298,7 +302,7 @@ export default function MemberCircles({
         }
       }}
     >
-      {hasLetter && letterId ? (
+      {letterId ? (
         <Link
           href={`/letters/${letterId}`}
           onClick={handleMarkAsRead}

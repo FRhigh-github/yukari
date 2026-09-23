@@ -1,7 +1,9 @@
 // ホーム画面に出す中身を、DB から取ってくる処理です。
 // page.tsx に全部書くと長くなるので、こちらに分けています。
 
-import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
+import { SEEN_COOKIE, parseSeen } from "@/lib/seenPosts";
 
 export type Member = {
   id: string;
@@ -28,18 +30,24 @@ export type RecoveryRequest = {
 export async function getHomeData(selectedId: string | null) {
   const supabase = await createClient();
 
-  // ▼ getUser() は、Supabase に問い合わせて本人確認をします。つまり通信1回ぶんです。
+  // ▼ 本人確認（getCurrentUserId）は通信なしで済みます（lib/supabase/server.ts）。
   //   communities の取得はこれを待つ必要がないので、同時に出しています。
-  //   （ログインの確認はCookieを使って Supabase 側が勝手にやってくれるためです）
   //
   // 絞り込みを書いていないのに自分のぶんだけ返ります。
   // communities は RLS で「メンバーしか読めない」設定なので、DB 側が絞ってくれます。
-  const [userResult, { data: communities }] = await Promise.all([
-    supabase.auth.getUser(),
+  //
+  // time_capsules（未来への手紙）も、ここで一緒に聞きます。
+  // 前はホームが出たあとに画面側で聞いていたので、✈️ が遅れてポンと出ていました。
+  // RLS で「開封日を過ぎた手紙」しか返ってこないので、1件あれば届いている、ということです。
+  const [userId, { data: communities }, { data: letters }] = await Promise.all([
+    getCurrentUserId(supabase),
     supabase.from("communities").select("id, name, icon_url"),
+    supabase.from("time_capsules").select("id").limit(1),
   ]);
 
-  const user = userResult.data.user;
+  // 画面側は user.id だけを使うので、その形にそろえて返します
+  const user = userId === null ? null : { id: userId };
+  const letterId = letters?.[0]?.id ?? null;
 
   if (user === null) {
     return {
@@ -49,6 +57,7 @@ export async function getHomeData(selectedId: string | null) {
       currentId: null,
       recoveryRequests: [],
       todayCount: 0,
+      letterId: null,
     };
   }
 
@@ -68,6 +77,7 @@ export async function getHomeData(selectedId: string | null) {
       currentId: null,
       recoveryRequests: [],
       todayCount: 0,
+      letterId: null,
     };
   }
 
@@ -118,7 +128,16 @@ export async function getHomeData(selectedId: string | null) {
     .select("id, display_name, avatar_url, birthday, mood")
     .in("id", memberIds);
 
-  const recentAuthorIds = recentPosts?.map((post) => post.author_id) ?? [];
+  // ▼ 光らせるのは「まだ見ていない新しいご報告がある人」だけです（lib/seenPosts.ts）。
+  //   その人の最新のご報告の日時と、見たところまでの日時を比べます。
+  //   recentPosts は新しい順なので、その人が最初に出てきた行が最新です。
+  const seen = parseSeen((await cookies()).get(SEEN_COOKIE)?.value);
+  const hasUnseen = (authorId: string) => {
+    const latest = recentPosts?.find((post) => post.author_id === authorId);
+    if (!latest) return false;
+    const seenAt = seen[authorId];
+    return seenAt === undefined || new Date(latest.created_at) > new Date(seenAt);
+  };
 
   // ▼ 「今日 N件の報告」を出すための数です。
   //   上で取ってきた新しい投稿20件を、そのまま数え直しているだけなので、
@@ -137,7 +156,7 @@ export async function getHomeData(selectedId: string | null) {
       id: profile.id,
       displayName: profile.display_name,
       avatarUrl: profile.avatar_url,
-      hasNews: recentAuthorIds.includes(profile.id),
+      hasNews: hasUnseen(profile.id),
       birthday: profile.birthday,
       mood: profile.mood,
     })) ?? [];
@@ -162,5 +181,6 @@ export async function getHomeData(selectedId: string | null) {
     currentId,
     recoveryRequests,
     todayCount,
+    letterId,
   };
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import InviteCode from "@/components/InviteCode";
 import CommunitySettings from "@/components/CommunitySettings";
 import CommunityIcon from "@/components/CommunityIcon";
@@ -11,17 +11,26 @@ export default async function CommunityPage({
   const supabase = await createClient();
 
   // 自分が作成者かどうかの判定に使います
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 本人確認。通信なしで済みます（lib/supabase/server.ts の getCurrentUserId）
+  const userId = await getCurrentUserId(supabase);
+  const user = userId === null ? null : { id: userId };
 
-  // メンバーでなければ、RLS が止めるので null が返ります。
+  // ▼ コミュニティとメンバーの一覧は、どちらも id だけで取れるので同時に出します。
+  //   前は1つずつ待っていたので、通信2回ぶん待たされていました。
+  //
+  // メンバーでなければ、RLS が止めるので community は null が返ります。
   // maybeSingle() は「0件でもエラーにしない single()」です。
-  const { data: community } = await supabase
-    .from("communities")
-    .select("id, name, invite_code, created_by, icon_url")
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data: community }, { data: memberships }] = await Promise.all([
+    supabase
+      .from("communities")
+      .select("id, name, invite_code, created_by, icon_url")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("memberships")
+      .select("user_id, role")
+      .eq("community_id", id),
+  ]);
 
   if (community === null) {
     return (
@@ -35,11 +44,6 @@ export default async function CommunityPage({
       </main>
     );
   }
-
-  const { data: memberships } = await supabase
-    .from("memberships")
-    .select("user_id, role")
-    .eq("community_id", id);
 
   const memberIds = memberships?.map((membership) => membership.user_id) ?? [];
 
@@ -107,7 +111,7 @@ export default async function CommunityPage({
                 {profile.display_name ?? "名無し"}
               </Link>
               {isOwner(profile.id) ? (
-                <span className="rounded-full border border-kin/60 px-2 py-0.5 text-[10px] text-kin">
+                <span className="rounded-full border border-kin/60 px-2 py-0.5 text-xs text-kin">
                   作成者
                 </span>
               ) : null}

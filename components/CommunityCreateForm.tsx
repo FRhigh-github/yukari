@@ -26,32 +26,18 @@ export default function CommunityCreateForm() {
       return;
     }
 
-    // id はこちらで先に決めます。
-    // 作ったあとに「作ったものを読み返す」ことができないためです
-    // （まだメンバーではないので、RLS に止められます）。
-    const id = crypto.randomUUID();
+    // ▼ 作るのと、自分を owner として入れるのを、DB の関数1つでまとめてやります
+    //   （supabase/04_security.sql の create_community）。
+    //   前は画面から memberships に直接書き込んでいましたが、
+    //   それを許すと「招待コードなしで、どのコミュニティにも入れる」状態になるため、
+    //   直接の書き込みは止めて、この関数と join_community（招待コード）だけにしました。
+    const { data: id, error: createError } = await supabase.rpc(
+      "create_community",
+      { community_name: name, code: makeInviteCode() },
+    );
 
-    const created = await supabase.from("communities").insert({
-      id,
-      name,
-      invite_code: makeInviteCode(),
-      created_by: data.user.id,
-    });
-
-    if (created.error) {
-      setError("作成に失敗しました: " + created.error.message);
-      return;
-    }
-
-    // 作っただけではメンバーになりません。自分を owner として登録します。
-    const joined = await supabase.from("memberships").insert({
-      user_id: data.user.id,
-      community_id: id,
-      role: "owner",
-    });
-
-    if (joined.error) {
-      setError("参加の登録に失敗しました: " + joined.error.message);
+    if (createError || typeof id !== "string") {
+      setError("作成に失敗しました: " + (createError?.message ?? "原因不明"));
       return;
     }
 

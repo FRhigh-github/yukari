@@ -66,7 +66,7 @@ export default function ReactionBoard({ reactions }: ReactionBoardProps) {
             />
             {/* 名前は一番手前の1枚だけ。全部に出すと重なって読めません */}
             {index === 0 ? (
-              <p className="w-14 truncate text-center text-[9px] text-stone-500">
+              <p className="w-14 truncate text-center text-xs text-stone-500">
                 {reaction.authorName ?? "名無し"}
               </p>
             ) : null}

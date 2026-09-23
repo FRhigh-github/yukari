@@ -164,15 +164,12 @@ export default function CommunityIcon({
         {/* min-w-0 = 名前が長くても、この欄が押し広がらないようにする指定 */}
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-xl font-bold text-stone-800">{name}</h1>
+          {/* 結果の知らせだけを出します。使い方の説明は、カメラの印で伝えています */}
           {message ? (
-            <p className={`mt-1 text-xs ${message.isError ? "text-beni" : "text-stone-500"}`}>
+            <p className={`mt-1 text-sm ${message.isError ? "text-beni" : "text-stone-500"}`}>
               {message.text}
             </p>
-          ) : (
-            <p className="mt-1 text-xs text-stone-400">
-              {picked !== null ? "まだ保存していません" : "押すと絵を変えられます"}
-            </p>
-          )}
+          ) : null}
         </div>
       </div>
 

@@ -7,19 +7,22 @@
 //   ・自分のご報告の一覧
 
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import PostGrid from "@/components/PostGrid";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
+import { getSignedUrls } from "@/lib/signedUrls";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
 
   // 1回目：本人確認と、入っているコミュニティを同時に取ります
-  const [userResult, { data: communities }] = await Promise.all([
-    supabase.auth.getUser(),
+  // 本人確認は通信なしで済みます（lib/supabase/server.ts の getCurrentUserId）
+  const [userId, { data: communities }] = await Promise.all([
+    getCurrentUserId(supabase),
     supabase.from("communities").select("name"),
   ]);
 
-  const user = userResult.data.user;
+  const user = userId === null ? null : { id: userId };
 
   if (user === null) {
     return (
@@ -47,21 +50,19 @@ export default async function ProfilePage() {
       .limit(30),
   ]);
 
-  // 写真の置き場所から、期限付きのURLを発行してもらいます（1時間）
+  // 写真の置き場所から、期限付きのURLを発行してもらいます
   const imagePaths =
     posts
       ?.filter((post) => post.image_url && !post.image_url.startsWith("http"))
       .map((post) => post.image_url) ?? [];
 
-  const { data: signedUrls } =
-    imagePaths.length > 0
-      ? await supabase.storage.from("posts").createSignedUrls(imagePaths, 3600)
-      : { data: null };
+  // URL は lib/signedUrls.ts で作ります（同じ写真には同じURLを返すので、写真を使い回せます）
+  const findSignedImage = await getSignedUrls("posts", imagePaths);
 
   const findImageUrl = (path: string | null) => {
     if (!path) return null;
     if (path.startsWith("http")) return path;
-    return signedUrls?.find((item) => item.path === path)?.signedUrl ?? null;
+    return findSignedImage(path);
   };
 
   return (
@@ -80,33 +81,17 @@ export default async function ProfilePage() {
         ご報告
       </h2>
 
-      {posts?.length === 0 ? (
-        <p className="p-5 text-sm text-stone-500">まだご報告はありません。</p>
-      ) : (
-        <ul>
-          {posts?.map((post) => (
-            <li key={post.id} className="border-b border-stone-100">
-              <Link
-                href={`/members/${user.id}`}
-                className="flex items-center gap-3 p-4"
-              >
-                <span className="min-w-0 flex-1 truncate text-sm text-stone-700">
-                  {post.title}
-                </span>
-
-                {findImageUrl(post.image_url) ? (
-                  <span
-                    className="h-14 w-20 shrink-0 rounded-lg bg-stone-100 bg-cover bg-center"
-                    style={{
-                      backgroundImage: `url("${findImageUrl(post.image_url)}")`,
-                    }}
-                  />
-                ) : null}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* 縦長の写真を3列に並べます（ご報告の一覧と同じ見た目）。押すとストーリーで開きます */}
+      <PostGrid
+        memberId={user.id}
+        posts={
+          posts?.map((post) => ({
+            id: post.id,
+            title: post.title,
+            imageUrl: findImageUrl(post.image_url),
+          })) ?? []
+        }
+      />
     </main>
   );
 }

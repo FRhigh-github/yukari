@@ -24,7 +24,7 @@ export default function HintOverlay({ text }: HintOverlayProps) {
     >
       <div className="rounded-2xl bg-white px-6 py-5 text-center shadow-xl">
         <p className="text-sm leading-relaxed text-stone-700">{text}</p>
-        <p className="mt-3 text-[10px] text-stone-400">画面を押すと閉じます</p>
+        <p className="mt-3 text-xs text-stone-400">画面を押すと閉じます</p>
       </div>
     </div>
   );

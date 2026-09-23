@@ -25,6 +25,7 @@ import type { PointerEvent, ReactNode } from "react";
 // Supabase(データベース)とつながる窓口を作る関数(手書き機能と同じもの)
 import { createClient } from "@/lib/supabase/client";
 import HorizontalScroller from "@/components/HorizontalScroller";
+import { shrinkImage } from "@/lib/image";
 // 選べるフォントのうち、Google Fonts から読み込むもの
 import { WEB_FONTS } from "./fonts";
 
@@ -37,6 +38,9 @@ const BUCKET = "drawings";
 
 // 開封日の年を、今年から何年先まで選べるようにするか
 const MAX_YEARS_AHEAD = 30;
+
+// 開封日の select の見た目(年・月・日の3つで共通)
+const DATE_SELECT = "h-12 rounded-lg bg-[#fdfbf5] px-3 text-[17px] shadow-sm ring-1 ring-kin/40";
 
 // 封筒を上に何px以上スワイプしたら「送る」とみなすか
 const SWIPE_SEND_DISTANCE = 120;
@@ -195,23 +199,23 @@ function createItem(id: number, type: ItemType, x: number, y: number): Item {
 // ※ コピーで行が消えないように、1つのアイコンを1行で書いています
 
 // 写真のアイコン
-const ImageIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5-8 8" /></svg>;
+const ImageIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5-8 8" /></svg>;
 
 // リンクのアイコン
-const LinkIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" /><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" /></svg>;
+const LinkIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" /><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" /></svg>;
 
 // カレンダーのアイコン(イベント用)
-const CalendarIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4" /><path d="M16 3v4" /></svg>;
+const CalendarIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4" /><path d="M16 3v4" /></svg>;
 
 // 回転のアイコン(くるっと回る矢印)
-const RotateIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M20 12a8 8 0 1 1-2.34-5.66" /><path d="M20 4v5h-5" /></svg>;
+const RotateIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M20 12a8 8 0 1 1-2.34-5.66" /><path d="M20 4v5h-5" /></svg>;
 
 // 紙飛行機のアイコン(「未来へ送る」ボタン用)
-const SendIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" className="h-4 w-4"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>;
+const SendIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" className="h-5 w-5"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>;
 
 // 紙の右上に並べる、黒い丸ボタンの一覧(上から順番に表示されます)
 const TOOLS: { type: ItemType | "event"; label: string; icon: ReactNode }[] = [
-  { type: "text", label: "テキスト", icon: <span className="font-serif text-base font-bold">T</span> },
+  { type: "text", label: "テキスト", icon: <span className="font-serif text-xl font-bold">T</span> },
   { type: "photo", label: "写真", icon: ImageIcon },
   { type: "url", label: "URL", icon: LinkIcon },
   { type: "event", label: "イベント", icon: CalendarIcon },
@@ -286,7 +290,8 @@ export default function LetterPage() {
   const [draft, setDraft] = useState<EventPlan | null>(null);
 
   // ===== 開封日(何年何月何日の私たちへ) =====
-  // 封筒の画面で入力します。最初は空(""＝未入力)。
+  // 封筒の画面で、年・月・日を1つずつ選びます。最初は空(""＝未入力)。
+  // (カレンダー1つで選ぶ形も試しましたが、何年も先の日を選ぶのに使いにくかったので戻しました)
   // select の値は文字で届くので、文字のまま持ち、使うときに Number() で数にします
   const [openYear, setOpenYear] = useState("");
   const [openMonth, setOpenMonth] = useState("");
@@ -310,9 +315,19 @@ export default function LetterPage() {
   // スワイプして送れるのは、未来の日付が入っているときだけ
   const canSwipe = isDateValid && openDate > new Date();
 
+  // ===== 送り先のコミュニティ =====
+  // 前は「入っているコミュニティの先頭」に決め打ちで送っていたので、
+  // 2つ以上入っていると、どこに届くか選べませんでした。
+  // 封筒を開いたときに一覧を取り、2つ以上あれば選べるようにします
+  const [communities, setCommunities] = useState<{ id: string; name: string }[]>([]);
+  const [communityId, setCommunityId] = useState("");
+
   // ===== 封筒のスワイプのための状態 =====
   const [showEnvelope, setShowEnvelope] = useState(false); // 封筒を出しているか
   const [swipeY, setSwipeY] = useState(0); // 上に何px動かしたか
+  // 指で動かしている最中か。封筒をなめらかに戻す動きを付けるかどうかに使います。
+  // (前は useRef の中身を画面を作る途中で読んでいて、React に「正しく描き直されない」と注意されていました)
+  const [isSwiping, setIsSwiping] = useState(false);
   // 指を置いた高さ(画面に出さないので useRef)。触っていないときは null
   const swipeStartRef = useRef<number | null>(null);
 
@@ -865,27 +880,16 @@ export default function LetterPage() {
       const supabase = createClient();
 
       // ----- 1. ログイン中のユーザーを取る -----
-      const userResult = await supabase.auth.getUser();
-      const user = userResult.data.user;
-      if (user === null) {
+      // getClaims() = ログインの証明書を、この場で確かめる命令(Supabase まで聞きに行かないので速い)
+      const claimsResult = await supabase.auth.getClaims();
+      const userId = claimsResult.data?.claims.sub;
+      if (!userId) {
         throw new Error("ログインしていません。/login からログインしてください");
       }
+      const user = { id: userId };
 
-      // ----- 1.5 送り先のコミュニティを決める -----
-      // ここは前まで、動作確認のために id を直接書いていました。
-      // そのコミュニティが消えたあと、
-      //   violates foreign key constraint "time_capsules_community_id_fkey"
-      // （そんなコミュニティは無い）というエラーになっていました。
-      //
-      // communities は RLS で「自分が入っているものしか返らない」ので、
-      // 取れた中の先頭をそのまま送り先にします。
-      const communityResult = await supabase
-        .from("communities")
-        .select("id")
-        .limit(1)
-        .maybeSingle();
-
-      const communityId = communityResult.data?.id;
+      // ----- 1.5 送り先のコミュニティ -----
+      // 封筒の画面で選んだもの(1つしか入っていなければ、それ)です
       if (!communityId) {
         throw new Error(
           "コミュニティに入っていません。先にコミュニティに参加してください",
@@ -907,7 +911,9 @@ export default function LetterPage() {
 
       const uploadResult = await supabase.storage
         .from(BUCKET)
-        .upload(path, blob, { contentType: "image/png" });
+        // cacheControl = 「この画像は1年間そのまま使い回してよい」とブラウザに伝えます。
+        // ファイル名は手紙ごとにちがうので、同じ名前の中身が変わることはありません
+        .upload(path, blob, { contentType: "image/png", cacheControl: "31536000" });
       if (uploadResult.error !== null) {
         throw new Error("画像の保存: " + uploadResult.error.message);
       }
@@ -984,7 +990,7 @@ export default function LetterPage() {
   // =====================================================
 
   // ----- 「未来へ送る」を押したとき:封筒を出す -----
-  function openEnvelope() {
+  async function openEnvelope() {
     if (!hasContent) {
       setErrorText("手紙に何か書いてから送ってください");
       return;
@@ -993,6 +999,14 @@ export default function LetterPage() {
     setSelectedId(null);
     setSwipeY(0);
     setShowEnvelope(true);
+
+    // 送り先の候補。RLS で「自分が入っているもの」だけが返ります
+    if (communities.length === 0) {
+      const { data } = await createClient().from("communities").select("id, name");
+      setCommunities(data ?? []);
+      // 最初は先頭を選んだ状態にします
+      if (data && data.length > 0 && communityId === "") setCommunityId(data[0].id);
+    }
   }
 
   // ----- 指を置いた -----
@@ -1003,6 +1017,7 @@ export default function LetterPage() {
     }
     e.currentTarget.setPointerCapture(e.pointerId);
     swipeStartRef.current = e.clientY;
+    setIsSwiping(true);
   }
 
   // ----- 指を動かしている間:上に動いたぶんだけ封筒を持ち上げる -----
@@ -1020,6 +1035,7 @@ export default function LetterPage() {
       return;
     }
     swipeStartRef.current = null;
+    setIsSwiping(false);
     if (swipeY >= SWIPE_SEND_DISTANCE) {
       handleSend();
     } else {
@@ -1081,17 +1097,25 @@ export default function LetterPage() {
     if (item.type === "photo") {
       if (item.imageSrc === "") {
         return (
-          <label className="inline-block cursor-pointer rounded-full bg-stone-700 px-3 py-1 text-xs text-white">
+          <label className="inline-flex h-11 cursor-pointer items-center rounded-full border border-kin/60 bg-white px-4 text-xs text-kin">
             ファイルを選択
             <input
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
-                if (file) {
-                  updateItem(item.id, { imageSrc: URL.createObjectURL(file) });
+                if (!file) return;
+                // ▼ 大きすぎる写真は、先に小さくしてから置きます(lib/image.ts)。
+                //   スマホの写真はそのままだと 3〜5MB あり、送るときに紙の画像を作るのが遅くなるためです。
+                //   縮められない形式(HEIC など)のときは、元のまま使います
+                let blob: Blob = file;
+                try {
+                  blob = await shrinkImage(file);
+                } catch {
+                  blob = file;
                 }
+                updateItem(item.id, { imageSrc: URL.createObjectURL(blob) });
               }}
             />
           </label>
@@ -1150,11 +1174,14 @@ export default function LetterPage() {
     return (
       <main className="flex h-full items-center justify-center overflow-hidden bg-[#f3ede2] p-6 text-stone-800">
         <div className="w-full max-w-[430px] text-center">
-          <p className="mb-6">未来へ送りました</p>
+          <p className="mb-2 text-lg font-bold">未来へ送りました</p>
+          <p className="mb-8 text-sm text-stone-500">
+            {openDate.toLocaleDateString("ja-JP")} に、みんなのもとへ届きます
+          </p>
           <button
             type="button"
             onClick={resetAll}
-            className="rounded-full bg-stone-700 px-5 py-2 text-sm text-white"
+            className="h-11 rounded-full border border-kin/60 bg-white px-6 text-sm text-kin"
           >
             もう一通書く
           </button>
@@ -1340,7 +1367,7 @@ export default function LetterPage() {
                           <span className="text-xl leading-none" style={{ fontFamily: f.family }}>
                             あ
                           </span>
-                          <span className="whitespace-nowrap text-[10px] text-stone-500">{f.label}</span>
+                          <span className="whitespace-nowrap text-xs text-stone-500">{f.label}</span>
                         </button>
                       ))}
                     </HorizontalScroller>
@@ -1389,7 +1416,9 @@ export default function LetterPage() {
           )}
 
           {/* ----- 右上の黒い丸ボタン ----- */}
-          <div className="absolute right-3 top-3 flex flex-col gap-3">
+          {/* 押せる範囲は 44px(h-11 w-11)。見た目の丸は 36px です。
+              色はアプリにそろえて、白地に金のふち・金のアイコンにしています */}
+          <div className="absolute right-1.5 top-1.5 z-10 flex flex-col gap-1">
             {TOOLS.map((tool) => (
               <button
                 key={tool.type}
@@ -1398,12 +1427,16 @@ export default function LetterPage() {
                   tool.type === "event" ? openEventPanel() : addItem(tool.type)
                 }
                 aria-label={`${tool.label}を追加`}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-700 text-white shadow"
+                className="flex h-11 w-11 items-center justify-center active:scale-90"
               >
-                {tool.icon}
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-kin shadow-sm ring-1 ring-kin/60">
+                  {tool.icon}
+                </span>
               </button>
             ))}
           </div>
+
+
 
           {/* ----- 「予定調整へ」ボタン(イベントがあるときだけ) ----- */}
           {/* ※ PNG 画像には入れません(受けとる側で、本物のボタンとして出すため) */}
@@ -1425,7 +1458,7 @@ export default function LetterPage() {
           // 送信中は押せないようにします(2回送ってしまうのを防ぐため)
           disabled={isSending}
           // shrink-0 = 場所が足りなくても縮めない。h-11 = 押せる範囲 44px
-          className="relative -mt-5 mr-2 flex h-11 shrink-0 items-center gap-2 self-end rounded-full bg-stone-700 px-4 text-sm text-white shadow disabled:opacity-60"
+          className="relative -mt-5 mr-2 flex h-11 shrink-0 items-center gap-2 self-end rounded-full bg-beni px-5 text-sm font-bold text-white shadow ring-1 ring-kin ring-offset-2 ring-offset-[#f3ede2] disabled:opacity-60"
         >
           未来へ送る
           {SendIcon}
@@ -1437,7 +1470,7 @@ export default function LetterPage() {
             紙の下には、ボタンの左に高さ 24px(h-6)のすき間ができます。そこに1行で出します。
             bottom は外側の枠の pb と同じ値 = ボタンの下端にそろえるためです */}
         {errorText !== null && (
-          <p className="absolute bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-4 right-40 flex h-6 items-center text-xs font-bold text-red-600">
+          <p className="absolute bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] left-4 right-40 flex h-6 items-center text-xs font-bold text-beni">
             {errorText}
           </p>
         )}
@@ -1451,12 +1484,23 @@ export default function LetterPage() {
         // absolute = この画面(main)の中だけに重ねます。
         // 前は fixed で、スマホ幅の枠を越えてブラウザ全体を覆ってしまっていました。
         // 不透明にして、後ろの紙が透けないようにしています
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#f3ede2]">
+        // z-50 = 下タブ(z-40)より手前に出して、ボタンが隠れないようにします
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f3ede2]">
           <div className="flex w-full max-w-[430px] flex-col items-center gap-6 px-4">
-            {/* 日付が入るまでは、スワイプできないことを伝える */}
-            <p className={`text-sm ${canSwipe ? "text-stone-700" : "text-stone-400"}`}>
-              {canSwipe ? "↑ スワイプして送信" : "未来の日付を入れるとスワイプできます"}
-            </p>
+            {/* 上向きの矢印。日付が入って送れるようになると、金色になって上下に揺れます */}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className={`h-8 w-8 ${canSwipe ? "animate-bounce text-kin" : "text-stone-300"}`}
+            >
+              <path d="M12 19V5" />
+              <path d="M5 12l7-7 7 7" />
+            </svg>
 
             {/* 封筒本体。touchAction: none = 指の上下の動きで画面がスクロールしないようにする */}
             <div
@@ -1468,7 +1512,7 @@ export default function LetterPage() {
                 transform: `translateY(${-swipeY}px)`,
                 opacity: 1 - Math.min(swipeY / (SWIPE_SEND_DISTANCE * 2), 0.5),
                 // 指で動かしている間は遅れず追いかけ、離したら元へなめらかに戻す
-                transition: swipeStartRef.current === null ? "transform 0.2s" : "none",
+                transition: isSwiping ? "none" : "transform 0.2s",
                 touchAction: "none",
               }}
               // 日付が未入力のあいだは薄くして、動かせないことを見た目でも伝える
@@ -1480,20 +1524,21 @@ export default function LetterPage() {
                 <path d="M0 3l12 9 12-9" />
               </svg>
               {isSending && (
-                <span className="relative rounded-full bg-stone-700 px-4 py-2 text-sm text-white">
+                <span className="relative rounded-full bg-beni px-4 py-2 text-sm text-white">
                   送信中…
                 </span>
               )}
             </div>
 
             {/* ===== 何年何月何日の私たちへ ===== */}
-            {/* 数を選ぶだけなので、select を3つ並べています(高さ h-11 = 44px) */}
-            <div className="flex flex-wrap items-center justify-center gap-1 text-sm">
+            {/* 数を選ぶだけなので、select を3つ並べています。
+                押しやすいよう高さ 48px(h-12)、文字は 17px にしています */}
+            <div className="flex flex-wrap items-center justify-center gap-1.5 text-base text-stone-700">
               <select
                 value={openYear}
                 onChange={(e) => setOpenYear(e.target.value)}
                 aria-label="開封する年"
-                className="h-11 rounded-lg bg-[#fdfbf5] px-2 shadow-sm"
+                className={DATE_SELECT}
               >
                 <option value="">----</option>
                 {yearOptions.map((y) => (
@@ -1507,7 +1552,7 @@ export default function LetterPage() {
                 value={openMonth}
                 onChange={(e) => setOpenMonth(e.target.value)}
                 aria-label="開封する月"
-                className="h-11 rounded-lg bg-[#fdfbf5] px-2 shadow-sm"
+                className={DATE_SELECT}
               >
                 <option value="">--</option>
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -1521,7 +1566,7 @@ export default function LetterPage() {
                 value={openDay}
                 onChange={(e) => setOpenDay(e.target.value)}
                 aria-label="開封する日"
-                className="h-11 rounded-lg bg-[#fdfbf5] px-2 shadow-sm"
+                className={DATE_SELECT}
               >
                 <option value="">--</option>
                 {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
@@ -1533,12 +1578,28 @@ export default function LetterPage() {
               日の私たちへ
             </div>
 
-            {/* 入れた日付が過去・存在しない日のときの案内 */}
-            {isDateValid && !canSwipe && (
-              <p className="text-xs text-red-500">未来の日付を選んでください</p>
-            )}
+            {/* 入れた日付が過去・存在しない日のときだけ、短く知らせます */}
+            {isDateValid && !canSwipe && <p className="text-sm text-beni">過去の日付です</p>}
             {openYear !== "" && openMonth !== "" && openDay !== "" && !isDateValid && (
-              <p className="text-xs text-red-500">存在しない日付です</p>
+              <p className="text-sm text-beni">存在しない日付です</p>
+            )}
+
+            {/* ===== 送り先のコミュニティ(2つ以上入っているときだけ選べます) ===== */}
+            {communities.length > 1 && (
+              <label className="flex items-center gap-2 text-sm text-stone-700">
+                送り先
+                <select
+                  value={communityId}
+                  onChange={(e) => setCommunityId(e.target.value)}
+                  className="h-11 rounded-lg bg-[#fdfbf5] px-3 shadow-sm ring-1 ring-kin/40"
+                >
+                  {communities.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
 
             <button
@@ -1563,9 +1624,11 @@ export default function LetterPage() {
               closeEventPanel();
             }
           }}
-          className="fixed inset-0 z-10 flex items-end justify-center bg-black/30"
+          // absolute = アプリの枠(スマホ幅)の中だけに重ねます。前は fixed で、PC では画面全体を覆っていました。
+          // z-50 = 下タブ(z-40)より手前。前は z-10 で、決定ボタンが下タブの裏に隠れていました
+          className="absolute inset-0 z-50 flex items-end justify-center bg-black/30"
         >
-          <div className="max-h-[80vh] w-full max-w-[430px] overflow-y-auto rounded-t-2xl bg-[#fdfbf5] p-5">
+          <div className="max-h-[80vh] w-full max-w-[430px] overflow-y-auto rounded-t-2xl bg-[#fdfbf5] p-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]">
             <p className="mb-4 flex items-center gap-2 font-bold">
               {CalendarIcon}
               イベントを企画する
@@ -1609,7 +1672,7 @@ export default function LetterPage() {
                       })
                     }
                     aria-label="この候補日を消す"
-                    className="px-2 text-stone-400"
+                    className="flex h-11 w-11 items-center justify-center text-stone-400"
                   >
                     ×
                   </button>
@@ -1618,13 +1681,13 @@ export default function LetterPage() {
             ))}
 
             {hasDuplicate && (
-              <p className="mb-2 text-xs text-red-500">同じ日が入っています</p>
+              <p className="mb-2 text-xs text-beni">同じ日が入っています</p>
             )}
 
             <button
               type="button"
               onClick={() => setDraft({ ...draft, dates: [...draft.dates, ""] })}
-              className="mb-6 rounded-full border border-stone-400 px-3 py-1 text-xs text-stone-600"
+              className="mb-6 h-11 rounded-full border border-kin/60 px-4 text-sm text-kin"
             >
               ＋ 候補日を追加
             </button>
@@ -1634,7 +1697,7 @@ export default function LetterPage() {
               <button
                 type="button"
                 onClick={closeEventPanel}
-                className="flex-1 rounded border border-stone-400 py-2 text-sm"
+                className="h-11 flex-1 rounded-xl border border-stone-300 text-sm text-stone-600"
               >
                 キャンセル
               </button>
@@ -1642,7 +1705,7 @@ export default function LetterPage() {
                 type="button"
                 onClick={saveEvent}
                 disabled={!canSaveEvent}
-                className="flex-1 rounded bg-stone-700 py-2 text-sm text-white disabled:opacity-40"
+                className="h-11 flex-1 rounded-xl bg-beni text-sm font-bold text-white disabled:opacity-40"
               >
                 決定
               </button>
@@ -1652,7 +1715,7 @@ export default function LetterPage() {
               <button
                 type="button"
                 onClick={removeEvent}
-                className="mt-3 w-full py-2 text-xs text-red-500"
+                className="mt-3 h-11 w-full text-xs text-beni"
               >
                 イベントを削除
               </button>

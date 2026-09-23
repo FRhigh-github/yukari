@@ -61,12 +61,14 @@ export default function LetterDetailPage() {
       ) {
         setSignedImageUrl(currentLetter.image_url);
       } else {
-        const { data: urlData, error: urlError } = await supabase.storage
-          .from("time_capsules")
-          .createSignedUrl(currentLetter.image_url, 3600);
-
-        if (!urlError && urlData) {
-          setSignedImageUrl(urlData.signedUrl);
+        // 画像のURLはサーバーに作ってもらいます（app/api/letter-image/route.ts）。
+        // 前は time_capsules という置き場所を探していましたが、
+        // 手紙の画像は drawings に保存されているので、見つからずに表示されていませんでした。
+        // また drawings は、他人のフォルダをブラウザから直接読めない決まりにしてあります
+        const response = await fetch(`/api/letter-image?id=${currentLetter.id}`);
+        const result = await response.json();
+        if (response.ok && result.url) {
+          setSignedImageUrl(result.url);
         }
       }
     }

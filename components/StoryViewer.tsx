@@ -1,18 +1,21 @@
 // その人のご報告を、インスタのストーリーのように画面いっぱいで1枚ずつ見せます。
 //
-//   画面の右側を押す   … 1つ前（古い）ご報告へ
-//   画面の左側を押す   … 戻る（新しいほうへ）
+//   画面の右側を押す / 左へスライド … 1つ前（古い）ご報告へ
+//   画面の左側を押す / 右へスライド … 戻る（新しいほうへ）
 //   上にスワイプ       … 手書きのカードが出てくる（ReactionCardSheet）
 //   上のアイコン・名前 … その人のプロフィールへ
-//   右上の ×           … ホームへ
+//   右上の ×           … 閉じて、ご報告の一覧（MemberPosts）に戻る
+//
+// 開いたご報告は「見た」と覚えておき、ホームで光らなくします（lib/seenPosts.ts）。
 
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactionBoard, { type Reaction } from "@/components/ReactionBoard";
 import ReactionCardSheet from "@/components/ReactionCardSheet";
+import { SEEN_COOKIE, parseSeen } from "@/lib/seenPosts";
 
 // これ以上指が上へ動いたら「スワイプした」とみなします（px）
 const SWIPE = 60;
@@ -34,6 +37,9 @@ type StoryViewerProps = {
   authorName: string;
   avatarUrl: string | null;
   posts: StoryPost[];
+  // 一覧で押したご報告が何枚目か。そこから見始めます
+  initialIndex: number;
+  onClose: () => void;
 };
 
 export default function StoryViewer({
@@ -41,14 +47,37 @@ export default function StoryViewer({
   authorName,
   avatarUrl,
   posts,
+  initialIndex,
+  onClose,
 }: StoryViewerProps) {
   const router = useRouter();
   // いま何枚目か。0 がいちばん新しいご報告です
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(initialIndex);
   const [isWriting, setIsWriting] = useState(false);
   const startRef = useRef<{ x: number; y: number } | null>(null);
 
   const post = posts[index];
+
+  // ▼ 開いたご報告を「見た」と Cookie に書いておきます（lib/seenPosts.ts）。
+  //   ホームはこれを読んで、見ていない新しいご報告がある人だけを光らせます。
+  //   その人について「見た中でいちばん新しい日時」だけを残します。
+  useEffect(() => {
+    if (post === undefined) return;
+    const cookie = document.cookie
+      .split("; ")
+      .find((item) => item.startsWith(`${SEEN_COOKIE}=`))
+      ?.slice(SEEN_COOKIE.length + 1);
+    const seen = parseSeen(cookie);
+    const before = seen[authorId];
+    if (before !== undefined && new Date(before) >= new Date(post.createdAt)) return;
+    seen[authorId] = post.createdAt;
+    // max-age = 覚えておく長さ（秒）。1年
+    document.cookie = `${SEEN_COOKIE}=${encodeURIComponent(JSON.stringify(seen))}; path=/; max-age=31536000; samesite=lax`;
+  }, [authorId, post]);
+
+  // 1つ古いほうへ / 新しいほうへ。端まで来たら、それ以上は進みません
+  const goOlder = () => setIndex(Math.min(posts.length - 1, index + 1));
+  const goNewer = () => setIndex(Math.max(0, index - 1));
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     const start = startRef.current;
@@ -57,6 +86,13 @@ export default function StoryViewer({
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
 
+    // 横へのスライド。縦より横に大きく動いたときだけ、横のスライドとみなします。
+    // 左へスライド（指を左へ）→ 古いほうへ。インスタと同じ向きです
+    if (Math.abs(dx) > SWIPE && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) goOlder();
+      else goNewer();
+      return;
+    }
     // 上にスワイプ → 手書きカードを出します
     if (dy < -SWIPE) {
       setIsWriting(true);
@@ -66,12 +102,8 @@ export default function StoryViewer({
     if (Math.abs(dx) < TAP && Math.abs(dy) < TAP) {
       const rect = event.currentTarget.getBoundingClientRect();
       const isRight = event.clientX - rect.left > rect.width / 2;
-      // 端まで来たら、それ以上は進みません
-      setIndex(
-        isRight
-          ? Math.min(posts.length - 1, index + 1)
-          : Math.max(0, index - 1),
-      );
+      if (isRight) goOlder();
+      else goNewer();
     }
   };
 
@@ -157,13 +189,14 @@ export default function StoryViewer({
               </span>
             ) : null}
           </Link>
-          <Link
-            href="/"
+          <button
+            type="button"
+            onClick={onClose}
             aria-label="閉じる"
-            className="pointer-events-auto ml-auto flex h-11 w-11 items-center justify-center text-2xl text-stone-700"
+            className="pointer-events-auto ml-auto flex h-11 w-11 cursor-pointer items-center justify-center text-stone-700"
           >
-            ×
-          </Link>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="h-7 w-7"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
         </div>
       </div>
 
@@ -178,14 +211,25 @@ export default function StoryViewer({
           <p className="line-clamp-4 text-sm leading-relaxed text-stone-600">
             {post.body}
           </p>
-          <p className="mt-4 text-center text-xs text-kin">
-            ↑ 上にスワイプしてお祝いを書く
-          </p>
+          {/* 上にスワイプできることを、言葉ではなく上向きの印だけで伝えます */}
+          <div className="mt-3 flex justify-center text-kin">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-8 w-8 animate-bounce"><path d="M6 15l6-6 6 6" /></svg>
+          </div>
         </div>
       ) : (
         <p className="absolute inset-0 flex items-center justify-center text-sm text-stone-500">
           まだご報告はありません。
         </p>
+      )}
+
+      {/* ▼ となり（前後）のご報告の写真を、見えない所で先に読んでおきます。
+          進めた・戻した瞬間に、写真がもう届いている状態にするためです。
+          hidden = 画面には出さないが、ブラウザは読み込んでおいてくれます */}
+      {[posts[index - 1], posts[index + 1]].map((near) =>
+        near?.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={near.id} src={near.imageUrl} alt="" aria-hidden="true" className="hidden" />
+        ) : null,
       )}
 
       {/* ▼ 手書きカード */}

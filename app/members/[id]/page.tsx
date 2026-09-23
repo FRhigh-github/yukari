@@ -1,13 +1,17 @@
-import { createClient } from "@/lib/supabase/server";
-import StoryViewer from "@/components/StoryViewer";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
+import MemberPosts from "@/components/MemberPosts";
+import { getSignedUrls } from "@/lib/signedUrls";
 import type { Reaction } from "@/components/ReactionBoard";
 
 // [id] という名前のフォルダにすると、URL の一部を受け取れます。
 // 例: /members/abc123 → id は "abc123"
 export default async function MemberPage({
   params,
+  searchParams,
 }: PageProps<"/members/[id]">) {
   const { id } = await params;
+  // ?post=<ご報告の id> = プロフィールの一覧で押したご報告。そこからストーリーで開きます
+  const { post: openPostId } = await searchParams;
   const supabase = await createClient();
 
   // ▼ 待ち時間の話
@@ -17,9 +21,10 @@ export default async function MemberPage({
   // お互いを必要としないものは Promise.all でまとめて出し、
   // 「次に進むのに必要なもの」が揃った時点で先へ進みます。
 
-  // 1回目：この3つは、どれも id だけで取れます
+  // 1回目：この4つは、どれも id だけで取れます
   // single() = 1件だけ取ってくる（配列ではなく、そのものが返ります）
-  const [{ data: profile }, { data: posts }, { data: reactions }] =
+  // getCurrentUserId = 自分か確かめるため（自分のご報告だけ、長押しで消せるようにします）。通信なしで済みます
+  const [{ data: profile }, { data: posts }, { data: reactions }, myId] =
     await Promise.all([
       supabase.from("profiles").select("display_name, avatar_url").eq("id", id).single(),
       // 列は使うものだけ並べます。
@@ -43,6 +48,7 @@ export default async function MemberPage({
         .select("id, post_id, from_user, drawing_url, posts!inner(author_id)")
         .eq("posts.author_id", id)
         .order("created_at", { ascending: false }),
+      getCurrentUserId(supabase),
     ]);
 
   // posts に入っているのは「保管庫のどこに置いたか」という場所だけです。
@@ -62,18 +68,17 @@ export default async function MemberPage({
   const drawingPaths = reactions?.map((reaction) => reaction.drawing_url) ?? [];
 
   // 2回目：この3つは、1回目の結果がそろえば同時に出せます
-  const [{ data: signedUrls }, { data: reactionUsers }, { data: drawingUrls }] =
+  //   写真のURLは lib/signedUrls.ts で作ります。同じ写真には6日間同じURLを返すので、
+  //   2回目からはブラウザが前にダウンロードした写真をそのまま使えます。
+  //   渡している場所は、どれも RLS を通して取ってきたものです（そこの約束を参照）
+  const [findSignedImage, { data: reactionUsers }, findDrawingUrl] =
     await Promise.all([
-      imagePaths.length > 0
-        ? supabase.storage.from("posts").createSignedUrls(imagePaths, 3600)
-        : Promise.resolve({ data: null }),
+      getSignedUrls("posts", imagePaths),
       supabase
         .from("profiles")
         .select("id, display_name")
         .in("id", reactionUserIds),
-      drawingPaths.length > 0
-        ? supabase.storage.from("drawings").createSignedUrls(drawingPaths, 3600)
-        : Promise.resolve({ data: null }),
+      getSignedUrls("drawings", drawingPaths),
     ]);
 
   // 置き場所から URL を探す。find() = 条件に合う最初の1件を返す
@@ -81,7 +86,7 @@ export default async function MemberPage({
     if (!path) return null;
     // デバッグ用データは最初から URL なので、そのまま使います
     if (path.startsWith("http")) return path;
-    return signedUrls?.find((item) => item.path === path)?.signedUrl ?? null;
+    return findSignedImage(path);
   };
 
   // 報告1件ぶんの反応を、表示に使う形にして返します
@@ -90,19 +95,19 @@ export default async function MemberPage({
       ?.filter((reaction) => reaction.post_id === postId)
       .map((reaction) => ({
         id: reaction.id,
-        imageUrl:
-          drawingUrls?.find((item) => item.path === reaction.drawing_url)
-            ?.signedUrl ?? null,
+        imageUrl: findDrawingUrl(reaction.drawing_url),
         authorName:
           reactionUsers?.find((user) => user.id === reaction.from_user)
             ?.display_name ?? null,
       })) ?? [];
 
-  // ▼ ストーリーのように、画面いっぱいで1枚ずつ見せます（StoryViewer）。
-  //   「〇〇さんのご報告」という見出しは置きません。上にアイコンと名前が出るためです。
+  // ▼ インスタのリールの一覧のように、縦長の写真を3列に並べます（MemberPosts）。
+  //   押すと、そこからストーリー（StoryViewer）で大きく見られます。
   return (
-    <StoryViewer
+    <MemberPosts
       authorId={id}
+      isMine={myId === id}
+      openPostId={typeof openPostId === "string" ? openPostId : null}
       authorName={profile?.display_name ?? "名無し"}
       avatarUrl={profile?.avatar_url ?? null}
       posts={
