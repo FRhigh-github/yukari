@@ -118,7 +118,7 @@ export default function PostForm({ communities }: PostFormProps) {
         <label
           className={`relative mx-auto flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl ${
             imageFile
-              ? "aspect-[9/16] w-2/3 bg-stone-700 ring-1 ring-kin/60"
+              ? "aspect-[9/16] w-2/3 bg-[#faf9f6] ring-1 ring-kin/60"
               : "h-64 w-full border border-dashed border-kin/60 bg-white"
           }`}
         >
@@ -144,10 +144,10 @@ export default function PostForm({ communities }: PostFormProps) {
                 alt=""
                 className="absolute inset-0 h-full w-full object-contain"
               />
-              {/* 下を暗くして、入力中のタイトルと本文を重ねて見せます */}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3 pt-12 text-left">
-                <p className="text-base font-bold text-white">{title || "タイトル"}</p>
-                <p className="line-clamp-4 text-[10px] leading-relaxed text-white/85">{body}</p>
+              {/* 下に白いもやをかけて、入力中のタイトルと本文を重ねて見せます */}
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#faf9f6]/90 via-[#faf9f6]/50 to-transparent p-3 pt-12 text-left">
+                <p className="text-base font-bold text-stone-800">{title || "タイトル"}</p>
+                <p className="line-clamp-4 text-[10px] leading-relaxed text-stone-600">{body}</p>
               </div>
               <span className="absolute right-2 top-2 rounded-full bg-black/50 px-2 py-1 text-[10px] text-white">
                 押すと選び直せます

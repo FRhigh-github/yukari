@@ -129,7 +129,7 @@ export default function ReactionCardSheet({
   return (
     // ▼ カードの外側。ここでのスワイプを「送る・やめる」の合図にします
     <div
-      className="absolute inset-0 z-20 flex touch-none select-none flex-col justify-end bg-black/40 px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]"
+      className="absolute inset-0 z-20 flex touch-none select-none flex-col justify-end bg-[#faf9f6]/60 px-4 backdrop-blur-sm pb-[calc(env(safe-area-inset-bottom)+1.5rem)]"
       onPointerDown={(event) => {
         swipeStartRef.current = event.clientY;
         // 指がカードの上まで動いても、最後までこちらで受け取るための命令。
@@ -162,8 +162,8 @@ export default function ReactionCardSheet({
       >
         {/* ▼ つまみ。ここを上に引くと送れます。
             カードの中は「書く」場所なので、スワイプはここ（とカードの外）で受け取ります */}
-        <div className="mx-auto mb-2 flex h-16 max-w-[40vh] flex-col items-center justify-center gap-1 rounded-2xl bg-white/15 text-white backdrop-blur">
-          <span className="h-1 w-10 rounded-full bg-white/80" />
+        <div className="mx-auto mb-2 flex h-16 max-w-[40vh] flex-col items-center justify-center gap-1 rounded-2xl bg-white/70 text-kin ring-1 ring-kin/40 backdrop-blur">
+          <span className="h-1 w-10 rounded-full bg-kin/70" />
           <span className="text-sm font-bold">
             {isSending ? "送っています…" : "↑ ここを上にスワイプして送る"}
           </span>
@@ -201,9 +201,9 @@ export default function ReactionCardSheet({
         </div>
 
         {errorText ? (
-          <p className="mt-2 text-center text-xs font-bold text-white">{errorText}</p>
+          <p className="mt-2 text-center text-xs font-bold text-beni">{errorText}</p>
         ) : null}
-        <p className="mt-2 text-center text-xs text-white/70">下を押すか、下にスワイプでやめる</p>
+        <p className="mt-2 text-center text-xs text-stone-500">下を押すか、下にスワイプでやめる</p>
       </div>
     </div>
   );

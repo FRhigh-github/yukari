@@ -9,7 +9,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactionBoard, { type Reaction } from "@/components/ReactionBoard";
 import ReactionCardSheet from "@/components/ReactionCardSheet";
@@ -50,35 +50,6 @@ export default function StoryViewer({
 
   const post = posts[index];
 
-  // ▼ この画面を開いている間だけ、一番上の帯（時計や電池が並ぶところ）を暗くします。
-  //   iPhone の Safari は、<meta name="theme-color"> の色でこの帯を塗ります。
-  //   画面ごとの設定（viewport）で変えると、ホームに戻っても黒いまま残ってしまったので、
-  //   開いたときに変えて、閉じるときに元の色へ戻すやり方にしています。
-  //
-  //   ただ、新しい iPhone の Safari（iOS 26〜）は theme-color を見ません。
-  //   代わりに「一番上に貼り付いた要素」か「body の背景色」を見るので、
-  //   body の背景色も一緒に暗くして、下の return でも細い帯を貼っています。
-  useEffect(() => {
-    const dark = "#1c1917";
-    const meta = document.querySelector('meta[name="theme-color"]');
-    const beforeMeta = meta?.getAttribute("content") ?? "#faf9f6";
-    const html = document.documentElement;
-    const body = document.body;
-    const beforeHtml = html.style.backgroundColor;
-    const beforeBody = body.style.backgroundColor;
-
-    meta?.setAttribute("content", dark);
-    html.style.backgroundColor = dark;
-    body.style.backgroundColor = dark;
-
-    // 閉じるときに、全部元に戻します
-    return () => {
-      meta?.setAttribute("content", beforeMeta);
-      html.style.backgroundColor = beforeHtml;
-      body.style.backgroundColor = beforeBody;
-    };
-  }, []);
-
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     const start = startRef.current;
     startRef.current = null;
@@ -106,13 +77,11 @@ export default function StoryViewer({
 
   return (
     // absolute inset-0 = アプリの枠（スマホ幅の1枚）いっぱいに広げます
-    <div className="absolute inset-0 z-40 select-none overflow-hidden bg-stone-700">
-      {/* ▼ Safari の上の帯を暗くするための、画面の一番上に貼り付けた細い帯です。
-          iPhone の Safari（iOS 26〜）は theme-color を無視して、
-          「画面の一番上に貼り付いている（fixed の）要素の背景色」を見て帯を塗ります。
-          写真の上のほうはもともと暗くしているので、この帯は目立ちません */}
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-50 h-2 bg-[#1c1917]" />
-
+    // ▼ 全体を白っぽい「もや」の見た目にしています。
+    //   iPhone の Safari は、一番上の帯（時計や電池の所）を思いどおりの色にできません
+    //   （iOS 26 から theme-color を見なくなったため）。
+    //   帯はアプリと同じ明るい色になるので、画面のほうも明るくして、境目を目立たなくしています。
+    <div className="absolute inset-0 z-40 select-none overflow-hidden bg-[#faf9f6]">
       {/* ▼ 写真。押す・スワイプはこの面で受け取ります。touch-none = 画面をスクロールさせない */}
       <div
         className="absolute inset-0 touch-none select-none"
@@ -125,7 +94,8 @@ export default function StoryViewer({
           <>
             {/* ▼ 後ろに、同じ写真を大きくぼかして敷きます。
                 写真と画面の形が違うと上下か左右が余りますが、
-                そこを灰色の帯ではなく写真の色でなじませるためです（インスタと同じやり方） */}
+                そこを帯ではなく写真の色でなじませるためです（インスタと同じやり方）。
+                opacity-70 で少し薄くして、後ろの生成り色と混ぜ、白いもやのように見せます */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={post.imageUrl}
@@ -147,9 +117,9 @@ export default function StoryViewer({
             />
           </>
         ) : null}
-        {/* 上と下を暗くして、白い文字を読めるようにします */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/60 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+        {/* 上と下に白いもやをかけて、濃い色の文字を読めるようにします */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#faf9f6]/85 via-[#faf9f6]/30 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#faf9f6]/90 via-[#faf9f6]/50 to-transparent" />
       </div>
 
       {/* ▼ 上：何枚あるかの線と、その人のアイコン・名前。
@@ -160,7 +130,7 @@ export default function StoryViewer({
           {posts.map((item, itemIndex) => (
             <span
               key={item.id}
-              className={`h-0.5 flex-1 rounded-full ${itemIndex <= index ? "bg-kin" : "bg-white/35"}`}
+              className={`h-0.5 flex-1 rounded-full ${itemIndex <= index ? "bg-kin" : "bg-stone-300"}`}
             />
           ))}
         </div>
@@ -178,11 +148,11 @@ export default function StoryViewer({
                   : undefined
               }
             />
-            <span className="truncate text-sm font-bold text-white">
+            <span className="truncate text-sm font-bold text-stone-800">
               {authorName}
             </span>
             {post ? (
-              <span className="shrink-0 text-xs text-white/70">
+              <span className="shrink-0 text-xs text-stone-500">
                 {new Date(post.createdAt).toLocaleDateString("ja-JP")}
               </span>
             ) : null}
@@ -190,7 +160,7 @@ export default function StoryViewer({
           <Link
             href="/"
             aria-label="閉じる"
-            className="pointer-events-auto ml-auto flex h-11 w-11 items-center justify-center text-2xl text-white"
+            className="pointer-events-auto ml-auto flex h-11 w-11 items-center justify-center text-2xl text-stone-700"
           >
             ×
           </Link>
@@ -204,16 +174,16 @@ export default function StoryViewer({
           <div className="pointer-events-auto inline-block pt-4">
             <ReactionBoard reactions={post.reactions} />
           </div>
-          <h2 className="mb-1 text-2xl font-bold text-white">{post.title}</h2>
-          <p className="line-clamp-4 text-sm leading-relaxed text-white/85">
+          <h2 className="mb-1 text-2xl font-bold text-stone-800">{post.title}</h2>
+          <p className="line-clamp-4 text-sm leading-relaxed text-stone-600">
             {post.body}
           </p>
-          <p className="mt-4 text-center text-xs text-white/70">
+          <p className="mt-4 text-center text-xs text-kin">
             ↑ 上にスワイプしてお祝いを書く
           </p>
         </div>
       ) : (
-        <p className="absolute inset-0 flex items-center justify-center text-sm text-white/70">
+        <p className="absolute inset-0 flex items-center justify-center text-sm text-stone-500">
           まだご報告はありません。
         </p>
       )}
