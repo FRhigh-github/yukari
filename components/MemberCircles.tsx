@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import MemberCircle from "@/components/MemberCircle";
 import type { Member } from "@/lib/home";
+import { createClient } from "@/lib/supabase/client";
 
 // 水引の色（globals.css と同じ）
 const BENI = "#b7282e";
@@ -112,6 +113,29 @@ export default function MemberCircles({
   members,
   currentUserId,
 }: MemberCirclesProps) {
+  const [hasLetter, setHasLetter] = useState(false);
+  const [letterId, setLetterId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function checkLetter() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("time_capsules")
+        .select("id")
+        .limit(1);
+
+      if (error || !data || data.length === 0) return;
+
+      setHasLetter(true);
+      setLetterId(data[0].id);
+    }
+
+    checkLetter();
+  }, []);
+
   // 自分は中心に置くので、輪に並べる人たちとは分けます
   const me = members.find((member) => member.id === currentUserId);
   const others = members.filter((member) => member.id !== currentUserId);
@@ -256,6 +280,16 @@ export default function MemberCircles({
         }
       }}
     >
+      {hasLetter && letterId ? (
+        <Link
+          href={`/letters/${letterId}`}
+          className="absolute right-4 top-4 z-50 rounded-full border border-stone-200 bg-white p-2 text-2xl shadow-md"
+          title="未来の手紙が届いています"
+        >
+          ✈️
+        </Link>
+      ) : null}
+
       {/* ▼ 動かす中身。移動と拡大・縮小を、この1枚にまとめてかけます */}
       <div
         className="absolute inset-0"
