@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Fragment } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -221,34 +221,65 @@ export default function EventChatPage() {
             まだメッセージはありません。<br />最初のメッセージを送ってみましょう！
           </div>
         ) : (
-          messages.map((msg) => {
+          messages.map((msg, index) => {
             const isMe = msg.user_id === currentUserId;
+
+            // 現在のメッセージの日付文字列（例: 2026/09/24）
+            const currentDateStr = new Date(msg.created_at).toLocaleDateString("ja-JP", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            });
+
+            // 1つ前のメッセージの日付文字列
+            const prevDateStr =
+              index > 0
+                ? new Date(messages[index - 1].created_at).toLocaleDateString("ja-JP", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                : null;
+
+            // 日付が変わったかどうかの判定（先頭メッセージまたは日付が異なる場合）
+            const isNewDay = currentDateStr !== prevDateStr;
+
             return (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
-              >
-                {!isMe && (
-                  <span className="text-[10px] text-gray-500 mb-1 ml-1 font-medium">
-                    {msg.user_name || "メンバー"}
-                  </span>
+              <Fragment key={msg.id}>
+                {/* 日付が変わったタイミングで日付ヘッダーを表示 */}
+                {isNewDay && (
+                  <div className="flex justify-center my-3">
+                    <span className="bg-gray-200/80 text-gray-600 text-[10px] px-3 py-0.5 rounded-full font-medium">
+                      {currentDateStr}
+                    </span>
+                  </div>
                 )}
+
                 <div
-                  className={`max-w-[75%] px-3 py-2 rounded-2xl text-xs break-words ${
-                    isMe
-                      ? "bg-amber-600 text-white rounded-br-none"
-                      : "bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm"
-                  }`}
+                  className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
                 >
-                  {msg.content}
+                  {!isMe && (
+                    <span className="text-[10px] text-gray-500 mb-1 ml-1 font-medium">
+                      {msg.user_name || "メンバー"}
+                    </span>
+                  )}
+                  <div
+                    className={`max-w-[75%] px-3 py-2 rounded-2xl text-xs break-words ${
+                      isMe
+                        ? "bg-amber-600 text-white rounded-br-none"
+                        : "bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                  <span className="text-[9px] text-gray-400 mt-0.5 px-1">
+                    {new Date(msg.created_at).toLocaleTimeString("ja-JP", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
                 </div>
-                <span className="text-[9px] text-gray-400 mt-0.5 px-1">
-                  {new Date(msg.created_at).toLocaleTimeString("ja-JP", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
+              </Fragment>
             );
           })
         )}

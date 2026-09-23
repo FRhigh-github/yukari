@@ -1,24 +1,3 @@
-// ホーム画面のマルを、自分を中心にした同心円に並べる部品です。
-//
-// 中心 = 自分。内側の輪 = 最近ご報告があった人。外側 = それ以外。
-// 中心からの距離が、そのまま「疎遠さ」になります。
-//
-// ▼ 並べ方は、蜂の巣と同じ「六角形の並び」です。
-//   1つ目の輪に6人、2つ目の輪に12人、3つ目の輪に18人…と、
-//   輪が1つ増えるごとに 6人ずつ置ける場所が増えます。
-//   どのとなりどうしも同じ距離（GAP）になるので、左右対称の、きっちりした形になります。
-//   メンバーが増えるほど輪が外へ広がって、模様そのものが大きく育っていきます。
-//
-// ▼ 指で動かせます。
-//     指1本でなぞる   … 移動
-//     指2本でつまむ   … 拡大・縮小（パソコンではマウスのホイール）
-//     ダブルタップ   … 最初の表示に戻る
-//   最初は、報告がある人がいる輪までが、ちょうど画面に収まる大きさで出します。
-//
-// ▼ 線は、水引で作る花（細い輪をいくつも重ねて、花びらにしたもの）にならっています。
-//   中心の自分と一人ひとりを「中心を通る細い輪」で結ぶので、輪が花びらのように重なります。
-//   色は、中心の近くが紅、外へ行くほど金になるグラデーションです。
-
 "use client";
 
 import Link from "next/link";
@@ -114,6 +93,7 @@ export default function MemberCircles({
   currentUserId,
 }: MemberCirclesProps) {
   const [hasLetter, setHasLetter] = useState(false);
+  const [openableCount, setOpenableCount] = useState<number>(0);
   const [letterId, setLetterId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -122,19 +102,57 @@ export default function MemberCircles({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      // 手紙が存在するか確認（飛行機マーク自体の表示判定用）
+      const { data: allLetters, error } = await supabase
         .from("time_capsules")
-        .select("id")
-        .limit(1);
+        .select("id, open_at")
+        .order("open_at", { ascending: true });
 
-      if (error || !data || data.length === 0) return;
+      if (error || !allLetters || allLetters.length === 0) {
+        setHasLetter(false);
+        return;
+      }
 
       setHasLetter(true);
-      setLetterId(data[0].id);
+
+      // LocalStorageから閲覧済みの手紙ID一覧を取得
+      const readIds: string[] = JSON.parse(
+        localStorage.getItem("read_letter_ids") || "[]"
+      );
+
+      // 開封日時を過ぎていて、かつ未読の手紙を取得
+      const now = new Date();
+      const unreadOpenable = allLetters.filter(
+        (item) => new Date(item.open_at) <= now && !readIds.includes(item.id)
+      );
+
+      setOpenableCount(unreadOpenable.length);
+
+      // 遷移先IDの設定（未読の開封可能な手紙があればそれを最優先、なければ最新の手紙ID）
+      if (unreadOpenable.length > 0) {
+        setLetterId(unreadOpenable[0].id);
+      } else {
+        setLetterId(allLetters[0].id);
+      }
     }
 
     checkLetter();
   }, []);
+
+  // 飛行機アイコンタップ時に既読保存し、赤マーク通知だけを即座に消す関数
+  const handleMarkAsRead = () => {
+    if (!letterId) return;
+    const readIds: string[] = JSON.parse(
+      localStorage.getItem("read_letter_ids") || "[]"
+    );
+    if (!readIds.includes(letterId)) {
+      localStorage.setItem(
+        "read_letter_ids",
+        JSON.stringify([...readIds, letterId])
+      );
+    }
+    setOpenableCount(0); // 赤い通知マークを消去
+  };
 
   // 自分は中心に置くので、輪に並べる人たちとは分けます
   const me = members.find((member) => member.id === currentUserId);
@@ -283,10 +301,18 @@ export default function MemberCircles({
       {hasLetter && letterId ? (
         <Link
           href={`/letters/${letterId}`}
+          onClick={handleMarkAsRead}
           className="absolute right-4 top-4 z-50 rounded-full border border-stone-200 bg-white p-2 text-2xl shadow-md"
           title="未来の手紙が届いています"
         >
-          ✈️
+          <div className="relative leading-none">
+            ✈️
+            {openableCount > 0 ? (
+              <span className="absolute -top-1.5 -right-1.5 flex min-w-[20px] h-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm border-2 border-white">
+                {openableCount > 99 ? "99+" : openableCount}
+              </span>
+            ) : null}
+          </div>
         </Link>
       ) : null}
 

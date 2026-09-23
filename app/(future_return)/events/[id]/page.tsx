@@ -19,6 +19,7 @@ type EventData = {
   description?: string;
   created_by?: string;
   confirmed_option_id?: string | null;
+  capsule_id?: string | null;
   event_date_options: DateOption[];
 };
 
@@ -76,7 +77,7 @@ export default function EventDetailPage() {
     const myId = user?.id || null;
     setCurrentUserId(myId);
 
-    // 💡 2. イベント本体の取得（イベントID、またはcapsule_idのどちらでもヒットするように変更）
+    // 2. イベント本体の取得
     const { data: eventData, error: eventErr } = await supabase
       .from("events")
       .select("*")
@@ -269,15 +270,36 @@ export default function EventDetailPage() {
   };
 
   if (loading) return <div className="p-8 text-center text-xs text-gray-400">読み込み中...</div>;
-  if (!event) return <div className="p-8 text-center text-xs text-gray-400">イベントが見つかりませんでした。</div>;
+
+  // 💡 イベントが見つからなかった場合にも「＜ 戻る」ボタンを表示
+  if (!event) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F0] max-w-sm mx-auto p-4 font-sans pb-20">
+        <div className="flex items-center justify-between mb-4">
+          <Link href={`/letters/${rawId}`} className="text-gray-500 text-xs">
+            ＜ 戻る
+          </Link>
+        </div>
+        <div className="bg-white rounded-2xl p-8 text-center text-xs text-gray-400 shadow-sm">
+          イベントが見つかりませんでした。
+        </div>
+      </div>
+    );
+  }
 
   const eventTitle = event.name || event.title || "イベント詳細";
   const isHost = !event.created_by || event.created_by === currentUserId;
 
+  // 戻り先となる手紙（capsule）のIDを確定
+  const letterId = event.capsule_id || rawId;
+
   return (
     <div className="min-h-screen bg-[#F7F5F0] max-w-sm mx-auto p-4 font-sans pb-20">
       <div className="flex items-center justify-between mb-4">
-        <Link href="/" className="text-gray-500 text-xs">＜ 戻る</Link>
+        {/* 戻るボタンの遷移先を letters ページに変更 */}
+        <Link href={`/letters/${letterId}`} className="text-gray-500 text-xs">
+          ＜ 戻る
+        </Link>
         <h1 className="text-xs font-bold text-gray-700 truncate">{eventTitle}</h1>
         <Link href={`/events/${event.id}/chat`} className="text-xs text-blue-600 font-bold">💬 チャット</Link>
       </div>
