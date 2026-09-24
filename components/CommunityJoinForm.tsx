@@ -25,7 +25,7 @@ export default function CommunityJoinForm({
 
     const supabase = createClient();
 
-    // join_community は schema.sql で用意してある DB 側の関数です。
+    // join_community は supabase/01_schema.sql で用意してある DB 側の関数です。
     // 招待コードから該当のコミュニティを探して、自分を登録してくれます。
     const { data: joinedId, error } = await supabase.rpc("join_community", {
       code: code.trim().toUpperCase(),

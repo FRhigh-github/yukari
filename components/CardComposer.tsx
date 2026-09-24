@@ -219,7 +219,7 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       const blob = await renderCardToBlob(background.kind, items);
 
       // 置き場所は「自分の id / でたらめな id.jpg」。
-      // 自分の id のフォルダにしか置けない決まりにしているためです（supabase/04_security.sql）
+      // 自分の id のフォルダにしか置けない決まりにしているためです（supabase/01_schema.sql）
       const path = `${data.user.id}/${crypto.randomUUID()}.jpg`;
       const upload = await supabase.storage
         .from("cards")
@@ -268,9 +268,9 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       router.push("/cards/inbox");
       router.refresh();
     } catch (sendError) {
-      setError(
-        sendError instanceof Error ? sendError.message : "送信に失敗しました",
-      );
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      console.error("カードを送れませんでした", sendError);
+      setError("送れませんでした。電波の良いところで、もう一度お試しください");
       setIsSending(false);
     }
   };

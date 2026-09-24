@@ -58,6 +58,12 @@ export default function SetupForm({
       return;
     }
 
+    // 空白だけの名前は DB が受け付けないので、先にここで知らせます
+    if (name.trim() === "") {
+      setMessage("お名前を入れてください");
+      return;
+    }
+
     setIsSending(true);
 
     try {
@@ -91,7 +97,7 @@ export default function SetupForm({
       const { error } = await supabase
         .from("profiles")
         .update({
-          display_name: name,
+          display_name: name.trim(),
           birthday: birthday === "" ? null : birthday,
           avatar_url: avatarUrl,
         })
@@ -105,9 +111,9 @@ export default function SetupForm({
       router.push("/start");
       router.refresh();
     } catch (setupError) {
-      setMessage(
-        setupError instanceof Error ? setupError.message : "保存に失敗しました",
-      );
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      console.error("アカウント情報を保存できませんでした", setupError);
+      setMessage("保存できませんでした。電波の良いところで、もう一度お試しください");
       setIsSending(false);
     }
   };

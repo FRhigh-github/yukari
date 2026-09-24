@@ -132,7 +132,8 @@ export default function RecoverPage() {
     });
 
     if (error) {
-      setMessage(error.message);
+      console.error("思い出ログインに失敗しました", error);
+      setMessage("ログインできませんでした。もう一度お試しください");
       setIsSending(false);
       return;
     }

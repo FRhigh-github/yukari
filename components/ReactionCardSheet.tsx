@@ -125,7 +125,9 @@ export default function ReactionCardSheet({
       setIsFlying(true);
       setTimeout(onSent, 450);
     } catch (error) {
-      setErrorText(error instanceof Error ? error.message : "不明なエラーが起きました");
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      console.error("お祝いを送れませんでした", error);
+      setErrorText("送れませんでした。電波の良いところで、もう一度お試しください");
       setIsSending(false);
     }
   };
