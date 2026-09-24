@@ -10,6 +10,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MOODS, SHOW_MOOD_ON_HOME } from "@/lib/mood";
 import type { Member } from "@/lib/home";
 import MoodIcon from "@/components/MoodIcon";
@@ -133,10 +134,20 @@ export default function MemberCircle({
         )}
       </Link>
 
-      {/* ▼ 長押しで出る小さなプロフィール */}
-      {isOpen ? (
+      {/* ▼ 長押しで出る小さなプロフィール
+            createPortal = この部品の中ではなく、ページのいちばん外側（body）に描く命令です。
+            このマルは、拡大・縮小・移動をかけた枠（MemberCircles）の中にあります。
+            その中に置くと、fixed でも画面ではなく枠が基準になってしまい、
+            プロフィールがずれたり縮んだりして、上のバーやボタンも暗くなりませんでした。
+            （isOpen は押したあとにしか true にならないので、document はブラウザの中でだけ使います） */}
+      {isOpen ? createPortal(
         <div
           onClick={() => setIsOpen(false)}
+          // 外側（MemberCircles）の「指で動かす」処理に、ここでの操作を伝えません。
+          // portal で外に描いても、React の中では親子のままなので、止めないと後ろの模様が動きます
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerMove={(event) => event.stopPropagation()}
+          onPointerUp={(event) => event.stopPropagation()}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-8"
         >
           {/* stopPropagation = ここを押したときに、背景の「閉じる」を動かさない */}
@@ -171,7 +182,8 @@ export default function MemberCircle({
               プロフィールを見る
             </Link>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );
