@@ -31,7 +31,8 @@ export default async function ChatsPage() {
           {events.map((event) => (
             <li key={event.id}>
               <Link
-                href={`/events/${event.id}/chat`}
+                // ?from=chats = チャットから戻るときに、この一覧へ帰ってこられるようにします
+                href={`/events/${event.id}/chat?from=chats`}
                 className="flex min-h-16 items-center gap-3 px-4 py-3"
               >
                 {/* ふきだしの絵 */}

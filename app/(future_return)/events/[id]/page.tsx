@@ -83,7 +83,10 @@ export default function EventDetailPage() {
   const router = useRouter();
   // ?answer=1 = チャットを開こうとしたけれど、まだ出欠を答えていない人。
   // 答えるパネルを開いた状態から始めて、保存したらそのままチャットへ進みます（chat/page.tsx）
-  const mustAnswer = useSearchParams().get("answer") === "1";
+  const searchParams = useSearchParams();
+  const mustAnswer = searchParams.get("answer") === "1";
+  // チャット一覧から来た流れを、チャットへ戻るときにも引き継ぎます
+  const fromChats = searchParams.get("from") === "chats";
 
   const [event, setEvent] = useState<EventData | null>(null);
   const [memberResponses, setMemberResponses] = useState<MemberResponse[]>([]);
@@ -302,7 +305,7 @@ export default function EventDetailPage() {
           await fetchEventData();
           setIsModalOpen(false);
           // チャットから来た人は、答え終わったらチャットへ
-          if (mustAnswer) router.push(`/events/${rawId}/chat`);
+          if (mustAnswer) router.push(`/events/${rawId}/chat${fromChats ? "?from=chats" : ""}`);
         }
       } else {
         setErrorText("〇△× を選んでください");

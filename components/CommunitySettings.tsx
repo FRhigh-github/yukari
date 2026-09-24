@@ -34,12 +34,13 @@ export default function CommunitySettings({
     // ▼ 名前は、メンバーなら誰でも変えられます。
     //   表を直接書き換えるのは作成者しかできないので、
     //   名前だけを変える DB の関数（supabase/04_security.sql の rename_community）を呼びます
-    const { error } = await supabase.rpc("rename_community", {
+    // 変えられたら true、メンバーでない・名前が長すぎるなどで変えなかったら false が返ります
+    const { data: changed, error } = await supabase.rpc("rename_community", {
       target_community: communityId,
       new_name: name,
     });
 
-    if (error) {
+    if (error || changed !== true) {
       setMessage("変更できませんでした");
       return;
     }

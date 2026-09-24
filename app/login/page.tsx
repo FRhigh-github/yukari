@@ -12,6 +12,10 @@ export default async function LoginPage({
   const { error } = await searchParams;
 
   return (
-    <LoginForm initialMessage={typeof error === "string" ? error : null} />
+    <LoginForm
+      initialMessage={typeof error === "string" ? error : null}
+      // 発表用の「デモで入る」ボタン。DEMO_COMMUNITY_ID が設定されているときだけ出します（app/api/demo-login）
+      demoEnabled={Boolean(process.env.DEMO_COMMUNITY_ID)}
+    />
   );
 }

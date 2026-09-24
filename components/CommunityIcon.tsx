@@ -104,12 +104,14 @@ export default function CommunityIcon({
       // ▼ 表を直接書き換えるのではなく、DB側の関数を呼びます。
       //   関数の中で「このコミュニティの人か」を確かめているので、
       //   メンバーでなければここでエラーが返ります。
-      const { error } = await supabase.rpc("set_community_icon", {
+      // 変えられたら true、メンバーでない・URLが違うなどで変えなかったら false が返ります
+      const { data: changed, error } = await supabase.rpc("set_community_icon", {
         target_community: communityId,
         url: savedUrl,
       });
 
       if (error) throw new Error(error.message);
+      if (changed !== true) throw new Error("このコミュニティのアイコンは変えられません");
 
       setPicked(null);
       setMessage({ text: "保存しました", isError: false });

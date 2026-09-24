@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Fragment } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Message = {
@@ -24,6 +24,12 @@ export default function EventChatPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [eventTitle, setEventTitle] = useState<string>("チャット");
   const [loading, setLoading] = useState(true);
+  // ?from=chats = ホームのチャット一覧から来たとき。戻るでその一覧へ帰します。
+  // それ以外（日程調整の画面から来たとき）は、日程調整へ帰します
+  const fromChats = useSearchParams().get("from") === "chats";
+  const backHref = fromChats ? "/chats" : `/events/${rawId}`;
+  // 日程の投票の集計（候補日ごとの〇△×の数）。チャットの上に小さく出します
+  const [votes, setVotes] = useState<{ id: string; date: string; ok: number; maybe: number; ng: number }[]>([]);
   // 送れなかったときの知らせ。前はブラウザの alert でしたが、画面の中に出します
   const [errorText, setErrorText] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -138,23 +144,41 @@ export default function EventChatPage() {
 
       // ▼ まだ日程の出欠に答えていない人は、先に答えてもらいます。
       //   候補日があって、自分の回答が1つも無いときだけ、答える画面へ移します（?answer=1）
-      if (myId) {
-        const { data: options } = await supabase
-          .from("event_date_options")
-          .select("id")
-          .eq("event_id", rawId);
-        const optionIds = options?.map((option) => option.id) ?? [];
-        if (optionIds.length > 0) {
-          const { count } = await supabase
-            .from("event_responses")
-            .select("option_id", { count: "exact", head: true })
-            .eq("user_id", myId)
-            .in("option_id", optionIds);
-          if (count === 0) {
-            router.replace(`/events/${rawId}?answer=1`);
-            return;
-          }
+      //   ついでに、候補日ごとの〇△×の数を数えて、チャットの上に出します
+      const { data: options } = await supabase
+        .from("event_date_options")
+        .select("id, event_date")
+        .eq("event_id", rawId)
+        .order("event_date", { ascending: true });
+      const optionIds = options?.map((option) => option.id) ?? [];
+      if (optionIds.length > 0) {
+        const { data: responses } = await supabase
+          .from("event_responses")
+          .select("option_id, user_id, answer")
+          .in("option_id", optionIds);
+
+        if (myId && !responses?.some((response) => response.user_id === myId)) {
+          // from も一緒に渡して、答え終わって戻ってきたときにも、戻る先が変わらないようにします
+          router.replace(`/events/${rawId}?answer=1${fromChats ? "&from=chats" : ""}`);
+          return;
         }
+
+        // answer は DB では yes / maybe / no で入っています
+        const countOf = (optionId: string, answer: string) =>
+          responses?.filter((r) => r.option_id === optionId && r.answer === answer).length ?? 0;
+        setVotes(
+          (options ?? []).map((option) => ({
+            id: option.id,
+            date: new Date(`${option.event_date}T00:00:00`).toLocaleDateString("ja-JP", {
+              month: "numeric",
+              day: "numeric",
+              weekday: "short",
+            }),
+            ok: countOf(option.id, "yes"),
+            maybe: countOf(option.id, "maybe"),
+            ng: countOf(option.id, "no"),
+          })),
+        );
       }
 
       await fetchMessages(myId);
@@ -229,11 +253,38 @@ export default function EventChatPage() {
     <div className="flex h-full flex-col bg-[#faf9f6]">
       {/* ▼ 上：戻る・イベント名 */}
       <header className="flex shrink-0 items-center gap-1 border-b border-kin/30 px-2 py-1">
-        <Link href={`/events/${rawId}`} aria-label="戻る" className="flex h-11 w-11 shrink-0 items-center justify-center text-stone-700">
+        <Link href={backHref} aria-label="戻る" className="flex h-11 w-11 shrink-0 items-center justify-center text-stone-700">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-7 w-7"><path d="M15 5l-7 7 7 7" /></svg>
         </Link>
         <h1 className="min-w-0 flex-1 truncate text-lg font-bold text-stone-800">{eventTitle}</h1>
       </header>
+
+      {/* ▼ 日程の投票を、ひと目で。候補日ごとの〇△×の数を横に並べます（多いときは横にスクロール）。
+          右のカレンダーを押すと、答えるパネルが開いた日程調整の画面へ移ります */}
+      {votes.length > 0 ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-kin/30 bg-white px-3 py-2">
+          <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto">
+            {votes.map((vote) => (
+              <span
+                key={vote.id}
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#faf9f6] px-3 py-1 text-sm ring-1 ring-kin/30"
+              >
+                <span className="font-bold text-stone-700">{vote.date}</span>
+                <span className="text-beni">〇{vote.ok}</span>
+                <span className="text-kin">△{vote.maybe}</span>
+                <span className="text-stone-400">×{vote.ng}</span>
+              </span>
+            ))}
+          </div>
+          <Link
+            href={`/events/${rawId}?answer=1${fromChats ? "&from=chats" : ""}`}
+            aria-label="投票する"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-beni text-white"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-5 w-5"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4" /><path d="M16 3v4" /></svg>
+          </Link>
+        </div>
+      ) : null}
 
       {/* ▼ メッセージ */}
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">

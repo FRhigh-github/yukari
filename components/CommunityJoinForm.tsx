@@ -28,7 +28,8 @@ export default function CommunityJoinForm({
       code: code.trim().toUpperCase(),
     });
 
-    if (error) {
+    // コードが違うとき・ゲストのときは、エラーではなく「空（null）」が返ってきます
+    if (error || !joinedId) {
       setMessage("コードが違うようです");
       return;
     }
