@@ -40,7 +40,13 @@ export async function getHomeData(selectedId: string | null) {
   //   画面側（MemberCircles.tsx）で聞いています。
   const [userId, { data: communities }] = await Promise.all([
     getCurrentUserId(supabase),
-    supabase.from("communities").select("id, name, icon_url"),
+    // 並び順を決めておかないと、DB の都合で順番が変わることがあり、
+    // ?c= 無しで開いたときの「一番上」が、開くたびに違うコミュニティになっていました。
+    // 作った順（古い順）に固定します
+    supabase
+      .from("communities")
+      .select("id, name, icon_url")
+      .order("created_at", { ascending: true }),
   ]);
 
   // 画面側は user.id だけを使うので、その形にそろえて返します

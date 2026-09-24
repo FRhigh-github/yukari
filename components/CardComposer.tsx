@@ -161,7 +161,7 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
 
     const [{ data: userData }, { data: communities }] = await Promise.all([
       supabase.auth.getUser(),
-      supabase.from("communities").select("id, name"),
+      supabase.from("communities").select("id, name").order("created_at", { ascending: true }),
     ]);
 
     if (!userData.user) {

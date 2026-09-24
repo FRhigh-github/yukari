@@ -19,7 +19,7 @@ export default async function ProfilePage() {
   // 本人確認は通信なしで済みます（lib/supabase/server.ts の getCurrentUserId）
   const [userId, { data: communities }] = await Promise.all([
     getCurrentUserId(supabase),
-    supabase.from("communities").select("name"),
+    supabase.from("communities").select("name").order("created_at", { ascending: true }),
   ]);
 
   const user = userId === null ? null : { id: userId };

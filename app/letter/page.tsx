@@ -1057,7 +1057,11 @@ export default function LetterPage() {
 
     // 送り先の候補。RLS で「自分が入っているもの」だけが返ります
     if (communities.length === 0) {
-      const { data } = await createClient().from("communities").select("id, name");
+      const { data } = await createClient()
+        .from("communities")
+        .select("id, name")
+        // 作った順に並べます（ホームのコミュニティ切り替えと同じ順）
+        .order("created_at", { ascending: true });
       setCommunities(data ?? []);
       // 最初は先頭を選んだ状態にします
       if (data && data.length > 0 && communityId === "") setCommunityId(data[0].id);
