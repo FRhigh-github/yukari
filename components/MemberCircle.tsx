@@ -65,13 +65,14 @@ export default function MemberCircle({
       <Link
         // ?view=story = 一覧を挟まずに、いきなり全画面のストーリーで開きます
         href={`/members/${member.id}?view=story`}
-        // ▼ ホームに出ている全員ぶん、ご報告の中身まで先に取っておきます。
-        //   ふつうは画面の「枠」しか先読みしないので、押してから DB に聞きに行く間、
-        //   待ち画面が見えていました。先に取っておけば、押した瞬間に開きます。
-        //   代わりにホームを開くたびに DB への問い合わせが人数ぶん増えますが、
+        // ▼ 光っている人（まだ見ていない新しいご報告がある人）だけ、ご報告の中身まで先に取っておきます。
+        //   押される見込みが高いのはこの人たちなので、押した瞬間に開くようにします。
+        //   前は全員ぶん中身まで取っていたので、ホームを開くたびに通信が30件ほど走り、
+        //   会場の Wi-Fi のように回線が弱いと、最初の操作がもたつくおそれがありました。
+        //   "auto" = ほかの人は、画面の「枠」（待ち画面まで）だけを先に取ります。
         //   一度取ったものは3分間使い回します（next.config.ts の staleTimes）。
         //   （先読みは本番のときだけ動きます。npm run dev では動きません）
-        prefetch={true}
+        prefetch={member.hasNews ? true : "auto"}
         onPointerDown={start}
         onPointerUp={cancel}
         onPointerLeave={cancel}
