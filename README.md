@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ゆかり
 
-## Getting Started
+大切な人たちのコミュニティの中で、人生の節目（結婚・出産・転職など）を「ご報告」として共有し、
+手書きのお祝いを返せるアプリです。しばよこハッカソン 9班。**スマホ専用**です。
 
-First, run the development server:
+- 画面の作りと、コードを書くときの決まりごと … [`AGENTS.md`](AGENTS.md)
+- データベースの作り方と、許可（RLS）の決まり … [`supabase/README.md`](supabase/README.md)
+
+## できること
+
+| 機能 | どこで |
+|---|---|
+| コミュニティ（招待コードで参加・作成・切り替え） | ホームの左上 |
+| ご報告を書く（写真つき） | ホームの右下の紅いボタン |
+| ご報告を見る（ストーリー）・手書きのお祝いを返す | ホームのアイコンを押す → 上にスワイプ |
+| メッセージカードを送る・届いたカードを見る | 下タブの「カード」/ ホームの左下の「ふみばこ」 |
+| 未来への手紙（タイムカプセル）と日程調整・チャット | 下タブの手紙 / ホームの右上の紙飛行機 |
+| 最後に話したのは何年前 | ホームのアイコンの「3年」の印・長押し・プロフィール |
+| 思い出ログイン（3人のコードで戻る） | ログイン画面の下 |
+
+## 動かす
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:3000
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.local` に次の4つを入れます（中身は Supabase のダッシュボードと Vercel にあります）。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...        # 絶対に NEXT_PUBLIC_ を付けない
+DEMO_COMMUNITY_ID=44444444-4444-4444-8444-000000000001   # 発表中だけ
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+データベースを作り直すときは、`supabase/README.md` の手順で
+`00_reset.sql` → `01_schema.sql` → `02_seed.sql` の順に流します。
 
-## Learn More
+## 発表（デモ）の手順
 
-To learn more about Next.js, take a look at the following resources:
+### 前日〜当日の朝
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Supabase の SQL Editor で `supabase/02_seed.sql` を流し直す
+   （ダミーのご報告の日時が「今」を基準に新しくなり、ホームでアイコンが光ります）
+2. Vercel の環境変数に `DEMO_COMMUNITY_ID` が入っていることを確かめる
+3. 発表に使うスマホで一度開き、ログイン画面に「デモで入る」が出ることを確かめる
+4. 会場の Wi-Fi が不安定なときに備えて、スマホのテザリングも用意しておく
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 本番の操作（約4分）
 
-## Deploy on Vercel
+1. **ログイン画面**で「デモで入る」を押す
+   → オープニングの水引が結ばれたら、画面を2回押してホームへ
+2. **ホーム**：自分が真ん中、まわりに仲間。
+   - 光っている輪 … まだ見ていない新しいご報告がある人
+   - 右下のハート / かばん … その人の今のステータス（会いたい！ / 多忙です）
+   - 右上の「3年」「1年」 … それだけの間やりとりしていない人（**最後に話したのは何年前**）
+3. 「3年」の人（齋藤 健介）の**アイコンを長押し** → 「会いたい！」「最後のやりとり 3年前」
+4. 画面の暗いところを押して閉じ、今度は**アイコンを押す** → ご報告のストーリー（プロポーズ成功しました）
+   → 写真を**上にスワイプ** → 白いカードに指でお祝いを描く → カードの上の**つまみを上にスワイプ**して送る
+5. 右上の × でホームへ戻り、もう一度長押し → 「最後のやりとり 今日」に変わり、「3年」の印も消えている
+6. 右下の**紅いボタン**で**ご報告を書く**：＋で写真を選ぶ → タイトル → 「ご報告」
+   → ホームの「今日 N件の報告」が1つ増える
+7. 右上の**紙飛行機** → 1年前に書かれた**未来への手紙**が開いている → 「日程調整」
+   → 「出欠を答える」→ 〇△× を選んで「保存する」→ 右上のふきだしで**チャット**
+8. 左下の**ふみばこ** → 「ようこそ」のカードが届いている → 右下の「カードを作る」
+   → 背景を選ぶ → 「ここに文字」に書く → 「カードを送る」→ 相手を選んで「この人に送る」
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 終わったあと
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Vercel の環境変数から `DEMO_COMMUNITY_ID` を消す（「デモで入る」が消えます）
+2. SQL Editor で `supabase/03_clear_demo_guests.sql` を流す（ゲストのアカウントを片づけます）
