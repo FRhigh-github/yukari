@@ -74,7 +74,8 @@ export default function ReceivedCard({
           {partnerName ?? "名無し"} <span className="font-normal text-kin">{suffix}</span>
         </p>
         <p className="text-xs text-stone-400">
-          {new Date(sentAt).toLocaleDateString("ja-JP")}
+          {/* timeZone = サーバーで描いても日本の日付にするため（サーバーの時計は世界標準時） */}
+          {new Date(sentAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
         </p>
       </button>
 

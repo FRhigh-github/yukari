@@ -185,7 +185,8 @@ export default function StoryViewer({
             </span>
             {post ? (
               <span className="shrink-0 text-xs text-stone-500">
-                {new Date(post.createdAt).toLocaleDateString("ja-JP")}
+                {/* timeZone = サーバーで描いても日本の日付にするため（サーバーの時計は世界標準時） */}
+                {new Date(post.createdAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
               </span>
             ) : null}
           </Link>
