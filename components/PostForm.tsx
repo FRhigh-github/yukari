@@ -41,62 +41,72 @@ export default function PostForm({ communities }: PostFormProps) {
       return;
     }
 
+    // 空白だけのタイトルは DB が受け付けないので、先にここで知らせます
+    if (title.trim() === "") {
+      setError("タイトルを入れてください");
+      return;
+    }
+
     setIsSending(true);
 
-    const supabase = createClient();
-    // getClaims() = ログインの証明書の署名を、この場で確かめる命令。
-    // getUser() と違って Supabase まで聞きに行かないので、送るまでの待ちが1回ぶん減ります
-    //（詳しくは lib/supabase/server.ts の getCurrentUserId）
-    const { data } = await supabase.auth.getClaims();
-    const userId = data?.claims.sub;
-    if (!userId) {
-      router.push("/login");
-      return;
-    }
+    // ▼ try / catch について
+    //   写真の変換（shrinkImage）や通信が途中で失敗すると、例外（エラー）が起きます。
+    //   受け止めないと、ボタンが「送信中...」のまま戻らず、押し直せなくなっていました。
+    //   失敗したら catch に移って、ボタンを元に戻します
+    try {
+      const supabase = createClient();
+      // getClaims() = ログインの証明書の署名を、この場で確かめる命令。
+      // getUser() と違って Supabase まで聞きに行かないので、送るまでの待ちが1回ぶん減ります
+      //（詳しくは lib/supabase/server.ts の getCurrentUserId）
+      const { data } = await supabase.auth.getClaims();
+      const userId = data?.claims.sub;
+      if (!userId) {
+        router.push("/login");
+        return;
+      }
 
-    // 写真を小さくしてから預けます。
-    //
-    // 置き場所の名前は、こちらで作った id にします。
-    // ファイル名をそのまま使うと、日本語や空白が入っていたときに
-    // 保管庫が受け付けてくれません
-    //（スマホのスクショは「スクリーンショット 2026-09-21 ....png」のような名前です）。
-    const shrunk = await shrinkImage(imageFile);
+      // 写真を小さくしてから預けます。
+      //
+      // 置き場所の名前は、こちらで作った id にします。
+      // ファイル名をそのまま使うと、日本語や空白が入っていたときに
+      // 保管庫が受け付けてくれません
+      //（スマホのスクショは「スクリーンショット 2026-09-21 ....png」のような名前です）。
+      const shrunk = await shrinkImage(imageFile);
 
-    const upload = await supabase.storage
-      .from("posts")
-      // 置き場所は「自分の id / でたらめな id.jpg」。
-      // 置き場所の決まり（supabase/04_security.sql）で、
-      // 自分の id のフォルダにしか写真を置けないようにしているためです
-      .upload(`${userId}/${crypto.randomUUID()}.jpg`, shrunk, {
-        contentType: "image/jpeg",
-        // cacheControl = ブラウザに「この写真は1年間そのまま使い回してよい」と伝えます。
-        // ファイル名は毎回ちがう id なので、同じ名前の中身が変わることはありません
-        cacheControl: "31536000",
+      const upload = await supabase.storage
+        .from("posts")
+        // 置き場所は「自分の id / でたらめな id.jpg」。
+        // 置き場所の決まり（supabase/01_schema.sql）で、
+        // 自分の id のフォルダにしか写真を置けないようにしているためです
+        .upload(`${userId}/${crypto.randomUUID()}.jpg`, shrunk, {
+          contentType: "image/jpeg",
+          // cacheControl = ブラウザに「この写真は1年間そのまま使い回してよい」と伝えます。
+          // ファイル名は毎回ちがう id なので、同じ名前の中身が変わることはありません
+          cacheControl: "31536000",
+        });
+
+      if (upload.error) throw new Error(upload.error.message);
+
+      const { error: insertError } = await supabase.from("posts").insert({
+        title: title.trim(),
+        body,
+        image_url: upload.data.path,
+        author_id: userId,
+        community_id: communityId,
       });
 
-    if (upload.error) {
-      setError("画像のアップロードに失敗しました: " + upload.error.message);
+      if (insertError) throw new Error(insertError.message);
+
+      // 投稿したコミュニティのホームへ戻ります（?c= が無いと、一番上のコミュニティが出るため）。
+      // refresh() が無いと、ホームに戻っても さっきの投稿が出ないことがあります
+      router.push(`/?c=${communityId}`);
+      router.refresh();
+    } catch (sendError) {
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      console.error("ご報告を送れませんでした", sendError);
+      setError("送れませんでした。電波の良いところで、もう一度お試しください");
       setIsSending(false);
-      return;
     }
-
-    const { error: insertError } = await supabase.from("posts").insert({
-      title,
-      body,
-      image_url: upload.data.path,
-      author_id: userId,
-      community_id: communityId,
-    });
-
-    if (insertError) {
-      setError("投稿の保存に失敗しました: " + insertError.message);
-      setIsSending(false);
-      return;
-    }
-
-    // refresh() が無いと、ホームに戻っても さっきの投稿が出ないことがあります
-    router.push("/");
-    router.refresh();
   };
 
   return (

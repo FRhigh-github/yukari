@@ -36,16 +36,23 @@ export default function LoginForm({ initialMessage, demoEnabled }: LoginFormProp
   const handleDemo = async () => {
     setMessage(null);
     setIsSending(true);
-    const response = await fetch("/api/demo-login", { method: "POST" });
-    if (!response.ok) {
-      // サーバーが返した理由（「デモの準備ができていません」など）を、そのまま出します
-      const result = await response.json().catch(() => null);
-      setMessage(result?.error ?? "デモに入れませんでした");
+    // 通信が切れていると fetch そのものが失敗します（例外）。
+    // 受け止めないと、ボタンが押せないまま戻らなくなっていました
+    try {
+      const response = await fetch("/api/demo-login", { method: "POST" });
+      if (!response.ok) {
+        // サーバーが返した理由（「デモの準備ができていません」など）を、そのまま出します
+        const result = await response.json().catch(() => null);
+        setMessage(result?.error ?? "デモに入れませんでした");
+        setIsSending(false);
+        return;
+      }
+      router.push("/");
+      router.refresh();
+    } catch {
+      setMessage("つながりませんでした。電波の良いところで、もう一度お試しください");
       setIsSending(false);
-      return;
     }
-    router.push("/");
-    router.refresh();
   };
 
   const handleLogin = async (event: React.FormEvent) => {

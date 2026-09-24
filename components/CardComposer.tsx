@@ -110,15 +110,25 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
   };
 
   const addImage = async (file: File) => {
-    const blob = await shrinkImage(file);
+    setError(null);
+    // 読めない形式の写真だと、縮める途中で失敗します（例外）。
+    // 受け止めないと何も起きないので、別の写真を選んでもらうよう知らせます
+    let src: string;
+    try {
+      const blob = await shrinkImage(file);
 
-    // 写真は data: の形にして持ちます。
-    // こうしておくと、画像に書き出すときにそのまま描けます。
-    const src = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.readAsDataURL(blob);
-    });
+      // 写真は data: の形にして持ちます。
+      // こうしておくと、画像に書き出すときにそのまま描けます。
+      src = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      setError("この写真は使えませんでした。別の写真を選んでください");
+      return;
+    }
 
     const id = crypto.randomUUID();
     setItems((current) => [

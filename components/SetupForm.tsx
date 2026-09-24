@@ -34,10 +34,17 @@ export default function SetupForm({
   const [message, setMessage] = useState<string | null>(null);
 
   const handlePick = async (file: File) => {
-    const blob = await shrinkImage(file);
-    setAvatar(blob);
-    // createObjectURL = 選んだ画像を、その場で表示できるURLにする命令
-    setPreview(URL.createObjectURL(blob));
+    setMessage(null);
+    // 読めない形式の写真（パソコンの HEIC など）だと、縮める途中で失敗します。
+    // 受け止めないと何も起きないので、別の写真を選んでもらうよう知らせます
+    try {
+      const blob = await shrinkImage(file);
+      setAvatar(blob);
+      // createObjectURL = 選んだ画像を、その場で表示できるURLにする命令
+      setPreview(URL.createObjectURL(blob));
+    } catch {
+      setMessage("この写真は使えませんでした。別の写真を選んでください");
+    }
   };
 
   const handleStart = async (event: React.FormEvent) => {
