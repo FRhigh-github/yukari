@@ -88,7 +88,7 @@ export default function MemberPosts({
 
     setIsDeleting(false);
     if (error || data?.length !== 1) {
-      setMessage("消せませんでした。supabase/04_security.sql をまだ流していないかもしれません");
+      setMessage("消せませんでした。もう一度お試しください");
       return;
     }
     setMenuPost(null);

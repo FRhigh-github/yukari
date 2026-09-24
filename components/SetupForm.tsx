@@ -34,10 +34,17 @@ export default function SetupForm({
   const [message, setMessage] = useState<string | null>(null);
 
   const handlePick = async (file: File) => {
-    const blob = await shrinkImage(file);
-    setAvatar(blob);
-    // createObjectURL = 選んだ画像を、その場で表示できるURLにする命令
-    setPreview(URL.createObjectURL(blob));
+    setMessage(null);
+    // 読めない形式の写真（パソコンの HEIC など）だと、縮める途中で失敗します。
+    // 受け止めないと何も起きないので、別の写真を選んでもらうよう知らせます
+    try {
+      const blob = await shrinkImage(file);
+      setAvatar(blob);
+      // createObjectURL = 選んだ画像を、その場で表示できるURLにする命令
+      setPreview(URL.createObjectURL(blob));
+    } catch {
+      setMessage("この写真は使えませんでした。別の写真を選んでください");
+    }
   };
 
   const handleStart = async (event: React.FormEvent) => {
@@ -48,6 +55,12 @@ export default function SetupForm({
     // 代わりにここで確かめます。
     if (birthday === "") {
       setMessage("誕生日を選んでください");
+      return;
+    }
+
+    // 空白だけの名前は DB が受け付けないので、先にここで知らせます
+    if (name.trim() === "") {
+      setMessage("お名前を入れてください");
       return;
     }
 
@@ -84,7 +97,7 @@ export default function SetupForm({
       const { error } = await supabase
         .from("profiles")
         .update({
-          display_name: name,
+          display_name: name.trim(),
           birthday: birthday === "" ? null : birthday,
           avatar_url: avatarUrl,
         })
@@ -98,9 +111,9 @@ export default function SetupForm({
       router.push("/start");
       router.refresh();
     } catch (setupError) {
-      setMessage(
-        setupError instanceof Error ? setupError.message : "保存に失敗しました",
-      );
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      console.error("アカウント情報を保存できませんでした", setupError);
+      setMessage("保存できませんでした。電波の良いところで、もう一度お試しください");
       setIsSending(false);
     }
   };

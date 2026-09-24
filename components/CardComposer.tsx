@@ -110,15 +110,25 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
   };
 
   const addImage = async (file: File) => {
-    const blob = await shrinkImage(file);
+    setError(null);
+    // 読めない形式の写真だと、縮める途中で失敗します（例外）。
+    // 受け止めないと何も起きないので、別の写真を選んでもらうよう知らせます
+    let src: string;
+    try {
+      const blob = await shrinkImage(file);
 
-    // 写真は data: の形にして持ちます。
-    // こうしておくと、画像に書き出すときにそのまま描けます。
-    const src = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.readAsDataURL(blob);
-    });
+      // 写真は data: の形にして持ちます。
+      // こうしておくと、画像に書き出すときにそのまま描けます。
+      src = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      setError("この写真は使えませんでした。別の写真を選んでください");
+      return;
+    }
 
     const id = crypto.randomUUID();
     setItems((current) => [
@@ -151,7 +161,7 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
 
     const [{ data: userData }, { data: communities }] = await Promise.all([
       supabase.auth.getUser(),
-      supabase.from("communities").select("id, name"),
+      supabase.from("communities").select("id, name").order("created_at", { ascending: true }),
     ]);
 
     if (!userData.user) {
@@ -209,7 +219,7 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       const blob = await renderCardToBlob(background.kind, items);
 
       // 置き場所は「自分の id / でたらめな id.jpg」。
-      // 自分の id のフォルダにしか置けない決まりにしているためです（supabase/04_security.sql）
+      // 自分の id のフォルダにしか置けない決まりにしているためです（supabase/01_schema.sql）
       const path = `${data.user.id}/${crypto.randomUUID()}.jpg`;
       const upload = await supabase.storage
         .from("cards")
@@ -258,9 +268,9 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       router.push("/cards/inbox");
       router.refresh();
     } catch (sendError) {
-      setError(
-        sendError instanceof Error ? sendError.message : "送信に失敗しました",
-      );
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      console.error("カードを送れませんでした", sendError);
+      setError("送れませんでした。電波の良いところで、もう一度お試しください");
       setIsSending(false);
     }
   };

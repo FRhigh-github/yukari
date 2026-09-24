@@ -42,3 +42,6 @@ next-env.d.ts
 
 # 本番の速さを測るときの出力先（next.config.ts の distDir）
 /.next-prod/
+
+# Supabase CLI が自動で作る一時ファイル
+/supabase/.temp/

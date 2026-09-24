@@ -27,25 +27,27 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 | URL | 中身 |
 |---|---|
-| URL | 中身 |
-|---|---|
-| `/` | ホーム。メンバーのマルが並ぶ。報告がある人は光る。上から引っぱると取り直す |
-| `/members/[id]` | その人のご報告一覧 |
-| `/members/[id]/profile` | その人のプロフィール。ホームでアイコンを長押しして開く |
-| `/post` | ご報告を書く |
-| `/draw` | 手書きのお祝いを描く |
+| `/` | ホーム。メンバーのマルが並ぶ。まだ見ていない報告がある人は光る。右下にステータス（会いたい / 多忙）、1年以上やりとりが無い人は右上に「3年」の印 |
+| `/members/[id]` | その人のご報告（ホームから来たときは、いきなりストーリーで開く）。上スワイプで手書きのお祝い |
+| `/members/[id]/profile` | その人のプロフィールと「最後にやりとりしたのは〜」。ホームでアイコンを長押しして開く |
+| `/post` | ご報告を書く。`?c=` で最初に選ぶコミュニティを渡す |
 | `/cards` | 背景をえらぶ（DBに聞かない。`CARD_KINDS` から出している） |
 | `/cards/new` | カードを作る。送る相手は「送る」を押してから取りに行く |
 | `/cards/inbox` | 届いた / 送ったカード |
-| `/letter` | 未来への手紙（別の人が担当） |
+| `/letter` | 未来への手紙を書く（別の人が担当） |
+| `/letters/[id]` | 届いた（開封日を過ぎた）手紙を読む。ホームの紙飛行機から |
+| `/events/[id]` `/events/[id]/chat` | 手紙に付いた日程調整と、そのチャット |
+| `/chats` | チャットの一覧。ホームの上のふきだしから |
 | `/profile` `/profile/edit` | 自分のプロフィール |
-| `/signup` `/login` `/setup` | 登録 / ログイン / 名前と誕生日の入力 |
+| `/signup` `/login` `/setup` `/start` | 登録 / ログイン / 名前と誕生日の入力 / 最初のコミュニティ選び |
 | `/recover` | 思い出ログイン（下に説明あり） |
 | `/communities/new` `/communities/join` | コミュニティを作る / 招待コードで参加 |
 | `/communities/[id]` | コミュニティの設定。ホームの切り替えの ⚙ から |
 
 下タブは `components/BottomNav.tsx`。
-タブを出したくない画面は、その中の `HIDE_NAV` に URL を足す。
+タブを出す画面は、その中の `SHOW_NAV` に並べた4つだけ（それ以外の画面は戻るボタンで帰る）。
+
+思いがけないエラーのときは `app/error.tsx`、無い URL のときは `app/not-found.tsx` が出る。
 
 コミュニティの切り替えは `components/CommunitySwitcher.tsx`。
 **「すべてのコミュニティ」は無い。** 常にどれか1つを見ている状態にする
@@ -69,24 +71,31 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 Supabase。**手順と決まりごとは `supabase/README.md` にまとめてある。**
 
 ```
-supabase/01_schema.sql   土台（テーブル・型・RLS・関数・トリガー）
-supabase/seed.sql        ダミーデータ。中で全部消してから入れ直す
-supabase/99_reset.sql    まっさらにする（危険）
+supabase/00_reset.sql             まっさらにする（危険。全アカウントも消える）
+supabase/01_schema.sql            土台（テーブル・型・RLS・関数・トリガー・保管庫）
+supabase/02_seed.sql              ダミーの10人と中身。流し直すとダミーだけ入れ替わる
+supabase/03_clear_demo_guests.sql 「デモで入る」のゲストを消す（発表後）
 ```
+
+SQL はこの4つだけ。**許可を足すときは、ダッシュボードから足さずに `01_schema.sql` に書く。**
 
 **RLS（行レベルセキュリティ）が本体。**
 画面側の `if` 文ではなく、DB 側が「誰に何を見せるか」を判断している。
 
 - `posts` / `communities` は **そのコミュニティのメンバーしか読めない**
-- `profiles` は **誰でも全員分読める**（`using (true)`）
+- `profiles` は **自分と、同じコミュニティにいる人しか読めない**
   → ホームでメンバーを出すときは `memberships` で絞る（`lib/home.ts`）
-- `time_capsules` は **開封日を過ぎた行しか返ってこない**。画面側では一切制御しない
+- `time_capsules` は **開封日を過ぎた行しか返ってこない**（書いた本人は別）。画面側では一切制御しない
+- `messages`（チャット）は **そのイベントが見える人しか読めない**
 - `recovery_codes` は **発行した本人しか読めない**
+- `interactions`（最後に話した日）は **画面からは書けない**。カード・お祝い・チャットを送ると、DB のトリガーが記録する
+- デモのゲスト（`@demo.yukari.invalid`）は、コミュニティの作成・参加・退出・名前やアイコンの変更ができない（`is_demo_guest`）
 
 テーブルを増やしたら、RLS の設定も必ず書くこと。
 書き忘れると、鍵を持っている人（＝アプリを開いた全員）が中身を全部読み書きできる。
 
-**決まった選択肢（enum）が7つある。** `member_role` や `recovery_status` など。
+**決まった選択肢（enum）が5つある。** `member_role` や `card_kind` など。
+`card_kind` は画面の `CARD_KINDS`（`components/CardTemplate.tsx`）とそろえること。
 ここに無い値を入れようとすると DB が受け付けない。`01_schema.sql` の先頭を見ること。
 
 ## 思い出ログイン
@@ -109,9 +118,11 @@ RLS の外にいる。`app/api/recovery/` が `SUPABASE_SERVICE_ROLE_KEY` を使
 
 ## いま分かっている宿題
 
-- `app/letter/page.tsx` に lint エラー（`Cannot access refs during render`）。別の人の担当
-- `messages` テーブルが未使用。チャットを作るときは RLS を書くこと（今は誰も読めない）
-- `recovery_approvals` / `recovery_contacts` は元の設計の名残。今の作りでは使っていない
+- 通知の鐘（`NotificationBell`）はアプリの中の「お知らせ」一覧。スマホへのプッシュ通知は送っていない
+- ダミーデータのアイコンとご報告の絵は public/demo/ に置いてある（外部のサービスは使っていない）
+- ログアウトは自分のプロフィール（`/profile`）のいちばん下。ログインしたまま `/login` を開くとホームへ戻る
+- `useEffect` の中で、描き直すたびに作り直される関数を呼ぶときは `useEffectEvent` で包む
+  （日程調整・チャットの画面を参照。依存から外すと lint の警告になる）
 
 ## コードの書き方
 

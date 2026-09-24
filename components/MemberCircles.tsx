@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import MemberCircle from "@/components/MemberCircle";
+import MoodIcon from "@/components/MoodIcon";
+import { MOODS, SHOW_MOOD_ON_HOME } from "@/lib/mood";
 import type { Member } from "@/lib/home";
 import { createClient } from "@/lib/supabase/client";
 
@@ -83,6 +85,17 @@ function layout(count: number) {
   return spots;
 }
 
+// 読んだ手紙の id の一覧を、ブラウザの保存領域（localStorage）から取り出します。
+// プライベートブラウズなどで保存領域が使えないと、読むだけで失敗する（例外が起きる）ことがあります。
+// そのときは「まだ何も読んでいない」として扱い、手紙のボタンが押せなくならないようにします
+function readLetterIds(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem("read_letter_ids") || "[]");
+  } catch {
+    return [];
+  }
+}
+
 type MemberCirclesProps = {
   members: Member[];
   currentUserId: string;
@@ -92,7 +105,6 @@ export default function MemberCircles({
   members,
   currentUserId,
 }: MemberCirclesProps) {
-  const [hasLetter, setHasLetter] = useState(false);
   const [openableCount, setOpenableCount] = useState<number>(0);
   const [letterId, setLetterId] = useState<string | null>(null);
 
@@ -109,16 +121,11 @@ export default function MemberCircles({
         .order("open_at", { ascending: true });
 
       if (error || !allLetters || allLetters.length === 0) {
-        setHasLetter(false);
         return;
       }
 
-      setHasLetter(true);
-
       // LocalStorageから閲覧済みの手紙ID一覧を取得
-      const readIds: string[] = JSON.parse(
-        localStorage.getItem("read_letter_ids") || "[]"
-      );
+      const readIds = readLetterIds();
 
       // 開封日時を過ぎていて、かつ未読の手紙を取得
       const now = new Date();
@@ -142,14 +149,15 @@ export default function MemberCircles({
   // 飛行機アイコンタップ時に既読保存し、赤マーク通知だけを即座に消す関数
   const handleMarkAsRead = () => {
     if (!letterId) return;
-    const readIds: string[] = JSON.parse(
-      localStorage.getItem("read_letter_ids") || "[]"
-    );
+    const readIds = readLetterIds();
     if (!readIds.includes(letterId)) {
-      localStorage.setItem(
-        "read_letter_ids",
-        JSON.stringify([...readIds, letterId])
-      );
+      // 保存できなくても、手紙は開けるので気にしません（try の中で失敗しても先へ進みます）
+      try {
+        localStorage.setItem(
+          "read_letter_ids",
+          JSON.stringify([...readIds, letterId])
+        );
+      } catch {}
     }
     setOpenableCount(0); // 赤い通知マークを消去
   };
@@ -157,6 +165,8 @@ export default function MemberCircles({
   // 自分は中心に置くので、輪に並べる人たちとは分けます
   const me = members.find((member) => member.id === currentUserId);
   const others = members.filter((member) => member.id !== currentUserId);
+  // 自分の気持ち（ステータス）。設定していなければ undefined
+  const myMood = MOODS.find((item) => item.value === me?.mood);
 
   // members は「報告がある人が先」に並んでいるので、そのまま内側の輪から埋まります
   const spots = layout(others.length);
@@ -378,6 +388,15 @@ export default function MemberCircles({
                   : undefined
               }
             />
+            {/* 自分の気持ち（ステータス）の印。まわりの人と同じ形です（MemberCircle.tsx） */}
+            {SHOW_MOOD_ON_HOME && myMood ? (
+              <span
+                aria-label={myMood.label}
+                className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-kin/40"
+              >
+                <MoodIcon value={myMood.value} className="h-3.5 w-3.5" />
+              </span>
+            ) : null}
           </Link>
         ) : null}
 

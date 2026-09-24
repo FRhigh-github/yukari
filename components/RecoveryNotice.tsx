@@ -40,7 +40,8 @@ export default function RecoveryNotice({ requests }: RecoveryNoticeProps) {
       .insert({ request_id: requestId, user_id: data.user.id });
 
     if (error) {
-      setMessage("止められませんでした: " + error.message);
+      console.error("復旧を止められませんでした", error);
+      setMessage("止められませんでした。もう一度お試しください");
       return;
     }
 

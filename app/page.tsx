@@ -7,19 +7,27 @@ import CommunitySwitcher from "@/components/CommunitySwitcher";
 import MemberCircles from "@/components/MemberCircles";
 import RecoveryNotice from "@/components/RecoveryNotice";
 import HintOverlay from "@/components/HintOverlay";
-import NotificationToggle from "@/components/NotificationToggle";
+import NotificationBell from "@/components/NotificationBell";
 import { SHOW_HINTS } from "@/lib/tutorial";
 
-// 画面の真ん中に、文と案内ボタンを1つ出すだけの小さな部品
-function Notice({ text, href, label }: { text: string; href: string; label: string }) {
+// まだどのコミュニティにも入っていない人に出す案内です。
+// 前は「参加する」だけで、招待コードを持っていない人は先へ進めませんでした。
+// 自分で輪を始められるよう、「新しく作る」も並べます（/start と同じ2つです）
+function NoCommunity() {
   return (
-    <div className="flex flex-col items-center gap-4 py-20">
-      <p className="text-sm text-stone-500">{text}</p>
+    <div className="flex flex-col items-center gap-3 px-8 py-20">
+      <p className="mb-1 text-sm text-stone-500">まだコミュニティに入っていません</p>
       <Link
-        href={href}
-        className="rounded-full bg-beni px-6 py-3 text-sm font-bold text-white"
+        href="/communities/join"
+        className="flex h-12 w-full max-w-xs items-center justify-center rounded-full bg-beni text-sm font-bold text-white"
       >
-        {label}
+        招待コードで参加する
+      </Link>
+      <Link
+        href="/communities/new"
+        className="flex h-12 w-full max-w-xs items-center justify-center rounded-full border-2 border-kin bg-white text-sm font-bold text-kin"
+      >
+        コミュニティを新しく作る
       </Link>
     </div>
   );
@@ -35,7 +43,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   // currentId = 実際に見ているコミュニティ。
   // ?c= が無いときは、getHomeData が一番上を選んで返してくれます。
-  const { user, communities, members, currentId, recoveryRequests, todayCount } =
+  const { user, communities, members, currentId, recoveryRequests, todayCount, news } =
     await getHomeData(selectedId);
 
   // ▼ ログインしていない人は、ここで追い返します。
@@ -73,7 +81,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           isGuest={isGuest}
         />
 
-        {/* 通知のオン・オフ。報告がある日は、鐘の右上に紅い点が出ます */}
+        {/* お知らせの鐘。押すと、新しいご報告の一覧が開きます（NotificationBell）。
+            まだ見ていないご報告があると、鐘の右上に紅い点が出ます */}
         {/* チャットの一覧へ（/chats）。ふきだしの線の絵だけのボタンです */}
         <Link
           href="/chats"
@@ -83,7 +92,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" width="28" height="28"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
         </Link>
 
-        <NotificationToggle hasNews={todayCount > 0} />
+        <NotificationBell news={news} />
       </header>
 
       {/* 初めての人にだけ、一言そえます */}
@@ -95,18 +104,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       <RecoveryNotice requests={recoveryRequests} />
 
       {members.length === 0 ? (
-        <Notice
-          text="まだコミュニティに入っていません"
-          href="/communities/join"
-          label="コミュニティに参加する"
-        />
+        <NoCommunity />
       ) : (
         // ▼ メンバーのアイコンを、自分を中心にした同心円に並べます（MemberCircles）。
-        //   ばらばらに散らす版（components/MemberScatter.tsx）と、
-        //   梅結びの模様（components/MizuhikiHome.tsx）は、いまは使っていません。
         //
         // flex-1 = 残りの高さを全部つかう。
-        // 上から引っぱって取り直す動き（PullToRefresh）は外しました。
+        // 上から引っぱって取り直す動きは外しました。
         // 指1本で模様を動かす操作と、同じ動きでぶつかるためです。
         // 余白（px / pb）は付けません。付けると、そこで模様が切れて見えるためです。
         // 下タブとボタンに重なるぶんは、MemberCircles の中で中心を上にずらして逃がしています。
@@ -155,7 +158,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
       {/* 右下：ご報告を書く */}
       <Link
-        href="/post"
+        // ?c= = いま見ているコミュニティ。投稿画面で最初からそれを選んでおきます
+        href={currentId ? `/post?c=${currentId}` : "/post"}
         // 投稿画面も中身まで先に取っておいて、押した瞬間に開くようにします（本番のときだけ動きます）
         prefetch={true}
         aria-label="報告する"

@@ -63,6 +63,8 @@ export default function LetterViewer({ letters, initialId }: LetterViewerProps) 
         year: "numeric",
         month: "long",
         day: "numeric",
+        // サーバーで描いても日本の日付にするため（サーバーの時計は世界標準時）
+        timeZone: "Asia/Tokyo",
       })
     : "";
 

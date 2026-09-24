@@ -112,8 +112,16 @@ export default async function MemberPage({
       openPostId={typeof openPostId === "string" ? openPostId : null}
       startInStory={view === "story"}
       // アプリの中の画面（"/" で始まり、"//" ではない）だけを受け付けます。
-      // よそのサイトの URL を入れられて、戻るで飛ばされるのを防ぐためです
-      backHref={typeof back === "string" && back.startsWith("/") && !back.startsWith("//") ? back : "/"}
+      // よそのサイトの URL を入れられて、戻るで飛ばされるのを防ぐためです。
+      // "\" も断ります。ブラウザは "/\evil.com" を "//evil.com"（よそのサイト）と読み替えるためです
+      backHref={
+        typeof back === "string" &&
+        back.startsWith("/") &&
+        !back.startsWith("//") &&
+        !back.includes("\\")
+          ? back
+          : "/"
+      }
       authorName={profile?.display_name ?? "名無し"}
       avatarUrl={profile?.avatar_url ?? null}
       posts={

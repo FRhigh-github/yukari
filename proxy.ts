@@ -66,9 +66,19 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // ▼ ログインしたままログイン画面・登録画面を開いたら、ホームへ戻します。
+  //   前はもう一度ログインの欄が出て、ログインできていないように見えていました。
+  //   別のアカウントで入りたいときは、プロフィールの「ログアウト」から出てもらいます
+  const path = request.nextUrl.pathname;
+  if (isLoggedIn && (path === "/login" || path === "/signup")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   // ▼ デモのゲストは、ほかのコミュニティを作ったり、参加したりできません。
   //   その画面を開こうとしたら、ホームへ戻します（DB 側でも止めています）
-  const path = request.nextUrl.pathname;
   if (
     isDemoGuest(data?.claims.email) &&
     (path === "/communities/new" || path === "/communities/join")

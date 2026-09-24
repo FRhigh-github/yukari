@@ -20,10 +20,13 @@ export default function CommunityCreateForm({ inline = false }: CommunityCreateF
   const router = useRouter();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // 送っている間は true。ボタンを押せなくして、二度押しで同じコミュニティが2つできるのを防ぎます
+  const [isSending, setIsSending] = useState(false);
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    setIsSending(true);
 
     const supabase = createClient();
     const { data } = await supabase.auth.getUser();
@@ -33,7 +36,7 @@ export default function CommunityCreateForm({ inline = false }: CommunityCreateF
     }
 
     // ▼ 作るのと、自分を owner として入れるのを、DB の関数1つでまとめてやります
-    //   （supabase/04_security.sql の create_community）。
+    //   （supabase/01_schema.sql の create_community）。
     //   前は画面から memberships に直接書き込んでいましたが、
     //   それを許すと「招待コードなしで、どのコミュニティにも入れる」状態になるため、
     //   直接の書き込みは止めて、この関数と join_community（招待コード）だけにしました。
@@ -43,7 +46,8 @@ export default function CommunityCreateForm({ inline = false }: CommunityCreateF
     );
 
     if (createError || typeof id !== "string") {
-      setError("作成に失敗しました: " + (createError?.message ?? "原因不明"));
+      setError("作れませんでした。名前を確かめて、もう一度お試しください");
+      setIsSending(false);
       return;
     }
 
@@ -64,9 +68,10 @@ export default function CommunityCreateForm({ inline = false }: CommunityCreateF
 
       <button
         type="submit"
-        className="h-12 w-full rounded-xl bg-beni text-sm font-bold text-white"
+        disabled={isSending}
+        className="h-12 w-full rounded-xl bg-beni text-sm font-bold text-white disabled:opacity-50"
       >
-        作る
+        {isSending ? "作っています…" : "作る"}
       </button>
 
       {error ? <p className="text-xs text-beni">{error}</p> : null}

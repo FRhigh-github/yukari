@@ -56,6 +56,13 @@ export default function ProfileForm({
 
   const handleSave = async () => {
     setMessage(null);
+
+    // 名前が空だと DB が受け付けないので、先にここで知らせます
+    if (name.trim() === "") {
+      setMessage("名前を入れてください");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -98,7 +105,7 @@ export default function ProfileForm({
       const { data: updated, error } = await supabase
         .from("profiles")
         .update({
-          display_name: name,
+          display_name: name.trim(),
           avatar_url: uploadedUrl,
           // 空のままなら null（未設定）にします
           birthday: date === "" ? null : date,
@@ -110,9 +117,7 @@ export default function ProfileForm({
       if (error) throw new Error(error.message);
 
       if (updated?.length === 0) {
-        setMessage(
-          "保存できませんでした。supabase/profile_fields.sql をまだ流していないかもしれません",
-        );
+        setMessage("保存できませんでした。もう一度お試しください");
         setIsSaving(false);
         return;
       }
@@ -120,9 +125,9 @@ export default function ProfileForm({
       router.push("/profile");
       router.refresh();
     } catch (saveError) {
-      setMessage(
-        saveError instanceof Error ? saveError.message : "保存に失敗しました",
-      );
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      console.error("プロフィールを保存できませんでした", saveError);
+      setMessage("保存できませんでした。電波の良いところで、もう一度お試しください");
       setIsSaving(false);
     }
   };

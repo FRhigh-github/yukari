@@ -47,7 +47,6 @@ export default function ReactionCardSheet({
   const [dragY, setDragY] = useState(0);
 
   // ▼ 画質の調整。スマホは 1px に2〜3個の点があるので、そのぶん細かくします
-  //   （DrawingPad.tsx と同じ考え方です）
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null) return;
@@ -104,7 +103,6 @@ export default function ReactionCardSheet({
       });
       if (blob === null) throw new Error("画像への変換に失敗しました");
 
-      // 送り方は /draw（DrawingPad.tsx）と同じです
       const path = `${userId}/${crypto.randomUUID()}.png`;
       const upload = await supabase.storage
         .from("drawings")
@@ -125,7 +123,9 @@ export default function ReactionCardSheet({
       setIsFlying(true);
       setTimeout(onSent, 450);
     } catch (error) {
-      setErrorText(error instanceof Error ? error.message : "不明なエラーが起きました");
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      console.error("お祝いを送れませんでした", error);
+      setErrorText("送れませんでした。電波の良いところで、もう一度お試しください");
       setIsSending(false);
     }
   };

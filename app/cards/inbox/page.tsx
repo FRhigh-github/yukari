@@ -112,7 +112,10 @@ export default async function CardInboxPage({
       {/* 右下に浮かせて出します（この画面には下タブが無いので、下の端の近くに置けます） */}
       <Link
         href="/cards"
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] left-1/2 ml-[6rem] flex h-11 -translate-x-1/2 items-center rounded-full bg-beni px-5 text-sm font-bold text-white ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6]"
+        // whitespace-nowrap = 折り返さない。
+        // 左の位置を画面の半分より右に決めているので、右の端までの幅しか使えず、
+        // 前は「カード／を作る」と2行に折れていました
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] left-1/2 ml-[6rem] flex h-11 -translate-x-1/2 items-center whitespace-nowrap rounded-full bg-beni px-5 text-sm font-bold text-white ring-1 ring-kin ring-offset-2 ring-offset-[#faf9f6]"
       >
         カードを作る
       </Link>

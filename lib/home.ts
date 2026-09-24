@@ -4,6 +4,7 @@
 import { cookies } from "next/headers";
 import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import { SEEN_COOKIE, parseSeen } from "@/lib/seenPosts";
+import { formatLastContact, yearsSince } from "@/lib/lastContact";
 
 export type Member = {
   id: string;
@@ -14,7 +15,34 @@ export type Member = {
   // 同じ問い合わせのついでに取れるので、待ち時間は増えません。
   birthday: string | null;
   mood: string | null;
+  // 最後にやりとりしてからの時間。「3年前」など。やりとりが無ければ null（lib/lastContact.ts）
+  lastContactLabel: string | null;
+  // 最後にやりとりしてから何年たったか。1年以上なら、相関図のアイコンに印を付けます
+  lastContactYears: number | null;
 };
+
+// 上のバーの鐘を押すと出る「お知らせ」1件ぶん。コミュニティの新しいご報告です
+export type NewsItem = {
+  postId: string;
+  authorId: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  title: string;
+  // 「2時間前」など。サーバーで作ります（下の formatAgo）
+  timeLabel: string;
+  // まだストーリーで見ていなければ true。紅い点を付けます
+  isUnseen: boolean;
+};
+
+// 投稿からどれだけたったかを「たった今」「5分前」「2時間前」「3日前」の形にします。
+// サーバーで1回だけ計算します（ブラウザでも計算すると、境目で食い違って表示がずれるため）
+function formatAgo(createdAt: string) {
+  const minutes = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+  if (minutes < 1) return "たった今";
+  if (minutes < 60) return `${minutes}分前`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}時間前`;
+  return `${Math.floor(minutes / (60 * 24))}日前`;
+}
 
 // 待ち中の復旧申請。コミュニティ全員に見せるためのものです
 export type RecoveryRequest = {
@@ -40,7 +68,13 @@ export async function getHomeData(selectedId: string | null) {
   //   画面側（MemberCircles.tsx）で聞いています。
   const [userId, { data: communities }] = await Promise.all([
     getCurrentUserId(supabase),
-    supabase.from("communities").select("id, name, icon_url"),
+    // 並び順を決めておかないと、DB の都合で順番が変わることがあり、
+    // ?c= 無しで開いたときの「一番上」が、開くたびに違うコミュニティになっていました。
+    // 作った順（古い順）に固定します
+    supabase
+      .from("communities")
+      .select("id, name, icon_url")
+      .order("created_at", { ascending: true }),
   ]);
 
   // 画面側は user.id だけを使うので、その形にそろえて返します
@@ -54,6 +88,7 @@ export async function getHomeData(selectedId: string | null) {
       currentId: null,
       recoveryRequests: [],
       todayCount: 0,
+      news: [],
     };
   }
 
@@ -73,6 +108,7 @@ export async function getHomeData(selectedId: string | null) {
       currentId: null,
       recoveryRequests: [],
       todayCount: 0,
+      news: [],
     };
   }
 
@@ -86,19 +122,26 @@ export async function getHomeData(selectedId: string | null) {
   //
   // 下の2つはどちらも targetIds しか使わないので、同時に出せます。
   // in(...) = 並べた値のどれかに一致するものを取る
-  const [{ data: memberships }, { data: recentPosts }, { data: recoveries }] =
+  const [
+    { data: memberships },
+    { data: recentPosts },
+    { data: recoveries },
+    { data: lastContacts },
+  ] =
     await Promise.all([
-      // ※ profiles を一緒に持ってくる書き方も試しましたが、DBが応じませんでした。
-      //   memberships.user_id が profiles ではなく auth.users を指しているためです。
-      //   減らすなら、DB側に関数を作る形になります。
+      // ※ profiles を一緒に持ってくる書き方も試しましたが、当時の DB では応じませんでした。
+      //   memberships.user_id が profiles ではなく auth.users を指していたためです。
+      //   作り直した今の DB（supabase/01_schema.sql）では profiles を指しているので、
+      //   memberships から profiles をまとめて取る書き方にもできます。
       supabase
         .from("memberships")
         .select("user_id")
         .in("community_id", targetIds),
-      // 「最近」は、このコミュニティの新しい投稿20件ぶん、ということにします
+      // 「最近」は、このコミュニティの新しい投稿20件ぶん、ということにします。
+      // id と title は、鐘の「お知らせ」に並べるために使います
       supabase
         .from("posts")
-        .select("author_id, created_at")
+        .select("id, title, author_id, created_at")
         .in("community_id", targetIds)
         .order("created_at", { ascending: false })
         .limit(20),
@@ -109,6 +152,13 @@ export async function getHomeData(selectedId: string | null) {
         .select("id, target_user, requested_at")
         .eq("community_id", currentId)
         .eq("status", "pending"),
+
+      // 相手ごとの「最後にやりとりした日時」（supabase/01_schema.sql の last_contacts）。
+      // 自分の分だけを取ります
+      supabase
+        .from("last_contacts")
+        .select("partner, last_at")
+        .eq("me", user.id),
     ]);
 
   // 同じ人が複数のコミュニティにいると id が重複します。
@@ -138,13 +188,23 @@ export async function getHomeData(selectedId: string | null) {
   //   上で取ってきた新しい投稿20件を、そのまま数え直しているだけなので、
   //   データベースへの問い合わせは増えていません。
   //
-  //   toDateString() は「Sat Sep 22 2026」のような文字列を返します。
-  //   時刻が入らないので、これが同じなら同じ日、と分かります。
-  const today = new Date().toDateString();
+  //   toLocaleDateString は「2026/9/22」のような、時刻の入らない日付の文字を返します。
+  //   これが同じなら同じ日、と分かります。
+  //
+  //   timeZone: "Asia/Tokyo" を必ず付けます。
+  //   この処理はサーバー（Vercel）で動き、サーバーの時計は日本ではなく世界標準時です。
+  //   付けないと、日本時間の朝9時まで「今日」が前の日のままになっていました。
+  const toJapanDate = (date: Date) =>
+    date.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
+  const today = toJapanDate(new Date());
   const todayCount =
     recentPosts?.filter(
-      (post) => new Date(post.created_at).toDateString() === today,
+      (post) => toJapanDate(new Date(post.created_at)) === today,
     ).length ?? 0;
+
+  // その人と最後にやりとりした日時。無ければ null
+  const findLastContact = (partnerId: string) =>
+    lastContacts?.find((contact) => contact.partner === partnerId)?.last_at ?? null;
 
   const members: Member[] =
     profiles?.map((profile) => ({
@@ -154,6 +214,8 @@ export async function getHomeData(selectedId: string | null) {
       hasNews: hasUnseen(profile.id),
       birthday: profile.birthday,
       mood: profile.mood,
+      lastContactLabel: formatLastContact(findLastContact(profile.id)),
+      lastContactYears: yearsSince(findLastContact(profile.id)),
     })) ?? [];
 
   // 光る人を先に並べる
@@ -169,6 +231,26 @@ export async function getHomeData(selectedId: string | null) {
           ?.displayName ?? "どなたか",
     })) ?? [];
 
+  // ▼ 鐘の「お知らせ」。新しいご報告を、自分のものを除いて10件まで並べます。
+  //   見たかどうかは、光る輪と同じく「その人のご報告をどこまで見たか」（lib/seenPosts.ts）で決めます
+  const news: NewsItem[] =
+    recentPosts
+      ?.filter((post) => post.author_id !== user.id)
+      .slice(0, 10)
+      .map((post) => {
+        const author = members.find((member) => member.id === post.author_id);
+        const seenAt = seen[post.author_id];
+        return {
+          postId: post.id,
+          authorId: post.author_id,
+          authorName: author?.displayName ?? "どなたか",
+          authorAvatarUrl: author?.avatarUrl ?? null,
+          title: post.title,
+          timeLabel: formatAgo(post.created_at),
+          isUnseen: seenAt === undefined || new Date(post.created_at) > new Date(seenAt),
+        };
+      }) ?? [];
+
   return {
     user,
     communities: list,
@@ -176,5 +258,6 @@ export async function getHomeData(selectedId: string | null) {
     currentId,
     recoveryRequests,
     todayCount,
+    news,
   };
 }

@@ -10,6 +10,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MOODS, SHOW_MOOD_ON_HOME } from "@/lib/mood";
 import type { Member } from "@/lib/home";
 import MoodIcon from "@/components/MoodIcon";
@@ -64,13 +65,14 @@ export default function MemberCircle({
       <Link
         // ?view=story = 一覧を挟まずに、いきなり全画面のストーリーで開きます
         href={`/members/${member.id}?view=story`}
-        // ▼ ホームに出ている全員ぶん、ご報告の中身まで先に取っておきます。
-        //   ふつうは画面の「枠」しか先読みしないので、押してから DB に聞きに行く間、
-        //   待ち画面が見えていました。先に取っておけば、押した瞬間に開きます。
-        //   代わりにホームを開くたびに DB への問い合わせが人数ぶん増えますが、
+        // ▼ 光っている人（まだ見ていない新しいご報告がある人）だけ、ご報告の中身まで先に取っておきます。
+        //   押される見込みが高いのはこの人たちなので、押した瞬間に開くようにします。
+        //   前は全員ぶん中身まで取っていたので、ホームを開くたびに通信が30件ほど走り、
+        //   会場の Wi-Fi のように回線が弱いと、最初の操作がもたつくおそれがありました。
+        //   "auto" = ほかの人は、画面の「枠」（待ち画面まで）だけを先に取ります。
         //   一度取ったものは3分間使い回します（next.config.ts の staleTimes）。
         //   （先読みは本番のときだけ動きます。npm run dev では動きません）
-        prefetch={true}
+        prefetch={member.hasNews ? true : "auto"}
         onPointerDown={start}
         onPointerUp={cancel}
         onPointerLeave={cancel}
@@ -111,12 +113,25 @@ export default function MemberCircle({
             />
           </div>
 
-          {/* 気持ちの印 */}
-          {/* 気持ちの印。顔にかぶらないよう、輪の外へ少し逃がしています。
-              SHOW_MOOD_ON_HOME が false のあいだは出しません（lib/mood.ts） */}
+          {/* 気持ち（ステータス）の印。顔にかぶらないよう、輪の外へ少し逃がしています。
+              SHOW_MOOD_ON_HOME が false のあいだは出しません（lib/mood.ts）。
+              h-5 w-5 = 20px。前の 16px では、相関図の上では小さくて見分けにくかったため */}
           {SHOW_MOOD_ON_HOME && mood ? (
-            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[8px] shadow-sm">
-              <MoodIcon value={mood.value} className="h-3 w-3" />
+            <span
+              aria-label={mood.label}
+              className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-kin/40"
+            >
+              <MoodIcon value={mood.value} className="h-3.5 w-3.5" />
+            </span>
+          ) : null}
+
+          {/* ▼ 「最後に話したのは何年前」の印。
+                1年以上やりとりが無い人にだけ「3年」のように付けます。
+                全員に付けると印だらけになるので、ごぶさたの人だけが目に入るようにしています。
+                数えているのは DB です（カード・お祝い・チャットを送ると記録されます） */}
+          {member.lastContactYears !== null && member.lastContactYears >= 1 ? (
+            <span className="absolute -right-2 -top-1 rounded-full bg-white px-1.5 text-[11px] font-bold leading-4 text-stone-500 shadow-sm ring-1 ring-kin/60">
+              {member.lastContactYears}年
             </span>
           ) : null}
         </div>
@@ -133,10 +148,20 @@ export default function MemberCircle({
         )}
       </Link>
 
-      {/* ▼ 長押しで出る小さなプロフィール */}
-      {isOpen ? (
+      {/* ▼ 長押しで出る小さなプロフィール
+            createPortal = この部品の中ではなく、ページのいちばん外側（body）に描く命令です。
+            このマルは、拡大・縮小・移動をかけた枠（MemberCircles）の中にあります。
+            その中に置くと、fixed でも画面ではなく枠が基準になってしまい、
+            プロフィールがずれたり縮んだりして、上のバーやボタンも暗くなりませんでした。
+            （isOpen は押したあとにしか true にならないので、document はブラウザの中でだけ使います） */}
+      {isOpen ? createPortal(
         <div
           onClick={() => setIsOpen(false)}
+          // 外側（MemberCircles）の「指で動かす」処理に、ここでの操作を伝えません。
+          // portal で外に描いても、React の中では親子のままなので、止めないと後ろの模様が動きます
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerMove={(event) => event.stopPropagation()}
+          onPointerUp={(event) => event.stopPropagation()}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-8"
         >
           {/* stopPropagation = ここを押したときに、背景の「閉じる」を動かさない */}
@@ -164,6 +189,18 @@ export default function MemberCircle({
               </p>
             ) : null}
 
+            {/* 最後にやりとりした時。まだ一度も無ければ、そう出します */}
+            <p className="mt-2 text-sm text-stone-500">
+              {member.lastContactLabel === null ? (
+                "まだやりとりはありません"
+              ) : (
+                <>
+                  最後のやりとり{" "}
+                  <span className="font-bold text-kin">{member.lastContactLabel}</span>
+                </>
+              )}
+            </p>
+
             <Link
               href={`/members/${member.id}/profile`}
               className="mt-4 block rounded-full bg-beni py-2.5 text-xs font-bold text-white"
@@ -171,7 +208,8 @@ export default function MemberCircle({
               プロフィールを見る
             </Link>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );

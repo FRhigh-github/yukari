@@ -44,12 +44,21 @@ export default function RecoverPage() {
     setMessage(null);
     setIsSending(true);
 
-    const response = await fetch("/api/recovery", {
-      method: "POST",
-      body: JSON.stringify({ codes }),
-    });
-
-    const result = await response.json();
+    // 通信が切れていると、fetch そのものが失敗します（例外）。
+    // 受け止めないと、ボタンが押せないまま戻らなくなるので、ここで知らせて戻します
+    let response: Response;
+    let result;
+    try {
+      response = await fetch("/api/recovery", {
+        method: "POST",
+        body: JSON.stringify({ codes }),
+      });
+      result = await response.json();
+    } catch {
+      setMessage("つながりませんでした。電波の良いところで、もう一度お試しください");
+      setIsSending(false);
+      return;
+    }
 
     if (!response.ok) {
       setMessage(result.error);
@@ -86,12 +95,20 @@ export default function RecoverPage() {
       saved = {};
     }
 
-    const response = await fetch("/api/recovery/complete", {
-      method: "POST",
-      body: JSON.stringify({ requestId: saved.requestId, ticket: saved.ticket }),
-    });
-
-    const result = await response.json();
+    // 上の handleSubmit と同じく、通信の失敗を受け止めます
+    let response: Response;
+    let result;
+    try {
+      response = await fetch("/api/recovery/complete", {
+        method: "POST",
+        body: JSON.stringify({ requestId: saved.requestId, ticket: saved.ticket }),
+      });
+      result = await response.json();
+    } catch {
+      setMessage("つながりませんでした。電波の良いところで、もう一度お試しください");
+      setIsSending(false);
+      return;
+    }
 
     if (!response.ok) {
       setMessage(result.error);
@@ -115,7 +132,8 @@ export default function RecoverPage() {
     });
 
     if (error) {
-      setMessage(error.message);
+      console.error("思い出ログインに失敗しました", error);
+      setMessage("ログインできませんでした。もう一度お試しください");
       setIsSending(false);
       return;
     }

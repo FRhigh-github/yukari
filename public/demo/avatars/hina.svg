@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<!-- 中村 陽菜（犬を飼いはじめた人。アイコンは柴犬） -->
+<rect width="200" height="200" fill="#cfe6f5"/>
+<path d="M30 200 C 36 160, 70 146, 100 146 C 130 146, 164 160, 170 200 Z" fill="#d9893b"/>
+<path d="M52 72 L 60 26 L 92 58 Z" fill="#d9893b"/><path d="M148 72 L 140 26 L 108 58 Z" fill="#d9893b"/>
+<path d="M60 64 L 64 38 L 84 58 Z" fill="#f3b6a8"/><path d="M140 64 L 136 38 L 116 58 Z" fill="#f3b6a8"/>
+<ellipse cx="100" cy="98" rx="56" ry="50" fill="#d9893b"/>
+<path d="M58 110 C 64 142, 84 154, 100 154 C 116 154, 136 142, 142 110 C 128 124, 116 126, 100 116 C 84 126, 72 124, 58 110 Z" fill="#fff7ee"/>
+<ellipse cx="100" cy="126" rx="24" ry="18" fill="#fff7ee"/>
+<circle cx="80" cy="80" r="5" fill="#fff7ee"/><circle cx="120" cy="80" r="5" fill="#fff7ee"/>
+<ellipse cx="80" cy="96" rx="5.5" ry="6.5" fill="#2b2320"/><ellipse cx="120" cy="96" rx="5.5" ry="6.5" fill="#2b2320"/>
+<circle cx="81.5" cy="94" r="1.8" fill="#fff"/><circle cx="121.5" cy="94" r="1.8" fill="#fff"/>
+<ellipse cx="100" cy="114" rx="9" ry="6.5" fill="#2b2320"/>
+<path d="M100 120 L 100 128 M 90 130 Q 100 138 110 130" fill="none" stroke="#2b2320" stroke-width="3" stroke-linecap="round"/>
+<path d="M100 170 C 94 164, 86 160, 86 154" fill="none" stroke="#b7282e" stroke-width="6" stroke-linecap="round"/>
+</svg>

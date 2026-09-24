@@ -10,6 +10,7 @@ import Link from "next/link";
 import PostGrid from "@/components/PostGrid";
 import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
+import LogoutButton from "@/components/LogoutButton";
 import { getSignedUrls } from "@/lib/signedUrls";
 
 export default async function ProfilePage() {
@@ -19,7 +20,7 @@ export default async function ProfilePage() {
   // 本人確認は通信なしで済みます（lib/supabase/server.ts の getCurrentUserId）
   const [userId, { data: communities }] = await Promise.all([
     getCurrentUserId(supabase),
-    supabase.from("communities").select("name"),
+    supabase.from("communities").select("name").order("created_at", { ascending: true }),
   ]);
 
   const user = userId === null ? null : { id: userId };
@@ -92,6 +93,11 @@ export default async function ProfilePage() {
           })) ?? []
         }
       />
+
+      {/* ログアウト。いちばん下の、押し間違えにくい場所に置きます */}
+      <div className="px-4 pt-10">
+        <LogoutButton />
+      </div>
     </main>
   );
 }

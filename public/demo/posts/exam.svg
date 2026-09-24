@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" width="900" height="1200">
+<!-- 資格に受かりました：合格の賞状と桜 -->
+<defs><linearGradient id="desk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d7b184"/><stop offset="1" stop-color="#a97a4b"/></linearGradient></defs>
+<rect width="900" height="1200" fill="url(#desk)"/>
+<path d="M0 200 L 900 260 M 0 520 L 900 580 M 0 900 L 900 950" stroke="#8a5f3a" stroke-opacity=".2" stroke-width="5"/>
+<g transform="rotate(-4 450 600)">
+<rect x="170" y="250" width="560" height="720" fill="#fffdf6" stroke="#c2a14d" stroke-width="10"/>
+<rect x="200" y="280" width="500" height="660" fill="none" stroke="#c2a14d" stroke-width="3"/>
+<rect x="300" y="360" width="300" height="18" rx="9" fill="#d9cfb8"/><rect x="260" y="420" width="380" height="14" rx="7" fill="#e6dfcc"/><rect x="260" y="456" width="340" height="14" rx="7" fill="#e6dfcc"/><rect x="260" y="492" width="360" height="14" rx="7" fill="#e6dfcc"/>
+<circle cx="450" cy="700" r="130" fill="none" stroke="#b7282e" stroke-width="16" opacity=".9"/>
+<text x="450" y="742" text-anchor="middle" font-size="118" font-weight="700" fill="#b7282e" font-family="'Hiragino Mincho ProN','Yu Mincho','Noto Serif JP',serif" opacity=".9">合格</text>
+</g>
+<g transform="rotate(28 700 1040)"><rect x="560" y="1020" width="280" height="36" fill="#f2c94c"/><path d="M840 1020 L 890 1038 L 840 1056 Z" fill="#f4dcb0"/><path d="M872 1032 L 890 1038 L 872 1044 Z" fill="#3a302b"/><rect x="540" y="1020" width="24" height="36" fill="#e38d8d"/></g>
+<ellipse cx="120" cy="180" rx="16" ry="10" fill="#f6c1cf" transform="rotate(20 120 180)"/><ellipse cx="780" cy="150" rx="16" ry="10" fill="#f6c1cf" transform="rotate(-30 780 150)"/><ellipse cx="820" cy="420" rx="16" ry="10" fill="#f6c1cf" transform="rotate(60 820 420)"/><ellipse cx="90" cy="760" rx="16" ry="10" fill="#f6c1cf" transform="rotate(-15 90 760)"/><ellipse cx="760" cy="860" rx="16" ry="10" fill="#f6c1cf" transform="rotate(40 760 860)"/><ellipse cx="160" cy="1080" rx="16" ry="10" fill="#f6c1cf" transform="rotate(10 160 1080)"/><ellipse cx="640" cy="200" rx="16" ry="10" fill="#f6c1cf" transform="rotate(80 640 200)"/>
+</svg>

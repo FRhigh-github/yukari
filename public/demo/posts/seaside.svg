@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" width="900" height="1200">
+<!-- 引っ越しました：海のそばの家 -->
+<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fc1ec"/><stop offset="1" stop-color="#dff1fb"/></linearGradient>
+<linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f8fc4"/><stop offset="1" stop-color="#6cc3de"/></linearGradient></defs>
+<rect width="900" height="1200" fill="url(#sky)"/>
+<g fill="#ffffff" opacity=".9"><ellipse cx="220" cy="230" rx="110" ry="40"/><ellipse cx="290" cy="210" rx="80" ry="50"/><ellipse cx="660" cy="320" rx="120" ry="38"/><ellipse cx="720" cy="300" rx="70" ry="44"/></g>
+<circle cx="720" cy="170" r="60" fill="#fff3c4"/>
+<rect y="620" width="900" height="260" fill="url(#sea)"/>
+<path d="M0 660 q 40 -12 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0" fill="none" stroke="#ffffff" stroke-width="6" opacity=".5"/>
+<path d="M0 760 q 40 -12 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0 t 80 0" fill="none" stroke="#ffffff" stroke-width="5" opacity=".35"/>
+<path d="M0 860 C 200 820, 700 820, 900 860 L 900 1200 L 0 1200 Z" fill="#f2dcae"/>
+<rect x="290" y="720" width="320" height="260" fill="#ffffff"/>
+<path d="M260 730 L 450 580 L 640 730 Z" fill="#b7282e"/>
+<rect x="420" y="850" width="64" height="130" fill="#8a5f3a"/><circle cx="470" cy="918" r="5" fill="#f2c94c"/>
+<rect x="320" y="780" width="72" height="64" fill="#9fd3f0" stroke="#8a5f3a" stroke-width="6"/><rect x="510" y="780" width="72" height="64" fill="#9fd3f0" stroke="#8a5f3a" stroke-width="6"/>
+<path d="M170 980 C 176 900, 168 840, 190 780" stroke="#6b4a36" stroke-width="16" fill="none" stroke-linecap="round"/>
+<g fill="#3f7a4e"><ellipse cx="190" cy="770" rx="90" ry="30"/><ellipse cx="150" cy="830" rx="70" ry="24"/><ellipse cx="230" cy="720" rx="60" ry="22"/></g>
+<path d="M560 420 q 16 -16 32 0 q 16 -16 32 0" fill="none" stroke="#3c4b62" stroke-width="5" stroke-linecap="round"/>
+</svg>

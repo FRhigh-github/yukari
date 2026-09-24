@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" width="900" height="1200">
+<!-- 店を出しました：小さなコーヒー屋 -->
+<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7e6cf"/><stop offset="1" stop-color="#f3d3ad"/></linearGradient>
+<linearGradient id="win" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe6a6"/><stop offset="1" stop-color="#f7b46a"/></linearGradient></defs>
+<rect width="900" height="1200" fill="url(#sky)"/>
+<rect x="130" y="260" width="640" height="760" fill="#7a5238"/>
+<rect x="130" y="260" width="640" height="70" fill="#5f3e2a"/>
+<rect x="260" y="290" width="380" height="24" rx="12" fill="#f4ece2"/>
+<path d="M130 420 L 210 420 L 210 500 C 190 530, 150 530, 130 500 Z" fill="#2f6b4f"/><path d="M210 420 L 290 420 L 290 500 C 270 530, 230 530, 210 500 Z" fill="#f4ece2"/><path d="M290 420 L 370 420 L 370 500 C 350 530, 310 530, 290 500 Z" fill="#2f6b4f"/><path d="M370 420 L 450 420 L 450 500 C 430 530, 390 530, 370 500 Z" fill="#f4ece2"/><path d="M450 420 L 530 420 L 530 500 C 510 530, 470 530, 450 500 Z" fill="#2f6b4f"/><path d="M530 420 L 610 420 L 610 500 C 590 530, 550 530, 530 500 Z" fill="#f4ece2"/><path d="M610 420 L 690 420 L 690 500 C 670 530, 630 530, 610 500 Z" fill="#2f6b4f"/><path d="M690 420 L 770 420 L 770 500 C 750 530, 710 530, 690 500 Z" fill="#f4ece2"/>
+<rect x="130" y="400" width="640" height="24" fill="#24533d"/>
+<rect x="170" y="560" width="330" height="330" rx="10" fill="url(#win)" stroke="#3e281b" stroke-width="12"/>
+<path d="M335 560 L 335 890 M 170 725 L 500 725" stroke="#3e281b" stroke-width="8"/>
+<rect x="560" y="560" width="170" height="460" rx="8" fill="#4b3223" stroke="#3e281b" stroke-width="10"/>
+<rect x="585" y="590" width="120" height="180" rx="6" fill="url(#win)"/><circle cx="700" cy="820" r="9" fill="#f2c94c"/>
+<path d="M280 780 L 390 780 L 380 850 C 376 866, 294 866, 290 850 Z" fill="#fffaf2"/><path d="M390 796 C 420 796, 420 832, 386 832" fill="none" stroke="#fffaf2" stroke-width="10"/>
+<path d="M310 760 C 300 740, 320 730, 310 710 M 340 760 C 330 740, 350 730, 340 710 M 370 760 C 360 740, 380 730, 370 710" fill="none" stroke="#fffaf2" stroke-width="6" stroke-linecap="round" opacity=".8"/>
+<path d="M110 1100 L 170 900 L 230 1100" fill="none" stroke="#3e281b" stroke-width="10"/><rect x="120" y="930" width="100" height="120" rx="6" fill="#2b2b2b"/><path d="M146 990 L 194 990 L 190 1024 C 188 1032, 152 1032, 150 1024 Z" fill="#fffaf2"/>
+<path d="M760 1020 L 840 1020 L 828 1100 L 772 1100 Z" fill="#b8683a"/><g fill="#4f8a5b"><ellipse cx="800" cy="980" rx="44" ry="56"/><ellipse cx="770" cy="1000" rx="30" ry="36"/><ellipse cx="832" cy="996" rx="30" ry="36"/></g>
+<rect y="1020" width="900" height="180" fill="#9a9086"/><path d="M0 1060 L 900 1060" stroke="#877d73" stroke-width="6"/>
+</svg>
