@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, Fragment } from "react";
+import { useEffect, useEffectEvent, useState, useRef, Fragment } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -86,11 +86,104 @@ export default function EventChatPage() {
     }
   };
 
+  // ▼ useEffectEvent について（React 19.2 の機能）
+  //   下の useEffect は「rawId が変わったときだけ」動かしたい処理です。
+  //   ところが中で使う fetchMessages などは、描き直すたびに作り直されるので、
+  //   そのまま useEffect の依存に入れると、描き直すたびに読み直し・購読し直しになってしまいます。
+  //   useEffectEvent で包んだ関数は依存に入れなくてよく、呼んだ時点の最新の中身で動きます。
+
+  // 新しい発言が届いたとき（リアルタイム）に、名前を添えて一覧の最後に足します
+  const handleNewMessage = useEffectEvent(async (newMsg: Message) => {
+    const myId = currentUserIdRef.current;
+
+    const senderName =
+      newMsg.user_id === myId
+        ? "自分"
+        : await fetchUserName(newMsg.user_id);
+
+    const msgWithName: Message = {
+      ...newMsg,
+      user_name: senderName,
+    };
+
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === msgWithName.id)) return prev;
+      return [...prev, msgWithName];
+    });
+  });
+
+  // 初期データ（ユーザー・イベント情報・過去ログ）の取得
+  const initChat = useEffectEvent(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const myId = user?.id || null;
+    setCurrentUserId(myId);
+    currentUserIdRef.current = myId;
+
+    const { data: eventData } = await supabase
+      .from("events")
+      // events の名前の列は name だけです（title という列は無く、前は読むのに失敗して「チャット」のままでした）
+      .select("name")
+      .eq("id", rawId)
+      .maybeSingle();
+
+    if (eventData) {
+      setEventTitle(eventData.name || "チャット");
+    }
+
+    // ▼ まだ日程の出欠に答えていない人は、先に答えてもらいます。
+    //   候補日があって、自分の回答が1つも無いときだけ、答える画面へ移します（?answer=1）
+    //   ついでに、候補日ごとの〇△×の数を数えて、チャットの上に出します
+    const { data: options } = await supabase
+      .from("event_date_options")
+      .select("id, event_date")
+      .eq("event_id", rawId)
+      .order("event_date", { ascending: true });
+    const optionIds = options?.map((option) => option.id) ?? [];
+    if (optionIds.length > 0) {
+      const { data: responses } = await supabase
+        .from("event_responses")
+        .select("option_id, user_id, answer")
+        .in("option_id", optionIds);
+
+      if (myId && !responses?.some((response) => response.user_id === myId)) {
+        // from も一緒に渡して、答え終わって戻ってきたときにも、戻る先が変わらないようにします
+        router.replace(`/events/${rawId}?answer=1${fromChats ? "&from=chats" : ""}`);
+        return;
+      }
+
+      // answer は DB では yes / maybe / no で入っています
+      const countOf = (optionId: string, answer: string) =>
+        responses?.filter((r) => r.option_id === optionId && r.answer === answer).length ?? 0;
+      setVotes(
+        (options ?? []).map((option) => ({
+          id: option.id,
+          date: new Date(`${option.event_date}T00:00:00`).toLocaleDateString("ja-JP", {
+            month: "numeric",
+            day: "numeric",
+            weekday: "short",
+          }),
+          ok: countOf(option.id, "yes"),
+          maybe: countOf(option.id, "maybe"),
+          ng: countOf(option.id, "no"),
+        })),
+      );
+    }
+
+    await fetchMessages(myId);
+    setLoading(false);
+  });
+
   useEffect(() => {
     if (!rawId) return;
 
+    // supabase の窓口は、ブラウザでは1つを使い回す作りなので、ここで呼んでも上の supabase と同じものです。
+    // （上の supabase をそのまま使うと、useEffect の依存に入れる必要が出てくるため、ここで受け取り直しています）
+    const client = createClient();
+
     // 1. チャンネル作成と購読を同期的に実行（非同期処理の待機による二重登録を回避）
-    const channel = supabase
+    const channel = client
       .channel(`event_chat_${rawId}`)
       .on(
         "postgres_changes",
@@ -100,96 +193,23 @@ export default function EventChatPage() {
           table: "messages",
           filter: `event_id=eq.${rawId}`,
         },
-        async (payload) => {
-          const newMsg = payload.new as Message;
-          const myId = currentUserIdRef.current;
-
-          const senderName =
-            newMsg.user_id === myId
-              ? "自分"
-              : await fetchUserName(newMsg.user_id);
-
-          const msgWithName: Message = {
-            ...newMsg,
-            user_name: senderName,
-          };
-
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === msgWithName.id)) return prev;
-            return [...prev, msgWithName];
-          });
+        (payload) => {
+          handleNewMessage(payload.new as Message);
         }
       )
       .subscribe();
 
-    // 2. 初期データ（ユーザー・イベント情報・過去ログ）の取得
-    const initChat = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const myId = user?.id || null;
-      setCurrentUserId(myId);
-      currentUserIdRef.current = myId;
-
-      const { data: eventData } = await supabase
-        .from("events")
-        // events の名前の列は name だけです（title という列は無く、前は読むのに失敗して「チャット」のままでした）
-        .select("name")
-        .eq("id", rawId)
-        .maybeSingle();
-
-      if (eventData) {
-        setEventTitle(eventData.name || "チャット");
-      }
-
-      // ▼ まだ日程の出欠に答えていない人は、先に答えてもらいます。
-      //   候補日があって、自分の回答が1つも無いときだけ、答える画面へ移します（?answer=1）
-      //   ついでに、候補日ごとの〇△×の数を数えて、チャットの上に出します
-      const { data: options } = await supabase
-        .from("event_date_options")
-        .select("id, event_date")
-        .eq("event_id", rawId)
-        .order("event_date", { ascending: true });
-      const optionIds = options?.map((option) => option.id) ?? [];
-      if (optionIds.length > 0) {
-        const { data: responses } = await supabase
-          .from("event_responses")
-          .select("option_id, user_id, answer")
-          .in("option_id", optionIds);
-
-        if (myId && !responses?.some((response) => response.user_id === myId)) {
-          // from も一緒に渡して、答え終わって戻ってきたときにも、戻る先が変わらないようにします
-          router.replace(`/events/${rawId}?answer=1${fromChats ? "&from=chats" : ""}`);
-          return;
-        }
-
-        // answer は DB では yes / maybe / no で入っています
-        const countOf = (optionId: string, answer: string) =>
-          responses?.filter((r) => r.option_id === optionId && r.answer === answer).length ?? 0;
-        setVotes(
-          (options ?? []).map((option) => ({
-            id: option.id,
-            date: new Date(`${option.event_date}T00:00:00`).toLocaleDateString("ja-JP", {
-              month: "numeric",
-              day: "numeric",
-              weekday: "short",
-            }),
-            ok: countOf(option.id, "yes"),
-            maybe: countOf(option.id, "maybe"),
-            ng: countOf(option.id, "no"),
-          })),
-        );
-      }
-
-      await fetchMessages(myId);
-      setLoading(false);
+    // 2. 初期データの取得。
+    //   async の関数を中で作って呼ぶ形にしているのは、
+    //   取り終わってから画面を書き換える（=待ってから setState する）ことを React に伝えるためです
+    const load = async () => {
+      await initChat();
     };
-
-    initChat();
+    load();
 
     // 3. クリーンアップで確実にチャンネルを解除
     return () => {
-      supabase.removeChannel(channel);
+      client.removeChannel(channel);
     };
   }, [rawId]);
 

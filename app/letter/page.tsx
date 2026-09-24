@@ -1182,6 +1182,7 @@ export default function LetterPage() {
       }
       return (
         // object-cover = 枠の形が写真と違っても、ゆがめずに、はみ出たぶんを切り取って見せる
+        // eslint-disable-next-line @next/next/no-img-element -- その場で選んだ写真（blob: の URL）は、next/image では出せないため
         <img
           src={item.imageSrc}
           alt="選んだ写真"

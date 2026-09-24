@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -215,11 +215,20 @@ export default function EventDetailPage() {
   };
 
   // 画面を開いたとき（とURLのidが変わったとき）に取りに行きます。
+  //
+  // ▼ useEffectEvent について（React 19.2 の機能）
+  //   fetchEventData は描き直すたびに作り直されるので、そのまま useEffect の依存に入れると、
+  //   描き直すたびに取りに行ってしまいます。useEffectEvent で包んだ関数は依存に入れなくてよく、
+  //   rawId が変わったときだけ動き、中では最新の fetchEventData を使えます。
+  const loadEvent = useEffectEvent(async () => {
+    await fetchEventData();
+  });
+
   // async の関数を中で作って呼ぶ形にしているのは、
   // 取り終わってから画面を書き換える（=待ってから setState する）ことを React に伝えるためです
   useEffect(() => {
     const load = async () => {
-      await fetchEventData();
+      await loadEvent();
     };
     load();
   }, [rawId]);
