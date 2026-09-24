@@ -120,6 +120,16 @@ export default function MemberCircle({
               <MoodIcon value={mood.value} className="h-3 w-3" />
             </span>
           ) : null}
+
+          {/* ▼ 「最後に話したのは何年前」の印。
+                1年以上やりとりが無い人にだけ「3年」のように付けます。
+                全員に付けると印だらけになるので、ごぶさたの人だけが目に入るようにしています。
+                数えているのは DB です（カード・お祝い・チャットを送ると記録されます） */}
+          {member.lastContactYears !== null && member.lastContactYears >= 1 ? (
+            <span className="absolute -right-2 -top-1 rounded-full bg-white px-1.5 text-[11px] font-bold leading-4 text-stone-500 shadow-sm ring-1 ring-kin/60">
+              {member.lastContactYears}年
+            </span>
+          ) : null}
         </div>
 
         {/* 名前。truncate = 長いときは「…」で切る */}
@@ -174,6 +184,18 @@ export default function MemberCircle({
                 {mood.label}
               </p>
             ) : null}
+
+            {/* 最後にやりとりした時。まだ一度も無ければ、そう出します */}
+            <p className="mt-2 text-sm text-stone-500">
+              {member.lastContactLabel === null ? (
+                "まだやりとりはありません"
+              ) : (
+                <>
+                  最後のやりとり{" "}
+                  <span className="font-bold text-kin">{member.lastContactLabel}</span>
+                </>
+              )}
+            </p>
 
             <Link
               href={`/members/${member.id}/profile`}

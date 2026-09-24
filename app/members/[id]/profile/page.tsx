@@ -6,10 +6,11 @@
 
 import Link from "next/link";
 import PostGrid from "@/components/PostGrid";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
 import RecoveryCodeButton from "@/components/RecoveryCodeButton";
 import { getSignedUrls } from "@/lib/signedUrls";
+import { formatLastContact } from "@/lib/lastContact";
 
 export default async function MemberProfilePage({
   params,
@@ -17,8 +18,15 @@ export default async function MemberProfilePage({
   const { id } = await params;
   const supabase = await createClient();
 
-  // 1回目：この3つは、どれも id だけで取れます
-  const [{ data: profile }, { data: memberships }, { data: posts }] =
+  // 1回目：この5つは、どれも id だけで取れます
+  // getCurrentUserId = 自分か確かめるため。通信なしで済みます（lib/supabase/server.ts）
+  const [
+    { data: profile },
+    { data: memberships },
+    { data: posts },
+    { data: lastContact },
+    myId,
+  ] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -39,7 +47,21 @@ export default async function MemberProfilePage({
         .eq("author_id", id)
         .order("created_at", { ascending: false })
         .limit(30),
+
+      // この人と最後にやりとりした日時（supabase/01_schema.sql の last_contacts）。
+      // me で絞らなくても、RLS で自分が関わった分しか返りませんが、
+      // 「自分から見た相手」の1行だけにするため、partner でも絞ります
+      supabase
+        .from("last_contacts")
+        .select("last_at")
+        .eq("partner", id)
+        .maybeSingle(),
+
+      getCurrentUserId(supabase),
     ]);
+
+  const isMe = myId === id;
+  const lastContactLabel = formatLastContact(lastContact?.last_at ?? null);
 
   // 写真の置き場所から、期限付きのURLを発行してもらいます
   const imagePaths =
@@ -86,14 +108,32 @@ export default async function MemberProfilePage({
         communityNames={communityNames}
       />
 
+      {/* ▼ 「最後に話したのは何年前」。自分のプロフィールには出しません。
+            カード・お祝い・チャットを送ると、DB が自動で記録します */}
+      {isMe ? null : (
+        <p className="mx-5 mt-4 rounded-xl border border-kin/30 bg-white px-4 py-3 text-center text-sm text-stone-600">
+          {lastContactLabel === null ? (
+            "まだやりとりはありません"
+          ) : (
+            <>
+              最後にやりとりしたのは{" "}
+              <span className="text-base font-bold text-kin">{lastContactLabel}</span>
+            </>
+          )}
+        </p>
+      )}
+
       {/* ▼ 困っている人を助けるための入口。
-          ふだんは使わないものなので、目立たせすぎない場所に置きます。 */}
-      <div className="p-5">
-        <RecoveryCodeButton
-          targetUserId={id}
-          targetName={profile?.display_name ?? "この人"}
-        />
-      </div>
+          ふだんは使わないものなので、目立たせすぎない場所に置きます。
+          自分で自分のコードは出せない（DB が止める）ので、自分のプロフィールには出しません */}
+      {isMe ? null : (
+        <div className="p-5">
+          <RecoveryCodeButton
+            targetUserId={id}
+            targetName={profile?.display_name ?? "この人"}
+          />
+        </div>
+      )}
 
       <h2 className="border-y border-stone-200 bg-white px-5 py-3 text-lg font-bold text-stone-800">
         ご報告

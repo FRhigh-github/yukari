@@ -12,7 +12,7 @@
 //
 //   使い捨てのアカウントは、メールアドレスの最後が @demo.yukari.invalid になっています。
 //   （.invalid は「実在しない」と決められた名前なので、メールがどこかへ届くことはありません）
-//   発表が終わったら supabase/91_clear_demo_users.sql で、まとめて消せます。
+//   発表が終わったら supabase/03_clear_demo_guests.sql で、まとめて消せます。
 //
 // ▼ ログインのさせ方（思い出ログイン app/api/recovery/complete と同じやり方です）
 //   作ったアカウントはパスワードを持たないので、サーバーが service_role の鍵で
@@ -28,6 +28,23 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { DEMO_EMAIL_DOMAIN } from "@/lib/demoGuest";
 
+// ▼ ゲストに「前からの知り合い」のふりをしてもらうための、ダミーの人たち（supabase/02_seed.sql）
+//   ゲストは作られたばかりなので、そのままだと誰ともやりとりの記録がありません。
+//   それでは「最後に話したのは何年前」が見せられないので、
+//   ダミーの何人かと、昔やりとりしたことにしておきます。
+//   daysAgo = 何日前にやりとりしたことにするか
+const PAST_CONTACTS = [
+  { userId: "11111111-1111-4111-8111-000000000001", kind: "card", daysAgo: 3 * 365 + 20 }, // 齋藤 健介：3年前
+  { userId: "11111111-1111-4111-8111-000000000003", kind: "reaction", daysAgo: 400 }, // 佐藤 美咲：1年前
+  { userId: "11111111-1111-4111-8111-000000000005", kind: "comment", daysAgo: 150 }, // 高橋 結衣：5か月前
+  { userId: "11111111-1111-4111-8111-000000000002", kind: "card", daysAgo: 12 }, // 山田 太郎：12日前
+];
+
+// ふみばこに最初から1通届いている「ようこそ」のカードの送り主（井上 颯太）。
+// 絵は public/demo/card-welcome.svg です
+const WELCOME_CARD_FROM = "11111111-1111-4111-8111-000000000010";
+
+const DAY = 24 * 60 * 60 * 1000;
 
 export async function POST() {
   const communityId = process.env.DEMO_COMMUNITY_ID;
@@ -39,14 +56,14 @@ export async function POST() {
 
   // ▼ 0. 先に、デモ用コミュニティがあるかを確かめます。
   //   無いまま進むと、ゲストのアカウントだけ作られて、入る先が無くて止まってしまいます
-  //   （supabase/92_demo_community.sql をまだ流していないとき）
+  //   （supabase/02_seed.sql をまだ流していないとき）
   const { data: community } = await admin
     .from("communities")
     .select("id")
     .eq("id", communityId)
     .maybeSingle();
   if (!community) {
-    console.error("demo login: demo community not found. 92_demo_community.sql を流してください");
+    console.error("demo login: demo community not found. supabase/02_seed.sql を流してください");
     return NextResponse.json({ error: "デモの準備ができていません" }, { status: 500 });
   }
 
@@ -82,6 +99,35 @@ export async function POST() {
     await admin.auth.admin.deleteUser(created.user.id);
     return NextResponse.json({ error: "デモに入れませんでした" }, { status: 500 });
   }
+
+  // ▼ 2.5 デモを見せるための下ごしらえ（上の PAST_CONTACTS / WELCOME_CARD_FROM）。
+  //   ダミーの人がいない（02_seed.sql を流していない）ときは失敗しますが、
+  //   ログインそのものには関係ないので、記録だけ残して先へ進みます
+  const guestId = created.user.id;
+  const { error: historyError } = await admin.from("interactions").insert(
+    PAST_CONTACTS.map((contact) => ({
+      user_a: guestId,
+      user_b: contact.userId,
+      kind: contact.kind,
+      occurred_at: new Date(Date.now() - contact.daysAgo * DAY).toISOString(),
+    })),
+  );
+  if (historyError) console.error("demo login: past contacts failed", historyError);
+
+  const { data: template } = await admin
+    .from("card_templates")
+    .select("id")
+    .eq("kind", "thanks")
+    .maybeSingle();
+  const { error: cardError } = await admin.from("card_sends").insert({
+    template_id: template?.id,
+    from_user: WELCOME_CARD_FROM,
+    to_user: guestId,
+    community_id: communityId,
+    // / で始まるものは、アプリの public/ の画像としてそのまま出します（lib/signedUrls.ts）
+    drawing_url: "/demo/card-welcome.svg",
+  });
+  if (cardError) console.error("demo login: welcome card failed", cardError);
 
   // ▼ 3. 1回だけ使えるログインの合言葉を作り、その場でログイン状態に変えます。
   //   ここ（route.ts）では Cookie を書けるので、ブラウザにログイン状態が保存されます

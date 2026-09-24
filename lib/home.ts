@@ -4,6 +4,7 @@
 import { cookies } from "next/headers";
 import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import { SEEN_COOKIE, parseSeen } from "@/lib/seenPosts";
+import { formatLastContact, yearsSince } from "@/lib/lastContact";
 
 export type Member = {
   id: string;
@@ -14,6 +15,10 @@ export type Member = {
   // 同じ問い合わせのついでに取れるので、待ち時間は増えません。
   birthday: string | null;
   mood: string | null;
+  // 最後にやりとりしてからの時間。「3年前」など。やりとりが無ければ null（lib/lastContact.ts）
+  lastContactLabel: string | null;
+  // 最後にやりとりしてから何年たったか。1年以上なら、相関図のアイコンに印を付けます
+  lastContactYears: number | null;
 };
 
 // 待ち中の復旧申請。コミュニティ全員に見せるためのものです
@@ -92,7 +97,12 @@ export async function getHomeData(selectedId: string | null) {
   //
   // 下の2つはどちらも targetIds しか使わないので、同時に出せます。
   // in(...) = 並べた値のどれかに一致するものを取る
-  const [{ data: memberships }, { data: recentPosts }, { data: recoveries }] =
+  const [
+    { data: memberships },
+    { data: recentPosts },
+    { data: recoveries },
+    { data: lastContacts },
+  ] =
     await Promise.all([
       // ※ profiles を一緒に持ってくる書き方も試しましたが、DBが応じませんでした。
       //   memberships.user_id が profiles ではなく auth.users を指しているためです。
@@ -115,6 +125,13 @@ export async function getHomeData(selectedId: string | null) {
         .select("id, target_user, requested_at")
         .eq("community_id", currentId)
         .eq("status", "pending"),
+
+      // 相手ごとの「最後にやりとりした日時」（supabase/01_schema.sql の last_contacts）。
+      // 自分の分だけを取ります
+      supabase
+        .from("last_contacts")
+        .select("partner, last_at")
+        .eq("me", user.id),
     ]);
 
   // 同じ人が複数のコミュニティにいると id が重複します。
@@ -158,6 +175,10 @@ export async function getHomeData(selectedId: string | null) {
       (post) => toJapanDate(new Date(post.created_at)) === today,
     ).length ?? 0;
 
+  // その人と最後にやりとりした日時。無ければ null
+  const findLastContact = (partnerId: string) =>
+    lastContacts?.find((contact) => contact.partner === partnerId)?.last_at ?? null;
+
   const members: Member[] =
     profiles?.map((profile) => ({
       id: profile.id,
@@ -166,6 +187,8 @@ export async function getHomeData(selectedId: string | null) {
       hasNews: hasUnseen(profile.id),
       birthday: profile.birthday,
       mood: profile.mood,
+      lastContactLabel: formatLastContact(findLastContact(profile.id)),
+      lastContactYears: yearsSince(findLastContact(profile.id)),
     })) ?? [];
 
   // 光る人を先に並べる
