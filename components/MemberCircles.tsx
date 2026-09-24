@@ -218,6 +218,13 @@ export default function MemberCircles({
   const lastTapRef = useRef(0);
 
   const handlePointerDown = (event: React.PointerEvent) => {
+    // ▼ isPrimary = 画面に何も触れていない状態から、最初に触れた指。
+    //   このときに一覧に残っている指は、離した合図を受け取りそこねた「幽霊」なので、消しておきます。
+    //   アイコンを長押ししたまま指を動かすと、スマホがリンクを運ぶ動き（ドラッグ）を始めて、
+    //   離した合図がここへ届かないことがありました。幽霊が残ると、次に触ったときに
+    //   「2本指でつまんでいる」と勘違いして、押しても開かず、動かしても動かない（固まった）状態になっていました
+    if (event.isPrimary) pointersRef.current.clear();
+
     const point = { x: event.clientX, y: event.clientY };
     pointersRef.current.set(event.pointerId, point);
 
@@ -378,6 +385,8 @@ export default function MemberCircles({
           <Link
             href={`/members/${currentUserId}`}
             aria-label="自分"
+            // 長押ししたまま動かしたときに、リンクをつまんで運ぶ動きを始めないようにします
+            draggable={false}
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-kin bg-white p-[3px]"
           >
             <div

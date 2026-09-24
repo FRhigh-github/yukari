@@ -76,7 +76,14 @@ export default function MemberCircle({
         onPointerDown={start}
         onPointerUp={cancel}
         onPointerLeave={cancel}
-        onPointerMove={cancel}
+        onPointerMove={(event) => {
+          // 長押しでプロフィールを出したあとは、指を動かしても後ろの相関図を動かしません
+          // （出ているプロフィールの裏で、模様だけが勝手にずれていくのを防ぎます）
+          if (longPressedRef.current) event.stopPropagation();
+          cancel();
+        }}
+        // 長押ししたまま動かしたときに、リンクをつまんで運ぶ動き（ドラッグ）を始めないようにします
+        draggable={false}
         // 長押しで開いたときは、移動させません
         onClick={(event) => {
           if (longPressedRef.current) event.preventDefault();
