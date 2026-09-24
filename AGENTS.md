@@ -121,8 +121,8 @@ RLS の外にいる。`app/api/recovery/` が `SUPABASE_SERVICE_ROLE_KEY` を使
 - lint の警告が3つ残っている（日程調整・チャットの `useEffect` の依存と、手紙の `<img>`）。
   直すと動きが変わるおそれがあるので、担当の人と相談してから
 - 通知の鐘（`NotificationToggle`）は見た目の切り替えだけ。実際の通知は送っていない
-- ダミーデータの写真とアイコンは外部のサービス（picsum.photos / i.pravatar.cc）から出している。
-  会場の回線でそこにつながらないと、灰色のまま出る
+- ダミーデータのご報告の写真は外部のサービス（picsum.photos）から出している。
+  会場の回線でそこにつながらないと、灰色のまま出る（アイコンは public/demo/avatars/ に置いてある）
 
 ## コードの書き方
 

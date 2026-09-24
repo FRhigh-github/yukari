@@ -44,6 +44,11 @@ where id in (
 --  auth.users に入れると、01_schema.sql のトリガーが profiles を自動で作ります。
 --  raw_user_meta_data の full_name / avatar_url が、そのまま名前とアイコンになります。
 --
+--  ▼ アイコンは public/demo/avatars/ に置いた絵です（/ で始まるものは、そのまま表示されます）
+--    前は外部の写真サービスの顔写真で、海外の人ばかりで SNS らしくなく、
+--    会場の回線でそのサービスにつながらないと灰色のままでした。
+--    似顔絵・ペット・コーヒー・桜など、日本の SNS でよく見るアイコンにしています
+--
 --  ▼ 空の文字（''）を入れている列について
 --    confirmation_token などは、DB の上では空（null）でもよいことになっていますが、
 --    Supabase の認証は「文字が入っている」前提で読みにいきます。
@@ -66,16 +71,16 @@ select
   -- パスワードが空なので、このダミーではログインできません
   '', '', '', '', '', '', '', '', ''
 from (values
-  ('11111111-1111-4111-8111-000000000001', 'kenta@example.com',   '齋藤 健介',   'https://i.pravatar.cc/200?img=12'),
-  ('11111111-1111-4111-8111-000000000002', 'taro@example.com',    '山田 太郎',   'https://i.pravatar.cc/200?img=13'),
-  ('11111111-1111-4111-8111-000000000003', 'misaki@example.com',  '佐藤 美咲',   'https://i.pravatar.cc/200?img=47'),
-  ('11111111-1111-4111-8111-000000000004', 'ichiro@example.com',  '鈴木 一郎',   'https://i.pravatar.cc/200?img=15'),
-  ('11111111-1111-4111-8111-000000000005', 'yui@example.com',     '高橋 結衣',   'https://i.pravatar.cc/200?img=45'),
-  ('11111111-1111-4111-8111-000000000006', 'ren@example.com',     '田中 蓮',     'https://i.pravatar.cc/200?img=33'),
-  ('11111111-1111-4111-8111-000000000007', 'hina@example.com',    '中村 陽菜',   'https://i.pravatar.cc/200?img=49'),
-  ('11111111-1111-4111-8111-000000000008', 'daisuke@example.com', '小林 大輔',   'https://i.pravatar.cc/200?img=52'),
-  ('11111111-1111-4111-8111-000000000009', 'sakura@example.com',  '松本 さくら', 'https://i.pravatar.cc/200?img=32'),
-  ('11111111-1111-4111-8111-000000000010', 'sota@example.com',    '井上 颯太',   'https://i.pravatar.cc/200?img=68')
+  ('11111111-1111-4111-8111-000000000001', 'kenta@example.com',   '齋藤 健介',   '/demo/avatars/kensuke.svg'),
+  ('11111111-1111-4111-8111-000000000002', 'taro@example.com',    '山田 太郎',   '/demo/avatars/taro.svg'),
+  ('11111111-1111-4111-8111-000000000003', 'misaki@example.com',  '佐藤 美咲',   '/demo/avatars/misaki.svg'),
+  ('11111111-1111-4111-8111-000000000004', 'ichiro@example.com',  '鈴木 一郎',   '/demo/avatars/ichiro.svg'),
+  ('11111111-1111-4111-8111-000000000005', 'yui@example.com',     '高橋 結衣',   '/demo/avatars/yui.svg'),
+  ('11111111-1111-4111-8111-000000000006', 'ren@example.com',     '田中 蓮',     '/demo/avatars/ren.svg'),
+  ('11111111-1111-4111-8111-000000000007', 'hina@example.com',    '中村 陽菜',   '/demo/avatars/hina.svg'),
+  ('11111111-1111-4111-8111-000000000008', 'daisuke@example.com', '小林 大輔',   '/demo/avatars/daisuke.svg'),
+  ('11111111-1111-4111-8111-000000000009', 'sakura@example.com',  '松本 さくら', '/demo/avatars/sakura.svg'),
+  ('11111111-1111-4111-8111-000000000010', 'sota@example.com',    '井上 颯太',   '/demo/avatars/sota.svg')
 ) as v(id, email, full_name, avatar_url);
 
 

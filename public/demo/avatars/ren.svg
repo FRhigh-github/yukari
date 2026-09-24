@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+<!-- 田中 蓮（コーヒー屋を開いた人。アイコンはラテアート） -->
+<defs><linearGradient id="wood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c79a6b"/><stop offset="1" stop-color="#9c6f45"/></linearGradient></defs>
+<rect width="200" height="200" fill="url(#wood)"/>
+<path d="M0 40 L 200 60 M 0 110 L 200 128 M 0 170 L 200 186" stroke="#8a5f3a" stroke-opacity=".25" stroke-width="3"/>
+<circle cx="100" cy="104" r="74" fill="#f7f3ec"/><circle cx="100" cy="104" r="62" fill="#fff"/>
+<path d="M160 88 C 184 84, 190 118, 164 122" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+<circle cx="100" cy="104" r="50" fill="#8a5a36"/>
+<path d="M100 132 C 80 118, 66 106, 70 92 C 74 80, 90 78, 100 90 C 110 78, 126 80, 130 92 C 134 106, 120 118, 100 132 Z" fill="#f1dfc4"/>
+<path d="M100 132 C 99 120, 99 104, 100 90" fill="none" stroke="#8a5a36" stroke-width="3" stroke-linecap="round"/>
+</svg>

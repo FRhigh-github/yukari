@@ -69,7 +69,8 @@ export async function POST() {
 
   // ▼ 1. 使い捨てのアカウントを作ります。
   //   名前とアイコンを入れておくと、DB の仕組み（handle_new_user）がプロフィールも作ってくれます。
-  //   アイコンは、ダミーの10人と同じ写真のサービスから、番号をばらばらに選びます
+  //   アイコンは、public/demo/avatars/ に置いたゲスト用の6枚から、ばらばらに選びます
+  //   （前は外部の写真サービスの顔写真で、海外の人ばかりで SNS らしくなかったため）
   const number = Math.floor(100 + Math.random() * 900);
   const email = `guest-${crypto.randomUUID().slice(0, 8)}@${DEMO_EMAIL_DOMAIN}`;
   const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -78,7 +79,7 @@ export async function POST() {
     email_confirm: true,
     user_metadata: {
       full_name: `ゲスト ${number}`,
-      avatar_url: `https://i.pravatar.cc/200?img=${Math.floor(1 + Math.random() * 70)}`,
+      avatar_url: `/demo/avatars/guest-${Math.floor(1 + Math.random() * 6)}.svg`,
     },
   });
 

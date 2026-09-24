@@ -42,11 +42,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="ja" className="h-full antialiased" suppressHydrationWarning>
       <head>
         {/* preconnect = その相手との接続だけ、先に始めておく指定。
-            アイコンは外部から読むので、画像のURLが分かってから
+            Google で登録した人のアイコンは Google から読むので、画像のURLが分かってから
             接続を始めると、そのぶん表示が遅れます。
             スマホの回線ほど、この待ち時間が大きくなります。 */}
         <link rel="preconnect" href="https://lh3.googleusercontent.com" />
-        <link rel="preconnect" href="https://i.pravatar.cc" />
 
         {/* 投稿の写真とカードの絵は Supabase に置いてあります。
             ここへの接続も先に始めておきます。
