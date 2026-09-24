@@ -144,12 +144,18 @@ export async function getHomeData(selectedId: string | null) {
   //   上で取ってきた新しい投稿20件を、そのまま数え直しているだけなので、
   //   データベースへの問い合わせは増えていません。
   //
-  //   toDateString() は「Sat Sep 22 2026」のような文字列を返します。
-  //   時刻が入らないので、これが同じなら同じ日、と分かります。
-  const today = new Date().toDateString();
+  //   toLocaleDateString は「2026/9/22」のような、時刻の入らない日付の文字を返します。
+  //   これが同じなら同じ日、と分かります。
+  //
+  //   timeZone: "Asia/Tokyo" を必ず付けます。
+  //   この処理はサーバー（Vercel）で動き、サーバーの時計は日本ではなく世界標準時です。
+  //   付けないと、日本時間の朝9時まで「今日」が前の日のままになっていました。
+  const toJapanDate = (date: Date) =>
+    date.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
+  const today = toJapanDate(new Date());
   const todayCount =
     recentPosts?.filter(
-      (post) => new Date(post.created_at).toDateString() === today,
+      (post) => toJapanDate(new Date(post.created_at)) === today,
     ).length ?? 0;
 
   const members: Member[] =
