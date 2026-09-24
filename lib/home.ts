@@ -21,6 +21,29 @@ export type Member = {
   lastContactYears: number | null;
 };
 
+// 上のバーの鐘を押すと出る「お知らせ」1件ぶん。コミュニティの新しいご報告です
+export type NewsItem = {
+  postId: string;
+  authorId: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  title: string;
+  // 「2時間前」など。サーバーで作ります（下の formatAgo）
+  timeLabel: string;
+  // まだストーリーで見ていなければ true。紅い点を付けます
+  isUnseen: boolean;
+};
+
+// 投稿からどれだけたったかを「たった今」「5分前」「2時間前」「3日前」の形にします。
+// サーバーで1回だけ計算します（ブラウザでも計算すると、境目で食い違って表示がずれるため）
+function formatAgo(createdAt: string) {
+  const minutes = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+  if (minutes < 1) return "たった今";
+  if (minutes < 60) return `${minutes}分前`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}時間前`;
+  return `${Math.floor(minutes / (60 * 24))}日前`;
+}
+
 // 待ち中の復旧申請。コミュニティ全員に見せるためのものです
 export type RecoveryRequest = {
   id: string;
@@ -65,6 +88,7 @@ export async function getHomeData(selectedId: string | null) {
       currentId: null,
       recoveryRequests: [],
       todayCount: 0,
+      news: [],
     };
   }
 
@@ -84,6 +108,7 @@ export async function getHomeData(selectedId: string | null) {
       currentId: null,
       recoveryRequests: [],
       todayCount: 0,
+      news: [],
     };
   }
 
@@ -112,10 +137,11 @@ export async function getHomeData(selectedId: string | null) {
         .from("memberships")
         .select("user_id")
         .in("community_id", targetIds),
-      // 「最近」は、このコミュニティの新しい投稿20件ぶん、ということにします
+      // 「最近」は、このコミュニティの新しい投稿20件ぶん、ということにします。
+      // id と title は、鐘の「お知らせ」に並べるために使います
       supabase
         .from("posts")
-        .select("author_id, created_at")
+        .select("id, title, author_id, created_at")
         .in("community_id", targetIds)
         .order("created_at", { ascending: false })
         .limit(20),
@@ -205,6 +231,26 @@ export async function getHomeData(selectedId: string | null) {
           ?.displayName ?? "どなたか",
     })) ?? [];
 
+  // ▼ 鐘の「お知らせ」。新しいご報告を、自分のものを除いて10件まで並べます。
+  //   見たかどうかは、光る輪と同じく「その人のご報告をどこまで見たか」（lib/seenPosts.ts）で決めます
+  const news: NewsItem[] =
+    recentPosts
+      ?.filter((post) => post.author_id !== user.id)
+      .slice(0, 10)
+      .map((post) => {
+        const author = members.find((member) => member.id === post.author_id);
+        const seenAt = seen[post.author_id];
+        return {
+          postId: post.id,
+          authorId: post.author_id,
+          authorName: author?.displayName ?? "どなたか",
+          authorAvatarUrl: author?.avatarUrl ?? null,
+          title: post.title,
+          timeLabel: formatAgo(post.created_at),
+          isUnseen: seenAt === undefined || new Date(post.created_at) > new Date(seenAt),
+        };
+      }) ?? [];
+
   return {
     user,
     communities: list,
@@ -212,5 +258,6 @@ export async function getHomeData(selectedId: string | null) {
     currentId,
     recoveryRequests,
     todayCount,
+    news,
   };
 }

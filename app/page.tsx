@@ -7,7 +7,7 @@ import CommunitySwitcher from "@/components/CommunitySwitcher";
 import MemberCircles from "@/components/MemberCircles";
 import RecoveryNotice from "@/components/RecoveryNotice";
 import HintOverlay from "@/components/HintOverlay";
-import NotificationToggle from "@/components/NotificationToggle";
+import NotificationBell from "@/components/NotificationBell";
 import { SHOW_HINTS } from "@/lib/tutorial";
 
 // 画面の真ん中に、文と案内ボタンを1つ出すだけの小さな部品
@@ -35,7 +35,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   // currentId = 実際に見ているコミュニティ。
   // ?c= が無いときは、getHomeData が一番上を選んで返してくれます。
-  const { user, communities, members, currentId, recoveryRequests, todayCount } =
+  const { user, communities, members, currentId, recoveryRequests, todayCount, news } =
     await getHomeData(selectedId);
 
   // ▼ ログインしていない人は、ここで追い返します。
@@ -73,7 +73,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           isGuest={isGuest}
         />
 
-        {/* 通知のオン・オフ。報告がある日は、鐘の右上に紅い点が出ます */}
+        {/* お知らせの鐘。押すと、新しいご報告の一覧が開きます（NotificationBell）。
+            まだ見ていないご報告があると、鐘の右上に紅い点が出ます */}
         {/* チャットの一覧へ（/chats）。ふきだしの線の絵だけのボタンです */}
         <Link
           href="/chats"
@@ -83,7 +84,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" width="28" height="28"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
         </Link>
 
-        <NotificationToggle hasNews={todayCount > 0} />
+        <NotificationBell news={news} />
       </header>
 
       {/* 初めての人にだけ、一言そえます */}
