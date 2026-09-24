@@ -155,7 +155,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
       {/* 右下：ご報告を書く */}
       <Link
-        href="/post"
+        // ?c= = いま見ているコミュニティ。投稿画面で最初からそれを選んでおきます
+        href={currentId ? `/post?c=${currentId}` : "/post"}
         // 投稿画面も中身まで先に取っておいて、押した瞬間に開くようにします（本番のときだけ動きます）
         prefetch={true}
         aria-label="報告する"

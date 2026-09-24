@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -8,9 +9,11 @@ import type { Community } from "@/components/CommunitySwitcher";
 
 type PostFormProps = {
   communities: Community[];
+  // 最初に選んでおくコミュニティ（ホームで見ていたもの）
+  initialCommunityId: string;
 };
 
-export default function PostForm({ communities }: PostFormProps) {
+export default function PostForm({ communities, initialCommunityId }: PostFormProps) {
   const router = useRouter();
 
   const [title, setTitle] = useState("");
@@ -22,8 +25,8 @@ export default function PostForm({ communities }: PostFormProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
-  // 最初から1つ目を選んだ状態にしておきます
-  const [communityId, setCommunityId] = useState(communities[0]?.id ?? "");
+  // 最初から、ホームで見ていたコミュニティを選んだ状態にしておきます
+  const [communityId, setCommunityId] = useState(initialCommunityId);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -118,29 +121,40 @@ export default function PostForm({ communities }: PostFormProps) {
     //   前は写真を選ぶと欄が横幅から決まる大きさになり、画面からはみ出してスクロールできていました。
     <div className="h-full overflow-hidden bg-[#faf9f6] px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
       <form onSubmit={handleSubmit} className="flex h-full flex-col gap-3">
-        {/* コミュニティ選択 */}
-        <div className="relative shrink-0">
-          <select
-            value={communityId}
-            onChange={(event) => setCommunityId(event.target.value)}
-            className="h-11 w-full appearance-none rounded-full border border-kin/50 bg-white px-10 text-center font-bold text-stone-800 focus:outline-none"
+        {/* ▼ 上：閉じるボタンとコミュニティ選択。
+              前は閉じるボタンが無く、ホーム画面に追加したアプリの形（ブラウザの「戻る」が無い）で開くと、
+              書かずに戻る方法がありませんでした */}
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href={communityId ? `/?c=${communityId}` : "/"}
+            aria-label="書かずに閉じる"
+            className="flex h-11 w-11 shrink-0 items-center justify-center text-stone-600"
           >
-            {communities.length === 0 ? (
-              <option value="">参加しているコミュニティがありません</option>
-            ) : null}
-            {communities.map((community) => (
-              <option
-                key={community.id}
-                value={community.id}
-                className="text-black"
-              >
-                {community.name}
-              </option>
-            ))}
-          </select>
-          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-kin">
-            ▼
-          </span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="h-7 w-7"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </Link>
+          <div className="relative min-w-0 flex-1">
+            <select
+              value={communityId}
+              onChange={(event) => setCommunityId(event.target.value)}
+              className="h-11 w-full appearance-none rounded-full border border-kin/50 bg-white px-10 text-center font-bold text-stone-800 focus:outline-none"
+            >
+              {communities.length === 0 ? (
+                <option value="">参加しているコミュニティがありません</option>
+              ) : null}
+              {communities.map((community) => (
+                <option
+                  key={community.id}
+                  value={community.id}
+                  className="text-black"
+                >
+                  {community.name}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-kin">
+              ▼
+            </span>
+          </div>
         </div>
 
         {/* 画像を添付。input は隠して、label 全体を押せるようにしています */}
@@ -210,6 +224,7 @@ export default function PostForm({ communities }: PostFormProps) {
         <input
           type="text"
           required
+          maxLength={60}
           placeholder="タイトルを入力"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
