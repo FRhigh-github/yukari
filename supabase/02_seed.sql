@@ -110,18 +110,21 @@ where p.id = v.id::uuid;
 --     もうあるときは、名前と作成者だけ入れ直します。
 --     招待コードと、そこにいる本物のメンバーや投稿はそのまま残します
 -- ------------------------------------------------------------
-insert into public.communities (id, name, invite_code, created_by)
+insert into public.communities (id, name, invite_code, created_by, icon_url)
 values
   ('22222222-2222-4222-8222-000000000001', 'しばよこハッカソン9班', 'YUKARI',
-   '11111111-1111-4111-8111-000000000001'),
+   '11111111-1111-4111-8111-000000000001', null),
   ('22222222-2222-4222-8222-000000000002', '高校の同級生', 'SHIBA22',
-   '11111111-1111-4111-8111-000000000005'),
-  -- 発表用。ゲストは招待コードなしで入るので、推測されにくい長めのコードにしています
+   '11111111-1111-4111-8111-000000000005', null),
+  -- 発表用。ゲストは招待コードなしで入るので、推測されにくい長めのコードにしています。
+  -- アイコンは水引の結び目（public/demo/community-demo.svg）。ゲストは変えられないので、ここで決めておきます
   ('44444444-4444-4444-8444-000000000001', 'ゆかり デモ',
-   'DEMO' || upper(substr(md5(random()::text), 1, 8)), null)
+   'DEMO' || upper(substr(md5(random()::text), 1, 8)), null, '/demo/community-demo.svg')
 on conflict (id) do update
   set name = excluded.name,
-      created_by = excluded.created_by;
+      created_by = excluded.created_by,
+      -- 9班などで、画面から付けたアイコンは消さずに残します（null で上書きしない）
+      icon_url = coalesce(excluded.icon_url, public.communities.icon_url);
 
 
 -- ------------------------------------------------------------
