@@ -104,9 +104,10 @@ export async function getHomeData(selectedId: string | null) {
     { data: lastContacts },
   ] =
     await Promise.all([
-      // ※ profiles を一緒に持ってくる書き方も試しましたが、DBが応じませんでした。
-      //   memberships.user_id が profiles ではなく auth.users を指しているためです。
-      //   減らすなら、DB側に関数を作る形になります。
+      // ※ profiles を一緒に持ってくる書き方も試しましたが、当時の DB では応じませんでした。
+      //   memberships.user_id が profiles ではなく auth.users を指していたためです。
+      //   作り直した今の DB（supabase/01_schema.sql）では profiles を指しているので、
+      //   memberships から profiles をまとめて取る書き方にもできます。
       supabase
         .from("memberships")
         .select("user_id")
