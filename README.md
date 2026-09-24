@@ -5,6 +5,7 @@
 
 - 画面の作りと、コードを書くときの決まりごと … [`AGENTS.md`](AGENTS.md)
 - データベースの作り方と、許可（RLS）の決まり … [`supabase/README.md`](supabase/README.md)
+- 変更の記録（リリースノート） … [`CHANGELOG.md`](CHANGELOG.md)。いまは **v1.0.0** 🎉
 
 ## できること
 
