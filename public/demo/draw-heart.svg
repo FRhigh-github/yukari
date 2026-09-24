@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
-  <!-- ダミーのお祝い（手描き風のハート）。supabase/02_seed.sql から使っています -->
-  <rect width="300" height="300" fill="#ffffff"/>
-  <g fill="none" stroke="#b7282e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M150 238 C 110 205, 58 170, 60 118 C 62 82, 104 66, 128 92 C 138 102, 146 114, 150 122 C 156 110, 166 96, 180 88 C 206 72, 244 88, 240 126 C 236 172, 190 204, 150 238 Z"/>
-    <path d="M88 118 C 92 102, 104 94, 116 96" stroke-width="4"/>
-    <path d="M232 52 l 10 -14 M 250 70 l 16 -6 M 214 44 l 0 -16" stroke="#c2a14d" stroke-width="5"/>
-  </g>
-</svg>
