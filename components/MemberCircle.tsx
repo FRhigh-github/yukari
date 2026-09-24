@@ -112,12 +112,15 @@ export default function MemberCircle({
             />
           </div>
 
-          {/* 気持ちの印 */}
-          {/* 気持ちの印。顔にかぶらないよう、輪の外へ少し逃がしています。
-              SHOW_MOOD_ON_HOME が false のあいだは出しません（lib/mood.ts） */}
+          {/* 気持ち（ステータス）の印。顔にかぶらないよう、輪の外へ少し逃がしています。
+              SHOW_MOOD_ON_HOME が false のあいだは出しません（lib/mood.ts）。
+              h-5 w-5 = 20px。前の 16px では、相関図の上では小さくて見分けにくかったため */}
           {SHOW_MOOD_ON_HOME && mood ? (
-            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[8px] shadow-sm">
-              <MoodIcon value={mood.value} className="h-3 w-3" />
+            <span
+              aria-label={mood.label}
+              className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-kin/40"
+            >
+              <MoodIcon value={mood.value} className="h-3.5 w-3.5" />
             </span>
           ) : null}
 

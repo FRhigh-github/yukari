@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import MemberCircle from "@/components/MemberCircle";
+import MoodIcon from "@/components/MoodIcon";
+import { MOODS, SHOW_MOOD_ON_HOME } from "@/lib/mood";
 import type { Member } from "@/lib/home";
 import { createClient } from "@/lib/supabase/client";
 
@@ -163,6 +165,8 @@ export default function MemberCircles({
   // 自分は中心に置くので、輪に並べる人たちとは分けます
   const me = members.find((member) => member.id === currentUserId);
   const others = members.filter((member) => member.id !== currentUserId);
+  // 自分の気持ち（ステータス）。設定していなければ undefined
+  const myMood = MOODS.find((item) => item.value === me?.mood);
 
   // members は「報告がある人が先」に並んでいるので、そのまま内側の輪から埋まります
   const spots = layout(others.length);
@@ -384,6 +388,15 @@ export default function MemberCircles({
                   : undefined
               }
             />
+            {/* 自分の気持ち（ステータス）の印。まわりの人と同じ形です（MemberCircle.tsx） */}
+            {SHOW_MOOD_ON_HOME && myMood ? (
+              <span
+                aria-label={myMood.label}
+                className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-kin/40"
+              >
+                <MoodIcon value={myMood.value} className="h-3.5 w-3.5" />
+              </span>
+            ) : null}
           </Link>
         ) : null}
 
