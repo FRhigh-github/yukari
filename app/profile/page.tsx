@@ -12,6 +12,9 @@ import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
 import LogoutButton from "@/components/LogoutButton";
 import { getSignedUrls } from "@/lib/signedUrls";
+// バージョンの番号は package.json の1か所だけで管理します（CHANGELOG.md も合わせて書く）。
+// この画面はサーバーで作るので、package.json がブラウザに配られることはありません
+import packageJson from "@/package.json";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -98,6 +101,11 @@ export default async function ProfilePage() {
       <div className="px-4 pt-10">
         <LogoutButton />
       </div>
+
+      {/* アプリのバージョン。何の版を見ているか、発表や不具合の相談のときに分かるようにします */}
+      <p className="pt-6 text-center text-xs tracking-widest text-stone-400">
+        ゆかり v{packageJson.version}
+      </p>
     </main>
   );
 }

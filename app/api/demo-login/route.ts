@@ -41,7 +41,8 @@ const PAST_CONTACTS = [
 ];
 
 // ふみばこに最初から1通届いている「ようこそ」のカードの送り主（井上 颯太）。
-// 絵は public/demo/card-welcome.svg です
+// 絵は public/demo/cards/welcome.jpg です。アプリのカード画面で「ありがとう」の背景に文字を書いて送り、
+// 保存されたものをそのまま使っています（ユーザーが作れるカードと同じ形にするため）
 const WELCOME_CARD_FROM = "11111111-1111-4111-8111-000000000010";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -126,7 +127,7 @@ export async function POST() {
     to_user: guestId,
     community_id: communityId,
     // / で始まるものは、アプリの public/ の画像としてそのまま出します（lib/signedUrls.ts）
-    drawing_url: "/demo/card-welcome.svg",
+    drawing_url: "/demo/cards/welcome.jpg",
   });
   if (cardError) console.error("demo login: welcome card failed", cardError);
 

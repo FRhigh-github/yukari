@@ -832,8 +832,18 @@ export default function LetterPage() {
 
       // ▼ Google Fonts のフォントは、選んだときに読み込むので、まだ届いていないことがあります。
       //   届く前に描くと、ちがうフォントで画像になってしまうので、ここで待ちます
+      //
+      //   ▼ 失敗しても止めません
+      //     next/font は、フォントごとに「届くまでの代わり」（Arial など端末に入っているもの）を登録しています。
+      //     その代わりのフォントが端末に無いと（Android など）、本命のフォントは届いているのに
+      //     ここが「A network error occurred.」で失敗し、手紙が送れなくなっていました。
+      //     失敗しても、届いているフォントでそのまま描けるので、先へ進みます
       if (item.type !== "photo") {
-        await document.fonts.load(ctx.font, item.type === "text" ? item.text : item.url);
+        try {
+          await document.fonts.load(ctx.font, item.type === "text" ? item.text : item.url);
+        } catch {
+          // 代わりのフォントが無いだけなので、気にせず描きます
+        }
       }
 
       // ▼ 回っているときは、枠の真ん中を軸に、紙ごと回してから描きます。
