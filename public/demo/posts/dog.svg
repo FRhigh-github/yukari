@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" width="900" height="1200">
+<!-- 犬を飼いはじめました：柴犬のむぎ -->
+<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a9d8f5"/><stop offset="1" stop-color="#e8f6ff"/></linearGradient></defs>
+<rect width="900" height="1200" fill="url(#sky)"/>
+<g fill="#ffffff" opacity=".85"><ellipse cx="200" cy="220" rx="100" ry="36"/><ellipse cx="700" cy="170" rx="120" ry="40"/></g>
+<path d="M0 760 C 200 700, 700 700, 900 760 L 900 1200 L 0 1200 Z" fill="#8cc56b"/>
+<path d="M0 860 C 250 820, 650 820, 900 860 L 900 1200 L 0 1200 Z" fill="#79b45a"/>
+<path d="M640 820 C 740 780, 740 680, 660 690 C 700 720, 690 770, 620 790 Z" fill="#d9893b"/>
+<ellipse cx="470" cy="880" rx="190" ry="170" fill="#d9893b"/>
+<ellipse cx="450" cy="930" rx="100" ry="120" fill="#fff7ee"/>
+<ellipse cx="380" cy="1040" rx="44" ry="30" fill="#fff7ee"/><ellipse cx="540" cy="1040" rx="44" ry="30" fill="#fff7ee"/>
+<path d="M300 520 L 320 390 L 410 470 Z" fill="#d9893b"/><path d="M600 520 L 580 390 L 490 470 Z" fill="#d9893b"/>
+<path d="M318 500 L 330 420 L 390 474 Z" fill="#f3b6a8"/><path d="M582 500 L 570 420 L 510 474 Z" fill="#f3b6a8"/>
+<ellipse cx="450" cy="580" rx="170" ry="150" fill="#d9893b"/>
+<path d="M300 620 C 320 710, 390 745, 450 745 C 510 745, 580 710, 600 620 C 560 660, 510 664, 450 634 C 390 664, 340 660, 300 620 Z" fill="#fff7ee"/>
+<ellipse cx="450" cy="660" rx="72" ry="54" fill="#fff7ee"/>
+<circle cx="390" cy="530" r="14" fill="#fff7ee"/><circle cx="510" cy="530" r="14" fill="#fff7ee"/>
+<ellipse cx="390" cy="576" rx="16" ry="19" fill="#2b2320"/><ellipse cx="510" cy="576" rx="16" ry="19" fill="#2b2320"/>
+<circle cx="395" cy="570" r="5" fill="#fff"/><circle cx="515" cy="570" r="5" fill="#fff"/>
+<ellipse cx="450" cy="630" rx="26" ry="19" fill="#2b2320"/>
+<path d="M450 648 L 450 670 M 422 676 Q 450 700 478 676" fill="none" stroke="#2b2320" stroke-width="7" stroke-linecap="round"/>
+<path d="M345 740 C 400 770, 500 770, 555 740" fill="none" stroke="#b7282e" stroke-width="18" stroke-linecap="round"/><circle cx="450" cy="772" r="14" fill="#f2c94c"/>
+<circle cx="700" cy="1020" r="46" fill="#b7282e"/><path d="M660 1000 C 690 1030, 720 1030, 744 1004" fill="none" stroke="#fff" stroke-width="6"/>
+</svg>

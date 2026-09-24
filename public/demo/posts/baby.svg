@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" width="900" height="1200">
+<!-- 子どもが生まれました：おくるみの赤ちゃん -->
+<defs><radialGradient id="bg" cx=".5" cy=".45" r=".7"><stop offset="0" stop-color="#fff4f2"/><stop offset="1" stop-color="#f6cfd6"/></radialGradient></defs>
+<rect width="900" height="1200" fill="url(#bg)"/>
+<circle cx="243" cy="1114" r="14" fill="#f7b8c6" opacity="0.33"/><circle cx="485" cy="1189" r="12" fill="#fde3b0" opacity="0.12"/><circle cx="857" cy="960" r="18" fill="#fde3b0" opacity="0.17"/><circle cx="734" cy="963" r="27" fill="#fde3b0" opacity="0.23"/><circle cx="654" cy="308" r="17" fill="#fde3b0" opacity="0.15"/><circle cx="535" cy="798" r="33" fill="#ffffff" opacity="0.27"/><circle cx="65" cy="326" r="34" fill="#fde3b0" opacity="0.13"/><circle cx="798" cy="63" r="36" fill="#f7b8c6" opacity="0.23"/><circle cx="736" cy="793" r="32" fill="#f7b8c6" opacity="0.21"/><circle cx="820" cy="1181" r="24" fill="#ffffff" opacity="0.32"/><circle cx="99" cy="73" r="14" fill="#f7b8c6" opacity="0.17"/><circle cx="688" cy="893" r="34" fill="#fde3b0" opacity="0.32"/><circle cx="431" cy="1038" r="36" fill="#f7b8c6" opacity="0.25"/><circle cx="546" cy="1198" r="23" fill="#fde3b0" opacity="0.17"/><circle cx="344" cy="58" r="37" fill="#f7b8c6" opacity="0.35"/><circle cx="687" cy="334" r="32" fill="#f7b8c6" opacity="0.34"/><circle cx="585" cy="1165" r="13" fill="#fde3b0" opacity="0.27"/><circle cx="648" cy="1174" r="18" fill="#f7b8c6" opacity="0.15"/><circle cx="493" cy="990" r="12" fill="#f7b8c6" opacity="0.30"/><circle cx="420" cy="308" r="10" fill="#f7b8c6" opacity="0.22"/><circle cx="425" cy="243" r="11" fill="#fde3b0" opacity="0.26"/><circle cx="46" cy="773" r="32" fill="#fde3b0" opacity="0.20"/>
+<path d="M250 560 C 250 380, 650 380, 650 560 L 650 900 C 650 1010, 250 1010, 250 900 Z" fill="#fbf1e4"/>
+<path d="M250 700 C 380 760, 520 760, 650 700 L 650 900 C 650 1010, 250 1010, 250 900 Z" fill="#f6c9d4"/>
+<path d="M250 700 C 380 760, 520 760, 650 700" fill="none" stroke="#e7a3b4" stroke-width="10"/>
+<circle cx="450" cy="560" r="150" fill="#fbe0cf"/>
+<path d="M300 540 C 300 400, 600 400, 600 540 C 560 470, 500 440, 450 440 C 400 440, 340 470, 300 540 Z" fill="#f6c9d4"/>
+<circle cx="450" cy="408" r="26" fill="#f6c9d4"/>
+<path d="M392 580 q 22 18 44 0 M 464 580 q 22 18 44 0" fill="none" stroke="#6b4a3a" stroke-width="7" stroke-linecap="round"/>
+<circle cx="372" cy="626" r="24" fill="#f5a3a3" opacity=".45"/><circle cx="528" cy="626" r="24" fill="#f5a3a3" opacity=".45"/>
+<path d="M438 650 q 12 10 24 0" fill="none" stroke="#c46f6f" stroke-width="6" stroke-linecap="round"/>
+<circle cx="530" cy="760" r="30" fill="#fbe0cf"/>
+<path d="M560 740 L 650 640" stroke="#c2a14d" stroke-width="12" stroke-linecap="round"/><circle cx="670" cy="615" r="44" fill="#ffd9a0" stroke="#c2a14d" stroke-width="8"/>
+<g fill="#b7282e"><path d="M180 260 c -18 -26 -60 -8 -40 24 l 40 36 l 40 -36 c 20 -32 -22 -50 -40 -24 Z" opacity=".55"/><path d="M730 340 c -12 -18 -42 -6 -28 17 l 28 25 l 28 -25 c 14 -23 -16 -35 -28 -17 Z" opacity=".45"/></g>
+</svg>

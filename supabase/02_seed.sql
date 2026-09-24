@@ -149,33 +149,36 @@ values
 -- ------------------------------------------------------------
 --  5. ご報告
 --     9班とデモに、同じ7件を入れます。
---     写真は外部の URL です。http で始まるものは、アプリが「保管庫のものではない」と判断して
---     そのまま表示します。日時をばらしてあるのは、新しい報告の人だけが光るのを確かめるためです
+--     写真は public/demo/posts/ に置いた、タイトルに合わせた絵です。
+--     / で始まるものは、アプリが「保管庫のものではない」と判断してそのまま表示します。
+--     本物の写真にしたいときは、同じ場所に写真（.jpg など）を置いて、下の URL を書き換えてください。
+--     （前は外部の写真サービスのランダムな写真で、内容と合わず、会場でつながらないと灰色でした）
+--     日時をばらしてあるのは、新しい報告の人だけが光るのを確かめるためです
 -- ------------------------------------------------------------
 insert into public.posts (author_id, community_id, title, body, image_url, created_at)
 select v.author_id::uuid, c.id, v.title, v.body, v.image_url, now() - v.ago::interval
 from (values
   ('11111111-1111-4111-8111-000000000001', 'プロポーズ成功しました',
    '3年付き合って、ようやく言えました。式は来年の春の予定です。',
-   'https://picsum.photos/seed/yukari1/900/1200', '2 hours'),
+   '/demo/posts/proposal.svg', '2 hours'),
   ('11111111-1111-4111-8111-000000000003', '転職します',
    '来月から、ずっと行きたかった会社で働きます。',
-   'https://picsum.photos/seed/yukari2/900/1200', '1 day'),
+   '/demo/posts/job.svg', '1 day'),
   ('11111111-1111-4111-8111-000000000005', '子どもが生まれました',
    '3200g、元気な女の子です。落ち着いたら会いに来てください。',
-   'https://picsum.photos/seed/yukari3/900/1200', '3 days'),
+   '/demo/posts/baby.svg', '3 days'),
   ('11111111-1111-4111-8111-000000000002', '引っ越しました',
    '海の近くです。遊びに来てください。',
-   'https://picsum.photos/seed/yukari4/900/1200', '6 days'),
+   '/demo/posts/seaside.svg', '6 days'),
   ('11111111-1111-4111-8111-000000000009', '資格に受かりました',
    '3回目でやっとです。',
-   'https://picsum.photos/seed/yukari5/900/1200', '12 days'),
+   '/demo/posts/exam.svg', '12 days'),
   ('11111111-1111-4111-8111-000000000007', '犬を飼いはじめました',
    '名前はむぎです。',
-   'https://picsum.photos/seed/yukari6/900/1200', '20 days'),
+   '/demo/posts/dog.svg', '20 days'),
   ('11111111-1111-4111-8111-000000000006', '店を出しました',
    '小さなコーヒー屋です。',
-   'https://picsum.photos/seed/yukari7/900/1200', '40 days')
+   '/demo/posts/cafe.svg', '40 days')
 ) as v(author_id, title, body, image_url, ago)
 cross join (values
   ('22222222-2222-4222-8222-000000000001'::uuid),
@@ -187,10 +190,10 @@ insert into public.posts (author_id, community_id, title, body, image_url, creat
 values
   ('11111111-1111-4111-8111-000000000007', '22222222-2222-4222-8222-000000000002',
    '犬を飼いはじめました', '名前はむぎです。',
-   'https://picsum.photos/seed/yukari6/900/1200', now() - interval '20 days'),
+   '/demo/posts/dog.svg', now() - interval '20 days'),
   ('11111111-1111-4111-8111-000000000006', '22222222-2222-4222-8222-000000000002',
    '店を出しました', '小さなコーヒー屋です。',
-   'https://picsum.photos/seed/yukari7/900/1200', now() - interval '40 days');
+   '/demo/posts/cafe.svg', now() - interval '40 days');
 
 
 -- ------------------------------------------------------------
