@@ -83,6 +83,17 @@ function layout(count: number) {
   return spots;
 }
 
+// 読んだ手紙の id の一覧を、ブラウザの保存領域（localStorage）から取り出します。
+// プライベートブラウズなどで保存領域が使えないと、読むだけで失敗する（例外が起きる）ことがあります。
+// そのときは「まだ何も読んでいない」として扱い、手紙のボタンが押せなくならないようにします
+function readLetterIds(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem("read_letter_ids") || "[]");
+  } catch {
+    return [];
+  }
+}
+
 type MemberCirclesProps = {
   members: Member[];
   currentUserId: string;
@@ -112,9 +123,7 @@ export default function MemberCircles({
       }
 
       // LocalStorageから閲覧済みの手紙ID一覧を取得
-      const readIds: string[] = JSON.parse(
-        localStorage.getItem("read_letter_ids") || "[]"
-      );
+      const readIds = readLetterIds();
 
       // 開封日時を過ぎていて、かつ未読の手紙を取得
       const now = new Date();
@@ -138,14 +147,15 @@ export default function MemberCircles({
   // 飛行機アイコンタップ時に既読保存し、赤マーク通知だけを即座に消す関数
   const handleMarkAsRead = () => {
     if (!letterId) return;
-    const readIds: string[] = JSON.parse(
-      localStorage.getItem("read_letter_ids") || "[]"
-    );
+    const readIds = readLetterIds();
     if (!readIds.includes(letterId)) {
-      localStorage.setItem(
-        "read_letter_ids",
-        JSON.stringify([...readIds, letterId])
-      );
+      // 保存できなくても、手紙は開けるので気にしません（try の中で失敗しても先へ進みます）
+      try {
+        localStorage.setItem(
+          "read_letter_ids",
+          JSON.stringify([...readIds, letterId])
+        );
+      } catch {}
     }
     setOpenableCount(0); // 赤い通知マークを消去
   };
