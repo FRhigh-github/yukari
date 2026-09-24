@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900">
+  <!-- 「デモで入る」のゲストに届く、ようこそのカード（app/api/demo-login/route.ts） -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fdf6ec"/>
+      <stop offset="1" stop-color="#f6e7d3"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <rect x="24" y="24" width="552" height="852" rx="18" fill="none" stroke="#c2a14d" stroke-width="4"/>
+  <g font-family="'Hiragino Maru Gothic ProN','Zen Maru Gothic','Yu Gothic',sans-serif" text-anchor="middle">
+    <text x="300" y="300" font-size="64" font-weight="700" fill="#b7282e">ようこそ</text>
+    <text x="300" y="380" font-size="44" font-weight="700" fill="#b7282e">ゆかりへ</text>
+    <text x="300" y="500" font-size="30" fill="#57534e">大切な人たちの節目を、</text>
+    <text x="300" y="546" font-size="30" fill="#57534e">いっしょにお祝いしよう。</text>
+    <text x="300" y="720" font-size="30" fill="#a8842f">齋藤 健介より</text>
+  </g>
+  <g fill="none" stroke="#b7282e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M300 620 C 284 606, 262 592, 264 574 C 266 560, 284 556, 294 568 L 300 576 L 306 568 C 316 556, 334 560, 336 574 C 338 592, 316 606, 300 620 Z"/>
+  </g>
+</svg>

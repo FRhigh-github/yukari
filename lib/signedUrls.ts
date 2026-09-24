@@ -41,11 +41,21 @@ const signOne = unstable_cache(
   { revalidate: REUSE_FOR },
 );
 
+// 保管庫の中ではない画像か。
+//   http で始まるもの = ダミーデータ用の外部の画像（アイコン・写真）
+//   / で始まるもの    = このアプリの public/ に置いた画像（ダミーのお祝いの絵など）
+// 保管庫の場所は「<id>/<ファイル名>」の形なので、どちらでも始まりません。
+// これらは期限付きURLを作らずに、そのまま表示します
+function isExternal(path: string) {
+  return path.startsWith("http") || path.startsWith("/");
+}
+
 // 場所の一覧を受け取り、「場所 → URL」を引ける関数を返します。
 // 使い方: const findUrl = await getSignedUrls("posts", paths);  findUrl(post.image_url)
 export async function getSignedUrls(bucket: string, paths: string[]) {
-  // 同じ場所が何度も入っていても、作るのは1回ずつにします
-  const unique = Array.from(new Set(paths));
+  // 同じ場所が何度も入っていても、作るのは1回ずつにします。
+  // 保管庫の外の画像は、URL を作る必要がないので外します
+  const unique = Array.from(new Set(paths.filter((path) => !isExternal(path))));
 
   // 1枚ずつ同時に作ります。覚えているものは通信なしですぐ返ってきます
   const urls = await Promise.all(
@@ -54,6 +64,8 @@ export async function getSignedUrls(bucket: string, paths: string[]) {
 
   return (path: string | null) => {
     if (!path) return null;
+    // 前は外部の画像を渡すと null が返り、ダミーのお祝いが白い四角になっていました
+    if (isExternal(path)) return path;
     const index = unique.indexOf(path);
     return index === -1 ? null : urls[index];
   };

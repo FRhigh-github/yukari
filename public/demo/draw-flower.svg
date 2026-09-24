@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <!-- ダミーのお祝い（手描き風の花）。supabase/02_seed.sql から使っています -->
+  <rect width="300" height="300" fill="#ffffff"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 170 C 148 206, 152 236, 146 268" stroke="#6b8f4e" stroke-width="6"/>
+    <path d="M148 226 C 124 214, 106 218, 96 232 C 118 240, 136 238, 148 226 Z" stroke="#6b8f4e" stroke-width="5"/>
+    <g stroke="#b7282e" stroke-width="6">
+      <path d="M150 124 C 128 96, 132 58, 152 56 C 172 58, 174 96, 150 124 Z"/>
+      <path d="M150 124 C 182 104, 214 116, 212 138 C 206 158, 172 150, 150 124 Z"/>
+      <path d="M150 124 C 176 146, 174 184, 154 190 C 132 190, 128 154, 150 124 Z"/>
+      <path d="M150 124 C 120 150, 88 146, 86 124 C 88 102, 124 104, 150 124 Z"/>
+    </g>
+    <circle cx="150" cy="124" r="12" stroke="#c2a14d" stroke-width="6"/>
+  </g>
+</svg>
