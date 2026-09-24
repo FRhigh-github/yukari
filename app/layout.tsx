@@ -74,6 +74,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             __html: `try{if(sessionStorage.getItem('yukari-opening-seen'))document.documentElement.dataset.openingSeen='1'}catch(e){}`,
           }}
         />
+
+        {/* ▼ リンクを長押ししたときのメニュー（「新しいタブで開く」など）を、アプリ全体で止めます。
+            Android はこのメニューから別のタブでページが開いてしまい、アプリに戻れなくなるためです。
+            iPhone のプレビューは CSS でしか止められないので、globals.css の側で止めています。
+            写真だけ（リンクではないもの）は、保存できるように残しています。 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `document.addEventListener('contextmenu',function(e){if(e.target instanceof Element&&e.target.closest('a'))e.preventDefault()})`,
+          }}
+        />
       </head>
       {/* 外側の灰色。PCで見たとき、アプリの外にあたる部分です */}
       <body className="min-h-full bg-stone-200">
