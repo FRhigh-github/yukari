@@ -10,6 +10,7 @@ import Link from "next/link";
 import PostGrid from "@/components/PostGrid";
 import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
+import LogoutButton from "@/components/LogoutButton";
 import { getSignedUrls } from "@/lib/signedUrls";
 
 export default async function ProfilePage() {
@@ -92,6 +93,11 @@ export default async function ProfilePage() {
           })) ?? []
         }
       />
+
+      {/* ログアウト。いちばん下の、押し間違えにくい場所に置きます */}
+      <div className="px-4 pt-10">
+        <LogoutButton />
+      </div>
     </main>
   );
 }
