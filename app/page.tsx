@@ -102,11 +102,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         />
       ) : (
         // ▼ メンバーのアイコンを、自分を中心にした同心円に並べます（MemberCircles）。
-        //   ばらばらに散らす版（components/MemberScatter.tsx）と、
-        //   梅結びの模様（components/MizuhikiHome.tsx）は、いまは使っていません。
         //
         // flex-1 = 残りの高さを全部つかう。
-        // 上から引っぱって取り直す動き（PullToRefresh）は外しました。
+        // 上から引っぱって取り直す動きは外しました。
         // 指1本で模様を動かす操作と、同じ動きでぶつかるためです。
         // 余白（px / pb）は付けません。付けると、そこで模様が切れて見えるためです。
         // 下タブとボタンに重なるぶんは、MemberCircles の中で中心を上にずらして逃がしています。

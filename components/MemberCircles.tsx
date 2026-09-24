@@ -92,7 +92,6 @@ export default function MemberCircles({
   members,
   currentUserId,
 }: MemberCirclesProps) {
-  const [hasLetter, setHasLetter] = useState(false);
   const [openableCount, setOpenableCount] = useState<number>(0);
   const [letterId, setLetterId] = useState<string | null>(null);
 
@@ -109,11 +108,8 @@ export default function MemberCircles({
         .order("open_at", { ascending: true });
 
       if (error || !allLetters || allLetters.length === 0) {
-        setHasLetter(false);
         return;
       }
-
-      setHasLetter(true);
 
       // LocalStorageから閲覧済みの手紙ID一覧を取得
       const readIds: string[] = JSON.parse(
