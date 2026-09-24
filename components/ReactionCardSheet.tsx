@@ -64,6 +64,20 @@ export default function ReactionCardSheet({
     requestAnimationFrame(() => setIsShown(true));
   }, []);
 
+  // ▼ 書いたものを全部消して、白紙に戻します。
+  //   canvas は大きさを細かくしてあるので（上の画質の調整）、目盛りを元に戻してから全体を消します
+  const clearAll = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    setHasDrawn(false);
+    setErrorText(null);
+  };
+
   // 指の位置を、canvas の中の座標に直します
   const toPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -210,6 +224,21 @@ export default function ReactionCardSheet({
               <path d="M14 6l4 4" />
             </svg>
           )}
+          {/* ▼ 全部消すボタン。書いているときだけ、カードの右上に出します。
+              外側の「スワイプで送る・やめる」に取られないよう、押した合図をここで止めます */}
+          {hasDrawn ? (
+            <button
+              type="button"
+              aria-label="書いたものを全部消す"
+              onPointerDown={(event) => event.stopPropagation()}
+              onPointerUp={(event) => event.stopPropagation()}
+              onClick={clearAll}
+              className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-stone-500 shadow ring-1 ring-kin/40"
+            >
+              {/* ごみ箱の絵 */}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-6 w-6"><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 13h10l1-13" /><path d="M9 7V4h6v3" /></svg>
+            </button>
+          ) : null}
           <canvas
             ref={canvasRef}
             // このカードの中の動きは「書く」なので、外側のスワイプに伝えません

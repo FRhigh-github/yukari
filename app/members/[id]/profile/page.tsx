@@ -43,7 +43,7 @@ export default async function MemberProfilePage({
 
       supabase
         .from("posts")
-        .select("id, title, image_url")
+        .select("id, title, image_url, created_at")
         .eq("author_id", id)
         .order("created_at", { ascending: false })
         .limit(30),
@@ -139,7 +139,7 @@ export default async function MemberProfilePage({
         ご報告
       </h2>
 
-      {/* 縦長の写真を3列に並べます（ご報告の一覧と同じ見た目）。押すとストーリーで開きます */}
+      {/* 小さい「ご報告のはがき」を2列に並べます。押すと、そのご報告を大きく開きます */}
       <PostGrid
         memberId={id}
         posts={
@@ -147,6 +147,7 @@ export default async function MemberProfilePage({
             id: post.id,
             title: post.title,
             imageUrl: findImageUrl(post.image_url),
+            createdAt: post.created_at,
           })) ?? []
         }
       />

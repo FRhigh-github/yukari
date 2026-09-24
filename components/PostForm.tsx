@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import type { Community } from "@/components/CommunitySwitcher";
+import ReportPostcard from "@/components/ReportPostcard";
 
 type PostFormProps = {
   communities: Community[];
@@ -159,15 +160,15 @@ export default function PostForm({ communities, initialCommunityId }: PostFormPr
 
         {/* 画像を添付。input は隠して、label 全体を押せるようにしています */}
         {/* ▼ 写真を選んだら、ここがそのまま「見え方のお試し（プレビュー）」になります。
-              見る側のストーリー画面（StoryViewer）と同じ 9:16 の形・余白のぼかし・文字の重なり方です。
+              見る側の画面（StoryViewer）と同じ「ご報告のはがき」の形です。
               押すと写真を選び直せます */}
         {/* min-h-0 = flex の中で、中身より小さく縮めてよい、という指定。これが無いと縮まずにはみ出します */}
         <div className="flex min-h-0 flex-1 justify-center">
           <label
             className={`relative flex h-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl ${
               imageFile
-                ? // 高さを先に決めて、横幅は 9:16 になるように自動で決めます
-                  "aspect-[9/16] bg-[#faf9f6] ring-1 ring-kin/60"
+                ? // はがきが、写真の欄の広さいっぱいに広がります
+                  "w-full"
                 : "w-full border border-dashed border-kin/60 bg-white"
             }`}
           >
@@ -184,31 +185,15 @@ export default function PostForm({ communities, initialCommunityId }: PostFormPr
               }}
             />
             {imageFile ? (
-              <>
-                {/* 見る側と同じく、後ろにぼかした同じ写真を敷いて余白をなじませます */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imageUrl ?? ""}
-                  alt=""
-                  aria-hidden="true"
-                  className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-xl"
-                />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imageUrl ?? ""}
-                  alt=""
-                  className="absolute inset-0 h-full w-full object-contain"
-                />
-                {/* 下に白いもやをかけて、入力中のタイトルと本文を重ねて見せます */}
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#faf9f6]/90 via-[#faf9f6]/50 to-transparent p-3 pt-12 text-left">
-                  <p className="text-base font-bold text-stone-800">
-                    {title || "タイトル"}
-                  </p>
-                  <p className="line-clamp-4 text-xs leading-relaxed text-stone-600">
-                    {body}
-                  </p>
-                </div>
-              </>
+              // ▼ 見る側（StoryViewer）と同じ「ご報告のはがき」で、どう見えるかをその場で見せます。
+              //   打っている途中のタイトルと本文が、そのまま入ります
+              <ReportPostcard
+                size="full"
+                title={title}
+                body={body}
+                createdAt={null}
+                imageUrl={imageUrl}
+              />
             ) : (
               // 言葉は出さず、大きな＋だけにしています（読み上げ用に aria-label を付けています）
               <div

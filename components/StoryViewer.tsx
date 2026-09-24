@@ -1,4 +1,5 @@
-// その人のご報告を、インスタのストーリーのように画面いっぱいで1枚ずつ見せます。
+// その人のご報告を、1枚ずつ「ご報告のはがき」の形で見せます。
+// （操作はインスタのストーリーと同じです）
 //
 //   画面の右側を押す / 左へスライド … 1つ前（古い）ご報告へ
 //   画面の左側を押す / 右へスライド … 戻る（新しいほうへ）
@@ -16,6 +17,7 @@ import { useRouter } from "next/navigation";
 import ReactionBoard, { type Reaction } from "@/components/ReactionBoard";
 import ReactionCardSheet from "@/components/ReactionCardSheet";
 import { SEEN_COOKIE, parseSeen } from "@/lib/seenPosts";
+import ReportPostcard from "@/components/ReportPostcard";
 
 // これ以上指が上へ動いたら「スワイプした」とみなします（px）
 const SWIPE = 60;
@@ -109,86 +111,59 @@ export default function StoryViewer({
 
   return (
     // absolute inset-0 = アプリの枠（スマホ幅の1枚）いっぱいに広げます
-    // ▼ 全体を白っぽい「もや」の見た目にしています。
-    //   iPhone の Safari は、一番上の帯（時計や電池の所）を思いどおりの色にできません
-    //   （iOS 26 から theme-color を見なくなったため）。
-    //   帯はアプリと同じ明るい色になるので、画面のほうも明るくして、境目を目立たなくしています。
-    <div className="absolute inset-0 z-40 select-none overflow-hidden bg-[#faf9f6]">
-      {/* ▼ 写真。押す・スワイプはこの面で受け取ります。touch-none = 画面をスクロールさせない */}
+    // ▼ 背景は、手紙の画面と同じ生成りの紙の色です。その上に白いはがきを1枚置きます。
+    //   iPhone の Safari は、一番上の帯（時計や電池の所）を思いどおりの色にできないので
+    //   （iOS 26 から theme-color を見なくなったため）、明るい色にして境目を目立たなくしています。
+    <div className="absolute inset-0 z-40 select-none overflow-hidden bg-[#f3ede2]">
+      {/* ▼ 押す・スワイプはこの面で受け取ります。touch-none = 画面をスクロールさせない。
+          真ん中に「ご報告のはがき」を1枚置きます。
+          前は写真を画面いっぱいに出すストーリーの形でしたが、結婚や出産の報告は、
+          もともとはがきや手紙の文化です。本文をきちんと読めるよう、はがきの形にしました。
+          （操作はストーリーのときのままです） */}
       <div
-        className="absolute inset-0 touch-none select-none"
+        className="absolute inset-0 flex touch-none select-none items-stretch justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+10.5rem)] pt-[calc(env(safe-area-inset-top)+3.5rem)]"
         onPointerDown={(event) => {
           startRef.current = { x: event.clientX, y: event.clientY };
         }}
         onPointerUp={handlePointerUp}
       >
-        {post?.imageUrl ? (
-          <>
-            {/* ▼ 後ろに、同じ写真を大きくぼかして敷きます。
-                写真と画面の形が違うと上下か左右が余りますが、
-                そこを帯ではなく写真の色でなじませるためです（インスタと同じやり方）。
-                opacity-70 で少し薄くして、後ろの生成り色と混ぜ、白いもやのように見せます */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={post.imageUrl}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-2xl"
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              key={post.id}
-              src={post.imageUrl}
-              alt=""
-              draggable={false}
-              fetchPriority="high"
-              // object-contain = 写真を切らずに全部見せます。
-              // 画面と形が違う写真で余ったところは、後ろのぼかした写真が見えます
-              className="relative h-full w-full object-contain"
-            />
-          </>
-        ) : null}
-        {/* 上と下に白いもやをかけて、濃い色の文字を読めるようにします */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#faf9f6]/85 via-[#faf9f6]/30 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#faf9f6]/90 via-[#faf9f6]/50 to-transparent" />
+        {post ? (
+          // ▼ はがき。白い紙に金の細いふち、少しだけ影を落として、机に置いた紙のように見せます
+          // はがきの見た目は components/ReportPostcard.tsx（投稿のお試し・一覧と同じもの）。
+          // h-full = 上の名前と下の案内のあいだを、はがきが全部使います
+          <ReportPostcard
+            key={post.id}
+            size="full"
+            title={post.title}
+            body={post.body}
+            createdAt={post.createdAt}
+            imageUrl={post.imageUrl}
+            authorName={authorName}
+          />
+        ) : (
+          <p className="self-center text-sm text-stone-500">まだご報告はありません。</p>
+        )}
       </div>
 
-      {/* ▼ 上：何枚あるかの線と、その人のアイコン・名前。
+      {/* ▼ 上：その人のアイコン・名前（ストーリーのような「何枚あるかの線」は、はがきに合わないので外しました）。
           z-30 = 手書きカード（z-20）を出しているときも、× とアイコンを押せるように手前に置きます */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-30 px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
-        {/* 1枚ごとの線。見ている所まで金色にします */}
-        <div className="flex gap-1">
-          {posts.map((item, itemIndex) => (
-            <span
-              key={item.id}
-              className={`h-0.5 flex-1 rounded-full ${itemIndex <= index ? "bg-kin" : "bg-stone-300"}`}
-            />
-          ))}
-        </div>
-
-        <div className="mt-2 flex items-center">
+        <div className="flex items-center">
           <Link
             href={`/members/${authorId}/profile`}
             className="pointer-events-auto flex min-h-11 min-w-0 items-center gap-2"
           >
             <span
-              className="h-9 w-9 shrink-0 rounded-full bg-stone-400 bg-cover bg-center ring-2 ring-kin"
+              className="h-10 w-10 shrink-0 rounded-full bg-stone-400 bg-cover bg-center ring-2 ring-kin"
               style={
                 avatarUrl
                   ? { backgroundImage: `url("${encodeURI(avatarUrl)}")` }
                   : undefined
               }
             />
-            <span className="truncate text-sm font-bold text-stone-800">
+            <span className="truncate text-base font-bold text-stone-800">
               {authorName}
             </span>
-            {post ? (
-              <span className="shrink-0 text-xs text-stone-500">
-                {/* timeZone = サーバーで描いても日本の日付にするため（サーバーの時計は世界標準時） */}
-                {new Date(post.createdAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
-              </span>
-            ) : null}
           </Link>
           <button
             type="button"
@@ -201,27 +176,25 @@ export default function StoryViewer({
         </div>
       </div>
 
-      {/* ▼ 下：届いたお祝い・タイトル・本文 */}
+      {/* ▼ 下：届いたお祝いの束と、上にスワイプしてお祝いを書く案内。
+          タイトルと本文は、はがきの中に移しました。
+          はがきの下に、この2つが入るぶんの余白（pb-…10.5rem）を空けてあります。
+          前は束がはがきの左下に重なって、本文が隠れていました */}
       {post ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]">
-          {/* お祝いの束だけは押して広げられるようにします */}
-          <div className="pointer-events-auto inline-block pt-4">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+          {/* お祝いの束だけは押して広げられるようにします。
+              束はもともと「写真の下からのぞく」ように上へ食い込む作り（-mt-4）なので、
+              pt-4 でそのぶんを戻して、はがきに重ならないようにしています */}
+          <div className="pointer-events-auto self-start pt-4">
             <ReactionBoard reactions={post.reactions} />
           </div>
-          <h2 className="mb-1 text-2xl font-bold text-stone-800">{post.title}</h2>
-          <p className="line-clamp-4 text-sm leading-relaxed text-stone-600">
-            {post.body}
-          </p>
-          {/* 上にスワイプできることを、言葉ではなく上向きの印だけで伝えます */}
-          <div className="mt-3 flex justify-center text-kin">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-8 w-8 animate-bounce"><path d="M6 15l6-6 6 6" /></svg>
+          {/* 上向きの印と、小さな一言。はじめての人が、お祝いを送れることに気づけるようにします */}
+          <div className="mt-1 flex flex-col items-center text-kin">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-7 w-7 animate-bounce"><path d="M6 15l6-6 6 6" /></svg>
+            <span className="text-base">上にスワイプしてお祝いを書く</span>
           </div>
         </div>
-      ) : (
-        <p className="absolute inset-0 flex items-center justify-center text-sm text-stone-500">
-          まだご報告はありません。
-        </p>
-      )}
+      ) : null}
 
       {/* ▼ となり（前後）のご報告の写真を、見えない所で先に読んでおきます。
           進めた・戻した瞬間に、写真がもう届いている状態にするためです。

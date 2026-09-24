@@ -1,4 +1,4 @@
-// その人のご報告を、インスタのリールの一覧のように、縦長の写真で3列に並べます。
+// その人のご報告を、小さい「ご報告のはがき」で2列に並べます。
 //
 //   写真を押す       … そこからストーリー（StoryViewer）で大きく見る
 //   自分の写真を長押し … 「この投稿を消す」を選べる
@@ -12,6 +12,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import StoryViewer, { type StoryPost } from "@/components/StoryViewer";
+import ReportPostcard from "@/components/ReportPostcard";
 
 // 長押しとみなすまでの時間（ミリ秒）。ホームのアイコンの長押しと同じ長さにそろえています
 const LONG_PRESS_MS = 500;
@@ -123,14 +124,14 @@ export default function MemberPosts({
       {posts.length === 0 ? (
         <p className="py-20 text-center text-sm text-stone-500">まだご報告はありません。</p>
       ) : (
-        // ▼ 3列に並べます。gap-0.5 = 写真どうしのすき間を細くして、1枚の壁のように見せます
-        <ul className="grid grid-cols-3 gap-0.5">
+        // ▼ 小さい「ご報告のはがき」を2列に並べます（プロフィールの一覧 PostGrid と同じ見た目）
+        <ul className="grid grid-cols-2 gap-3 bg-[#f3ede2] p-3">
           {posts.map((post, index) => (
             <li key={post.id}>
               <button
                 type="button"
                 // no-callout = iPhone で長押ししたときに出る「画像を保存」などの吹き出しを止めます
-                className="no-callout relative block aspect-[9/16] w-full cursor-pointer overflow-hidden bg-stone-200 select-none"
+                className="no-callout block h-full w-full cursor-pointer text-left select-none"
                 onPointerDown={(event) => {
                   longPressedRef.current = false;
                   startRef.current = { x: event.clientX, y: event.clientY };
@@ -156,23 +157,12 @@ export default function MemberPosts({
                 // パソコンの右クリックのメニューも止めます
                 onContextMenu={(event) => event.preventDefault()}
               >
-                {post.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={post.imageUrl}
-                    alt=""
-                    draggable={false}
-                    // 画面に見えている上のほうの9枚だけ、すぐ読みます
-                    loading={index < 9 ? "eager" : "lazy"}
-                    className="h-full w-full object-cover"
-                  />
-                ) : null}
-                {/* 下を暗くして、白いタイトルを読めるようにします */}
-                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-2 pt-8 text-left">
-                  <span className="line-clamp-2 text-xs font-bold leading-snug text-white">
-                    {post.title}
-                  </span>
-                </span>
+                <ReportPostcard
+                  size="tile"
+                  title={post.title}
+                  createdAt={post.createdAt}
+                  imageUrl={post.imageUrl}
+                />
               </button>
             </li>
           ))}

@@ -1,15 +1,16 @@
-// プロフィールの画面の「ご報告」を、縦長の写真で3列に並べる部品です。
+// プロフィールの画面の「ご報告」を、小さいはがきで2列に並べる部品です。
 // 見た目は、ご報告の一覧（MemberPosts）と同じにそろえています。
 //
 // 押すと、ご報告の画面（/members/<id>）へ移り、押した写真からストーリーで開きます。
 // ?post=<ご報告の id> で「どれを押したか」を伝えています。
 
 import Link from "next/link";
+import ReportPostcard from "@/components/ReportPostcard";
 
 type PostGridProps = {
   // だれのご報告か
   memberId: string;
-  posts: { id: string; title: string; imageUrl: string | null }[];
+  posts: { id: string; title: string; imageUrl: string | null; createdAt: string }[];
 };
 
 export default function PostGrid({ memberId, posts }: PostGridProps) {
@@ -18,30 +19,19 @@ export default function PostGrid({ memberId, posts }: PostGridProps) {
   }
 
   return (
-    // gap-0.5 = 写真どうしのすき間を細くして、1枚の壁のように見せます
-    <ul className="grid grid-cols-3 gap-0.5">
-      {posts.map((post, index) => (
+    // ▼ 小さい「ご報告のはがき」を2列に並べます（components/ReportPostcard.tsx）。
+    //   前は写真だけを3列に詰めていましたが、ご報告ははがきの形で見せることにしたので、
+    //   一覧でも同じはがきにして、タイトルと日付が読める大きさにしています
+    <ul className="grid grid-cols-2 gap-3 bg-[#f3ede2] p-3">
+      {posts.map((post) => (
         <li key={post.id}>
-          <Link
-            href={`/members/${memberId}?post=${post.id}`}
-            className="relative block aspect-[9/16] overflow-hidden bg-stone-200"
-          >
-            {post.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={post.imageUrl}
-                alt=""
-                // 画面に見えている上のほうの6枚だけ、すぐ読みます
-                loading={index < 6 ? "eager" : "lazy"}
-                className="h-full w-full object-cover"
-              />
-            ) : null}
-            {/* 下を暗くして、白いタイトルを読めるようにします */}
-            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-2 pt-8">
-              <span className="line-clamp-2 text-xs font-bold leading-snug text-white">
-                {post.title}
-              </span>
-            </span>
+          <Link href={`/members/${memberId}?post=${post.id}`} className="block h-full">
+            <ReportPostcard
+              size="tile"
+              title={post.title}
+              createdAt={post.createdAt}
+              imageUrl={post.imageUrl}
+            />
           </Link>
         </li>
       ))}
