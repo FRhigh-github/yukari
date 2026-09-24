@@ -10,16 +10,24 @@ import HintOverlay from "@/components/HintOverlay";
 import NotificationBell from "@/components/NotificationBell";
 import { SHOW_HINTS } from "@/lib/tutorial";
 
-// 画面の真ん中に、文と案内ボタンを1つ出すだけの小さな部品
-function Notice({ text, href, label }: { text: string; href: string; label: string }) {
+// まだどのコミュニティにも入っていない人に出す案内です。
+// 前は「参加する」だけで、招待コードを持っていない人は先へ進めませんでした。
+// 自分で輪を始められるよう、「新しく作る」も並べます（/start と同じ2つです）
+function NoCommunity() {
   return (
-    <div className="flex flex-col items-center gap-4 py-20">
-      <p className="text-sm text-stone-500">{text}</p>
+    <div className="flex flex-col items-center gap-3 px-8 py-20">
+      <p className="mb-1 text-sm text-stone-500">まだコミュニティに入っていません</p>
       <Link
-        href={href}
-        className="rounded-full bg-beni px-6 py-3 text-sm font-bold text-white"
+        href="/communities/join"
+        className="flex h-12 w-full max-w-xs items-center justify-center rounded-full bg-beni text-sm font-bold text-white"
       >
-        {label}
+        招待コードで参加する
+      </Link>
+      <Link
+        href="/communities/new"
+        className="flex h-12 w-full max-w-xs items-center justify-center rounded-full border-2 border-kin bg-white text-sm font-bold text-kin"
+      >
+        コミュニティを新しく作る
       </Link>
     </div>
   );
@@ -96,11 +104,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       <RecoveryNotice requests={recoveryRequests} />
 
       {members.length === 0 ? (
-        <Notice
-          text="まだコミュニティに入っていません"
-          href="/communities/join"
-          label="コミュニティに参加する"
-        />
+        <NoCommunity />
       ) : (
         // ▼ メンバーのアイコンを、自分を中心にした同心円に並べます（MemberCircles）。
         //
