@@ -1059,13 +1059,27 @@ grant execute on function public.recovery_is_unlocked(uuid) to service_role;
 --   drawings = 非公開。手書きのお祝いと、未来への手紙の紙
 --   cards    = 非公開。メッセージカード
 --   非公開のものは、サーバーが期限付きURLを作って見せます（lib/signedUrls.ts）
-insert into storage.buckets (id, name, public)
-values
-  ('avatars', 'avatars', true),
-  ('posts', 'posts', false),
-  ('drawings', 'drawings', false),
-  ('cards', 'cards', false)
-on conflict (id) do update set public = excluded.public;
+--
+-- ▼ 権限が無いときは、止まらずに先へ進みます
+--   プロジェクトによっては、SQL からバケットを作る権限が postgres に無く、
+--   「permission denied for table buckets」で止まります（ローカルで試したときに実際に起きました）。
+--   このファイルは途中で止まると何も入らないので、ここだけは失敗しても先へ進むようにしています。
+--   そのときは、流したあとに「NOTICE: バケットを…」と出るので、README.md の手順で
+--   ダッシュボードから作ってください（すでにあるなら、何もしなくて大丈夫です）。
+--   exception = begin〜end の間で起きたエラーを受け止める書き方です
+do $$
+begin
+  insert into storage.buckets (id, name, public)
+  values
+    ('avatars', 'avatars', true),
+    ('posts', 'posts', false),
+    ('drawings', 'drawings', false),
+    ('cards', 'cards', false)
+  on conflict (id) do update set public = excluded.public;
+exception
+  when insufficient_privilege then
+    raise notice 'バケットを SQL から作る権限がありませんでした。supabase/README.md の「保管庫」を見て、ダッシュボードで作ってください';
+end $$;
 
 -- ▼ 許可。00_reset.sql で全部消しているので、ここで作るものが全てです。
 --   storage.foldername(name)[1] = いちばん上のフォルダ名
@@ -1160,6 +1174,7 @@ create policy "photos read own folder"
 --     supabase_realtime という配信の一覧に、messages を足します。
 --     届くのは 7. の許可で「読める」人にだけです
 -- ============================================================
+--   権限が無くても止まらないようにしています（チャットは、開き直せば新しい発言が出ます）
 do $$
 declare
   p record;
@@ -1169,6 +1184,9 @@ begin
   loop
     execute 'alter publication supabase_realtime add table public.messages';
   end loop;
+exception
+  when insufficient_privilege then
+    raise notice 'リアルタイムの設定ができませんでした。ダッシュボードの Database → Publications で supabase_realtime に messages を足してください';
 end $$;
 
 
