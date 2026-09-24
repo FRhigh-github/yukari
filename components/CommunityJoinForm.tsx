@@ -15,10 +15,13 @@ export default function CommunityJoinForm({
   const router = useRouter();
   const [code, setCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  // 送っている間は true。ボタンを押せなくして、二度押しを防ぎます
+  const [isSending, setIsSending] = useState(false);
 
   const handleJoin = async (event: React.FormEvent) => {
     event.preventDefault();
     setMessage(null);
+    setIsSending(true);
 
     const supabase = createClient();
 
@@ -31,6 +34,7 @@ export default function CommunityJoinForm({
     // コードが違うとき・ゲストのときは、エラーではなく「空（null）」が返ってきます
     if (error || !joinedId) {
       setMessage("コードが違うようです");
+      setIsSending(false);
       return;
     }
 
@@ -56,9 +60,10 @@ export default function CommunityJoinForm({
 
       <button
         type="submit"
-        className="h-12 w-full rounded-xl border border-kin bg-white text-sm font-bold text-kin"
+        disabled={isSending}
+        className="h-12 w-full rounded-xl border border-kin bg-white text-sm font-bold text-kin disabled:opacity-50"
       >
-        参加する
+        {isSending ? "確かめています…" : "参加する"}
       </button>
 
       {message ? <p className="text-xs text-beni">{message}</p> : null}
