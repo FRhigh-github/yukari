@@ -34,10 +34,11 @@ export default function ReceivedCard({
         onClick={() => imageUrl && setIsOpen(true)}
         className="w-full text-left"
       >
-        {/* ▼ ご祝儀袋のような見た目にします。
-              白い台紙に金のふち、上のほうに紅白の水引を1本かけて、真ん中で結びます。
+        {/* ▼ 白い台紙に金のふち。
+              前は上のほうに水引の帯と結び目をかけていましたが、
+              送ったカードの文字や写真が隠れてしまうので、無くしました。
               aspect-[2/3] = 縦横の比。はがきの形にそろえます */}
-        <div className="relative rounded-xl bg-white p-1.5 ring-1 ring-kin/60">
+        <div className="rounded-xl bg-white p-1.5 ring-1 ring-kin/60">
           <div className="aspect-[2/3] w-full overflow-hidden rounded-lg">
             {imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -55,19 +56,6 @@ export default function ReceivedCard({
               />
             )}
           </div>
-
-          {/* 水引の帯。紅と金の細い線を2本、横にかけます */}
-          <div className="pointer-events-none absolute inset-x-0 top-[22%] flex flex-col gap-[2px]">
-            <span className="h-[2px] bg-beni" />
-            <span className="h-[2px] bg-kin" />
-          </div>
-          {/* 帯の真ん中の結び目。ホームなどと同じ紅白の結びを小さく置きます */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/knot.svg"
-            alt=""
-            className="pointer-events-none absolute left-1/2 top-[22%] w-10 -translate-x-1/2 -translate-y-1/2 drop-shadow"
-          />
         </div>
 
         <p className="mt-2 truncate text-sm font-bold text-stone-800">
