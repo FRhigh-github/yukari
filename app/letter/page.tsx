@@ -1152,8 +1152,9 @@ export default function LetterPage() {
             autoResize(e.target);
             updateItem(item.id, { text: e.target.value });
           }}
-          placeholder="テキストを入力"
-          className="block w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-stone-300"
+          placeholder="ここに文字"
+          // 薄い文字は、選んだ文字の色を薄くしたもの(メッセージカードと同じ)
+          className="block w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-current placeholder:opacity-40"
         />
       );
     }
@@ -1211,7 +1212,7 @@ export default function LetterPage() {
     }
 
     const link = item.url.startsWith("http") ? (
-      <a href={item.url} target="_blank" rel="noopener noreferrer" className="inline-block text-xs text-stone-500 underline">
+      <a href={item.url} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center text-sm font-bold text-kin underline">
         開く
       </a>
     ) : null;
@@ -1225,7 +1226,7 @@ export default function LetterPage() {
             value={item.url}
             onChange={(e) => updateItem(item.id, { url: e.target.value })}
             placeholder="https://..."
-            className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-stone-300"
+            className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-current placeholder:opacity-40"
           />
         </div>
         {link}
@@ -1315,8 +1316,17 @@ export default function LetterPage() {
                 data-item-id={item.id}
                 // 押す・動かすの見分けは bindDrag(上の「ドラッグ」)にまかせます
                 {...bindDrag(item.id)}
-                className={`absolute cursor-move select-none p-2 ${
-                  isSelected ? "outline outline-1 outline-stone-700" : ""
+                // ▼ 枠の見た目は、メッセージカード(CardComposer)とそろえています。
+                //   テキスト・URL … いつも薄い点線(ここに書ける、と分かるように)。選ぶと金の太い点線
+                //   写真         … 選んだときだけ金の線
+                className={`absolute cursor-move select-none rounded p-2 ${
+                  item.type !== "photo"
+                    ? isSelected
+                      ? "outline-dashed outline-2 outline-kin"
+                      : "outline-dashed outline-1 outline-stone-400/60"
+                    : isSelected
+                      ? "outline outline-2 outline-kin"
+                      : ""
                 }`}
                 style={{
                   left: item.x,
@@ -1333,28 +1343,28 @@ export default function LetterPage() {
 
                 {isSelected && (
                   <>
-                    {/* ▼ 枠の上に、削除のボタンを置きます。
-                        (回すのは2本指でできるので、回転のボタンは無くしました)
-                        枠から細い点線でつなぎ、どの枠のボタンか分かるようにしています。
-                        見た目は 28px の丸ですが、押せる範囲は 44px あります */}
-                    <span className="pointer-events-none absolute -top-8 left-1/2 h-6 -translate-x-1/2 border-l border-dotted border-stone-700" />
-                    <div className="absolute -top-[68px] left-1/2 flex -translate-x-1/2">
-                      {/* 削除 */}
-                      <button
-                        type="button"
-                        onClick={() => deleteItem(item.id)}
-                        aria-label="削除"
-                        className="flex h-11 w-11 items-center justify-center"
-                      >
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-stone-700 bg-white text-xs text-stone-700 shadow-sm">
-                          ×
-                        </span>
-                      </button>
-                    </div>
+                    {/* ▼ 右上に、消すボタンを出します(メッセージカードと同じ形)。
+                        見た目は 28px の丸ですが、押せる範囲は 44px あります。
+                        押したときに、外側の「動かす」に伝えないようにします */}
+                    <button
+                      type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => deleteItem(item.id)}
+                      aria-label="削除"
+                      className="absolute -right-5 -top-5 z-10 flex h-11 w-11 items-center justify-center"
+                    >
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-beni shadow ring-1 ring-kin/60">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true" className="h-4 w-4"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                      </span>
+                    </button>
 
                     {/* 枠の〇(四つ角と、辺の中点)。引っぱると大きさや形が変わります。
                         見た目は 12px ですが、押せる範囲は 44px あります */}
                     {HANDLES.filter((h) => {
+                      // 右上の角は、消すボタンの場所なので〇を出しません
+                      if (h.handle === "tr") {
+                        return false;
+                      }
                       // 写真をまだ選んでいないときは、大きさを変えられないので、
                       // 四つ角だけを飾りとして出します
                       if (item.type === "photo" && item.imageSrc === "") {
@@ -1367,7 +1377,7 @@ export default function LetterPage() {
                           key={h.handle}
                           className={`pointer-events-none absolute flex h-11 w-11 items-center justify-center ${h.position}`}
                         >
-                          <span className="h-3 w-3 rounded-full border border-stone-700 bg-white" />
+                          <span className="h-3 w-3 rounded-full border border-kin bg-white" />
                         </span>
                       ) : (
                         <button
@@ -1381,7 +1391,7 @@ export default function LetterPage() {
                           className={`absolute flex h-11 w-11 items-center justify-center ${h.position} ${h.cursor}`}
                           style={{ touchAction: "none" }}
                         >
-                          <span className="h-3 w-3 rounded-full border border-stone-700 bg-white" />
+                          <span className="h-3 w-3 rounded-full border border-kin bg-white" />
                         </button>
                       )
                     )}
