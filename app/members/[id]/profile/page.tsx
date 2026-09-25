@@ -94,11 +94,19 @@ export default async function MemberProfilePage({
 
   return (
     <main className="pb-24">
-      <div className="px-5 pt-3">
-        <Link href="/" className="text-sm text-stone-500">
-          ← ホーム
+      {/* ▼ 戻るボタン。ご報告の一覧（MemberPosts）と同じ形にそろえています。
+            前は小さな文字のリンクだけで、押せる範囲が狭いうえ、下へ送ると見えなくなりました。
+            ホーム画面に追加したアプリには、ブラウザの「戻る」がありません。
+            sticky = 下へ送っても上に残ります。h-11 = 44px（押せる範囲の iOS の基準） */}
+      <header className="sticky top-0 z-10 border-b border-kin/30 bg-[#faf9f6]/90 px-2 py-1 backdrop-blur">
+        <Link
+          href="/"
+          className="flex h-11 w-fit items-center gap-0.5 pr-3 text-stone-700"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-7 w-7"><path d="M15 5l-7 7 7 7" /></svg>
+          <span className="text-sm">ホーム</span>
         </Link>
-      </div>
+      </header>
 
       <ProfileHeader
         displayName={profile?.display_name ?? null}
