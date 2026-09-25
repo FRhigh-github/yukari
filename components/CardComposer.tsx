@@ -13,6 +13,8 @@ import {
   type CardItem,
 } from "@/lib/cardCanvas";
 import { TEXT_COLORS } from "@/lib/cardBackground";
+// 回した角度を、まっすぐの近くでぴたっと止める計算（未来への手紙と共通）
+import { snapRotation } from "@/lib/rotation";
 import CardTemplate, {
   CARD_KINDS,
   type CardKind,
@@ -60,8 +62,6 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
   const background =
     CARD_KINDS.find((item) => item.kind === kind) ?? CARD_KINDS[0];
 
-  const selected = items.find((item) => item.id === selectedId);
-
   const addText = () => {
     const id = crypto.randomUUID();
     setItems((current) => [
@@ -104,14 +104,6 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
     setItems((current) =>
       current.map((item) =>
         item.id === id ? ({ ...item, ...changes } as CardItem) : item,
-      ),
-    );
-  };
-
-  const updateSelected = (changes: Partial<CardItem>) => {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === selectedId ? ({ ...item, ...changes } as CardItem) : item,
       ),
     );
   };
@@ -248,6 +240,8 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
   // ▼ 背景を、カードの上で左右にスライドして切り替えます。
   //   カードの何もない所（背景）に触れて、横に大きく動かしたときだけ切り替えます
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  // 下の背景えらびの帯で、指を置いた横の位置
+  const barStartRef = useRef<number | null>(null);
   const kindIndex = CARD_KINDS.findIndex((item) => item.kind === kind);
   const changeKind = (step: number) => {
     // % で端から端へぐるっと回ります（最後の次は最初）
@@ -289,11 +283,11 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
     { filterTaps: true },
   );
 
-  // ▼ 2本指で挟むと、選んでいるものの大きさが変わります（下のつまみと同じ）。
+  // ▼ 2本指で挟むと、選んでいるものの大きさと向きが変わります（写真アプリと同じ操作）。
   //   小さい文字でも挟めるよう、カードのどこで挟んでもよいことにしています。
-  //   movement[0] = 挟み始めてから何倍に広げたか
+  //   movement = [挟み始めてから何倍に広げたか, 何度回したか]
   usePinch(
-    ({ first, last, movement: [scale], memo }) => {
+    ({ first, last, movement: [scale, angle], memo }) => {
       pinchingRef.current = !last;
       // 背景のスワイプとして数えないようにします
       swipeStartRef.current = null;
@@ -305,6 +299,8 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       updateItem(item.id, {
         width,
         x: Math.min(0.95, Math.max(0, start.x + (start.width - width) / 2)),
+        // まっすぐ・真横の近くでは、ぴたっと止まります
+        rotation: snapRotation((start.rotation ?? 0) + angle).rotation,
       });
       return start;
     },
@@ -390,6 +386,8 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
                   top: `${item.y * 100}%`,
                   width: `${item.width * 100}%`,
                   padding: itemPadding,
+                  // 真ん中を軸に回します（書き出す lib/cardCanvas.ts も同じ回し方です）
+                  transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
                 }}
               >
                 {item.type === "text" ? (
@@ -415,6 +413,23 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={item.src} alt="" className="block w-full" draggable={false} />
                 )}
+
+                {/* ▼ 選んでいるものの右上に、消すボタンを出します。
+                    見た目は 28px の丸ですが、押せる範囲は 44px あります。
+                    押したときに、外側の「動かす」に伝えないようにします */}
+                {isSelected ? (
+                  <button
+                    type="button"
+                    aria-label="消す"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={removeSelected}
+                    className="absolute -right-5 -top-5 z-10 flex h-11 w-11 items-center justify-center"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-beni shadow ring-1 ring-kin/60">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true" className="h-4 w-4"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                    </span>
+                  </button>
+                ) : null}
               </div>
             );
           })}
@@ -455,44 +470,49 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
 
       {/* ▼ 下：道具。高さを固定して、選んだり外したりしてもカードが上下に動かないようにします */}
       <div className="shrink-0 space-y-2 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-        <div className="flex h-11 items-center gap-3">
-          {selected ? (
-            <>
-              {/* 大きさ（横幅）のつまみ */}
-              <input
-                type="range"
-                min={15}
-                max={95}
-                value={Math.round(selected.width * 100)}
-                onChange={(event) =>
-                  updateSelected({ width: Number(event.target.value) / 100 })
-                }
-                aria-label="大きさ"
-                className="flex-1 accent-[#c2a14d]"
-              />
-              <button
-                type="button"
-                onClick={removeSelected}
-                aria-label="消す"
-                className="flex h-11 w-11 items-center justify-center text-beni"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 13h10l1-13" /><path d="M9 7V4h6v3" /></svg>
-              </button>
-            </>
-          ) : (
-            // 何も選んでいないときは、いまの背景の名前と、何枚目かの点を出します
-            <div className="flex w-full items-center justify-center gap-3">
-              <span className="text-sm font-bold text-kin">{background.label}</span>
-              <span className="flex gap-1.5">
-                {CARD_KINDS.map((item) => (
-                  <span
-                    key={item.kind}
-                    className={`h-1.5 w-1.5 rounded-full ${item.kind === kind ? "bg-kin" : "bg-stone-300"}`}
-                  />
-                ))}
-              </span>
-            </div>
-          )}
+        {/* ▼ 背景えらび。左右の矢印を押すか、この帯を横にスライドすると、背景が変わります。
+            （大きさは2本指で、消すのは選んだものの右上の × でできるので、つまみの帯は無くしました） */}
+        <div
+          onPointerDown={(event) => {
+            barStartRef.current = event.clientX;
+          }}
+          onPointerUp={(event) => {
+            const start = barStartRef.current;
+            barStartRef.current = null;
+            if (start === null) return;
+            const dx = event.clientX - start;
+            // 左へスライド → 次の背景、右へ → 前の背景（カードの上のスライドと同じ向き）
+            if (Math.abs(dx) > 40) changeKind(dx < 0 ? 1 : -1);
+          }}
+          className="flex h-14 touch-none select-none items-center justify-between rounded-2xl bg-white ring-1 ring-kin/40"
+        >
+          <button
+            type="button"
+            onClick={() => changeKind(-1)}
+            aria-label="前の背景"
+            className="flex h-14 w-14 items-center justify-center text-kin active:scale-90"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-7 w-7"><path d="M15 6l-6 6 6 6" /></svg>
+          </button>
+          <div className="flex flex-col items-center gap-1.5">
+            <span className="text-base font-bold text-kin">{background.label}</span>
+            <span className="flex gap-1.5">
+              {CARD_KINDS.map((item) => (
+                <span
+                  key={item.kind}
+                  className={`h-1.5 w-1.5 rounded-full ${item.kind === kind ? "bg-kin" : "bg-stone-300"}`}
+                />
+              ))}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => changeKind(1)}
+            aria-label="次の背景"
+            className="flex h-14 w-14 items-center justify-center text-kin active:scale-90"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-7 w-7"><path d="M9 6l6 6-6 6" /></svg>
+          </button>
         </div>
 
         {/* ▼ 相手えらびは、押してから出します。

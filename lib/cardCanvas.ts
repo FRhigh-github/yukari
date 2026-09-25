@@ -16,9 +16,10 @@ import {
 // カードの中に置いたもの1つぶん。
 // x, y, width は「カードの幅を1としたときの割合」で持ちます。
 // 画面の大きさが変わっても、同じ見た目で書き出せるようにするためです。
+// rotation = 2本指で回した角度（度・時計回りがプラス）。回していないものは無くてもよい
 export type CardItem =
-  | { id: string; type: "text"; x: number; y: number; width: number; text: string }
-  | { id: string; type: "image"; x: number; y: number; width: number; src: string };
+  | { id: string; type: "text"; x: number; y: number; width: number; rotation?: number; text: string }
+  | { id: string; type: "image"; x: number; y: number; width: number; rotation?: number; src: string };
 
 // 書き出す大きさは、背景の絵と同じにします
 const OUT_WIDTH = CARD_WIDTH;
@@ -47,19 +48,38 @@ export async function renderCardToBlob(
   // 置いたものを、下から順に描いていきます
   const padding = OUT_WIDTH * ITEM_PADDING_RATIO;
 
+  const lineHeight = Math.round(OUT_WIDTH * FONT_RATIO * 1.5);
+
   for (const item of items) {
-    // 置いたものの枠の左上から、内側の余白ぶんだけ入った所が、中身の左上です
-    const x = item.x * OUT_WIDTH + padding;
-    const y = item.y * OUT_HEIGHT + padding;
-    const contentWidth = item.width * OUT_WIDTH - padding * 2;
+    const boxWidth = item.width * OUT_WIDTH;
+    const contentWidth = boxWidth - padding * 2;
+
+    // 写真は、読み込みを待ってから描きます（src は選んだ写真の中身そのもの data:...）。
+    // 縦は元の比率のまま
+    const image = item.type === "image" ? await loadImage(item.src) : null;
+    const contentHeight =
+      item.type === "text"
+        ? // 文字は、画面の入力欄と同じく「改行の数」ぶんの高さです
+          item.text.split("\n").length * lineHeight
+        : image
+          ? (contentWidth / image.width) * image.height
+          : 0;
+    const boxHeight = contentHeight + padding * 2;
+
+    // ▼ 画面と同じく、枠の真ん中を軸にして回します。
+    //   ctx.translate で描く基準を枠の真ん中へ動かし、回してから、枠の左上へ戻します。
+    //   save / restore = 次のものを描くときに、回した向きが残らないようにする命令
+    ctx.save();
+    ctx.translate(item.x * OUT_WIDTH + boxWidth / 2, item.y * OUT_HEIGHT + boxHeight / 2);
+    ctx.rotate(((item.rotation ?? 0) * Math.PI) / 180);
+    ctx.translate(-boxWidth / 2, -boxHeight / 2);
+    // 枠の左上から、内側の余白ぶんだけ入った所が、中身の左上です
+    const x = padding;
+    const y = padding;
 
     if (item.type === "image") {
-      // src は選んだ写真の中身そのもの（data:...）なので、
-      // 読み込みを待ってから描きます
-      const image = await loadImage(item.src);
-      // 縦は元の比率のまま
-      const height = (contentWidth / image.width) * image.height;
-      ctx.drawImage(image, x, y, contentWidth, height);
+      if (image) ctx.drawImage(image, x, y, contentWidth, contentHeight);
+      ctx.restore();
       continue;
     }
 
@@ -70,7 +90,6 @@ export async function renderCardToBlob(
     // ▼ 枠の幅で折り返して、1行ずつ下にずらして描きます。
     //   canvas は「ここで折り返す」をやってくれないので、1文字ずつ足していき、
     //   はみ出したところで次の行に送ります（画面の折り返しと合わせるため）
-    const lineHeight = Math.round(OUT_WIDTH * FONT_RATIO * 1.5);
     const lines: string[] = [];
     for (const paragraph of item.text.split("\n")) {
       let line = "";
@@ -87,6 +106,7 @@ export async function renderCardToBlob(
     lines.forEach((line, index) => {
       ctx.fillText(line, x, y + index * lineHeight);
     });
+    ctx.restore();
   }
 
   const blob = await new Promise<Blob | null>((resolve) => {

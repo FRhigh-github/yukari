@@ -28,6 +28,8 @@ import type { PointerEvent, ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import HorizontalScroller from "@/components/HorizontalScroller";
 import { shrinkImage } from "@/lib/image";
+// 回した角度を、まっすぐの近くでぴたっと止める計算(カード作りと共通)
+import { snapRotation } from "@/lib/rotation";
 // 選べるフォントのうち、Google Fonts から読み込むもの
 import { WEB_FONTS } from "./fonts";
 
@@ -201,20 +203,6 @@ const HANDLES: { handle: Handle; position: string; cursor: string }[] = [
   { handle: "r", position: "-right-[22px] top-1/2 -translate-y-1/2", cursor: "cursor-ew-resize" },
 ];
 
-// 回した角度を -180〜180 に直し、まっすぐ(0度)や真横(90度)の近くでは、ぴたっと止めます。
-// 指で少しだけ傾いてしまうのを防ぐためです。isStraight = ぴたっと止めたかどうか
-function snapRotation(value: number) {
-  let rotation = ((((value + 180) % 360) + 360) % 360) - 180;
-  let isStraight = false;
-  for (const snap of [-180, -90, 0, 90, 180]) {
-    if (Math.abs(rotation - snap) < 5) {
-      rotation = snap;
-      isStraight = true;
-    }
-  }
-  return { rotation, isStraight };
-}
-
 // 新しく1つ作る関数です。
 function createItem(id: number, type: ItemType, x: number, y: number): Item {
   return {
@@ -247,9 +235,6 @@ const LinkIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 
 // カレンダーのアイコン(イベント用)
 const CalendarIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4" /><path d="M16 3v4" /></svg>;
-
-// 回転のアイコン(くるっと回る矢印)
-const RotateIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M20 12a8 8 0 1 1-2.34-5.66" /><path d="M20 4v5h-5" /></svg>;
 
 // 紙飛行機のアイコン(「未来へ送る」ボタン用)
 const SendIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" className="h-5 w-5"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>;
@@ -409,21 +394,7 @@ export default function LetterPage() {
     rotation: number; // 置いたものが回っている角度(度)
   } | null>(null);
 
-  // いま回転のボタンを引っぱって、回している最中の情報(していないときは null)
-  //   centerX / centerY … 置いたものの真ん中(画面の中の位置)。ここを軸に回します
-  //   startAngle        … 押した瞬間の「真ん中から見た指の角度」
-  const rotateRef = useRef<{
-    id: number;
-    centerX: number;
-    centerY: number;
-    startAngle: number;
-    startRotation: number;
-    // 紙の中での、置いたものの真ん中(点線を引く位置)
-    paperX: number;
-    paperY: number;
-  } | null>(null);
-
-  // 回している最中に、まっすぐ(0度・90度・180度)になったら出す点線の位置。
+  // 2本指で回している最中に、まっすぐ(0度・90度・180度)になったら出す点線の位置。
   // 出していないときは null です(画面に出すので useState)
   const [rotateGuide, setRotateGuide] = useState<{ x: number; y: number } | null>(null);
 
@@ -782,63 +753,6 @@ export default function LetterPage() {
   // ----- 〇を離した瞬間 -----
   function handleResizeUp() {
     resizeRef.current = null;
-  }
-
-  // =====================================================
-  // 回転のボタンを引っぱって、回す
-  // =====================================================
-
-  // 真ん中から見た、指の角度(度)
-  function angleFrom(centerX: number, centerY: number, e: PointerEvent<HTMLButtonElement>) {
-    return (Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180) / Math.PI;
-  }
-
-  // ----- 回転のボタンを押した瞬間 -----
-  function handleRotateDown(e: PointerEvent<HTMLButtonElement>, item: Item) {
-    // 外側の枠(ドラッグで動かす所)に伝えません
-    e.stopPropagation();
-    // このボタンが入っている「置いたものの枠」を探し、その真ん中を回す軸にします
-    const box = e.currentTarget.closest("[data-item-id]");
-    if (box === null) {
-      return;
-    }
-    const rect = box.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    e.currentTarget.setPointerCapture(e.pointerId);
-    rotateRef.current = {
-      id: item.id,
-      centerX,
-      centerY,
-      startAngle: angleFrom(centerX, centerY, e),
-      startRotation: item.rotation,
-      paperX: centerX - (paperRef.current?.getBoundingClientRect().left ?? 0),
-      paperY: centerY - (paperRef.current?.getBoundingClientRect().top ?? 0),
-    };
-  }
-
-  // ----- 回している間 -----
-  function handleRotateMove(e: PointerEvent<HTMLButtonElement>) {
-    const r = rotateRef.current;
-    if (r === null) {
-      return;
-    }
-    // 押した瞬間から、指が真ん中のまわりを何度まわったか
-    // (-180〜180 に直し、まっすぐの近くでぴたっと止めます。snapRotation を参照)
-    const { rotation, isStraight } = snapRotation(
-      r.startRotation + angleFrom(r.centerX, r.centerY, e) - r.startAngle
-    );
-    updateItem(r.id, { rotation });
-
-    // まっすぐのときだけ、真ん中を通る縦と横の点線を出して、そろったことを知らせます
-    setRotateGuide(isStraight ? { x: r.paperX, y: r.paperY } : null);
-  }
-
-  // ----- 回転のボタンを離した瞬間 -----
-  function handleRotateUp() {
-    rotateRef.current = null;
-    setRotateGuide(null);
   }
 
   // =====================================================
@@ -1419,26 +1333,12 @@ export default function LetterPage() {
 
                 {isSelected && (
                   <>
-                    {/* ▼ 枠の上に、回転と削除のボタンを並べます。
+                    {/* ▼ 枠の上に、削除のボタンを置きます。
+                        (回すのは2本指でできるので、回転のボタンは無くしました)
                         枠から細い点線でつなぎ、どの枠のボタンか分かるようにしています。
                         見た目は 28px の丸ですが、押せる範囲は 44px あります */}
                     <span className="pointer-events-none absolute -top-8 left-1/2 h-6 -translate-x-1/2 border-l border-dotted border-stone-700" />
                     <div className="absolute -top-[68px] left-1/2 flex -translate-x-1/2">
-                      {/* 回転:押したまま、枠のまわりをぐるっと動かすと回ります */}
-                      <button
-                        type="button"
-                        aria-label="回転"
-                        onPointerDown={(e) => handleRotateDown(e, item)}
-                        onPointerMove={handleRotateMove}
-                        onPointerUp={handleRotateUp}
-                        onPointerCancel={handleRotateUp}
-                        className="flex h-11 w-11 cursor-grab items-center justify-center active:cursor-grabbing"
-                        style={{ touchAction: "none" }}
-                      >
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-stone-700 bg-white text-stone-700 shadow-sm">
-                          {RotateIcon}
-                        </span>
-                      </button>
                       {/* 削除 */}
                       <button
                         type="button"
@@ -1571,7 +1471,7 @@ export default function LetterPage() {
             </>
           )}
 
-          {/* ----- 回転がまっすぐになったときの点線 ----- */}
+          {/* ----- 2本指で回して、まっすぐになったときの点線 ----- */}
           {/* 置いたものの真ん中を通る、横と縦の線です。紙の端から端まで引きます */}
           {rotateGuide !== null && (
             <>
