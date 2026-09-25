@@ -1,6 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+// 指の動き(ドラッグ・2本指のピンチ)を見分けてくれるライブラリ
+import { useDrag, usePinch } from "@use-gesture/react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
@@ -34,8 +36,8 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
 
   // カードの枠。指の位置を「カードの中での割合」に直すのに使います
   const cardRef = useRef<HTMLDivElement>(null);
-  // 動かしている最中のものの id。null なら誰も動かしていません
-  const draggingRef = useRef<string | null>(null);
+  // 2本指で大きさを変えている最中か。その間は、1本指で動かすほうを止めます
+  const pinchingRef = useRef(false);
 
   const [kind, setKind] = useState<CardKind>(initialKind);
   // ▼ 最初から、文字の枠を1つ置いておきます（中身は空。薄く「ここに文字」と出ます）。
@@ -59,46 +61,6 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
     CARD_KINDS.find((item) => item.kind === kind) ?? CARD_KINDS[0];
 
   const selected = items.find((item) => item.id === selectedId);
-
-  // ▼ 指の位置を、カードの中での割合(0〜1)に直します。
-  //   割合で持っておくと、画面の大きさが変わっても位置がずれません。
-  const toRatio = (clientX: number, clientY: number) => {
-    const rect = cardRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return {
-      x: (clientX - rect.left) / rect.width,
-      y: (clientY - rect.top) / rect.height,
-    };
-  };
-
-  const handlePointerDown = (id: string) => (event: React.PointerEvent) => {
-    // setPointerCapture = 指がその要素から外れても、動きを追い続ける指定
-    event.currentTarget.setPointerCapture(event.pointerId);
-    draggingRef.current = id;
-    setSelectedId(id);
-  };
-
-  const handlePointerMove = (event: React.PointerEvent) => {
-    if (draggingRef.current === null) return;
-
-    const pos = toRatio(event.clientX, event.clientY);
-    setItems((current) =>
-      current.map((item) =>
-        item.id === draggingRef.current
-          ? // カードの外へ出てしまわないように、0〜0.95 に収めます
-            {
-              ...item,
-              x: Math.min(0.95, Math.max(0, pos.x)),
-              y: Math.min(0.95, Math.max(0, pos.y)),
-            }
-          : item,
-      ),
-    );
-  };
-
-  const handlePointerUp = () => {
-    draggingRef.current = null;
-  };
 
   const addText = () => {
     const id = crypto.randomUUID();
@@ -136,6 +98,14 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       { id, type: "image", x: 0.15, y: 0.3, width: 0.5, src },
     ]);
     setSelectedId(id);
+  };
+
+  const updateItem = (id: string, changes: Partial<CardItem>) => {
+    setItems((current) =>
+      current.map((item) =>
+        item.id === id ? ({ ...item, ...changes } as CardItem) : item,
+      ),
+    );
   };
 
   const updateSelected = (changes: Partial<CardItem>) => {
@@ -285,6 +255,74 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
     setKind(CARD_KINDS[next].kind);
   };
 
+  // ▼ 置いたものを動かす・大きさを変える。指の動きの計算は @use-gesture/react にまかせています。
+  //   前は自分で書いていて、つかんだ瞬間に、写真の左上の角が指の所へ飛んでいました。
+  //   このライブラリは「軽く押した(タップ)」と「押したまま動かした(ドラッグ)」を見分けてくれるので、
+  //     軽く押す         … 選ぶ
+  //     押したまま動かす … つかんだ所のまま、動かす
+  //     2本指で挟む      … 選んでいるものの大きさを変える
+  //   になります。
+  //   memo = 動かし始めたときに返した値を、指を離すまで覚えておいてくれる入れ物です
+  const bindDrag = useDrag(
+    ({ args, tap, first, movement: [moveX, moveY], memo, cancel }) => {
+      const id = args[0] as string;
+      if (tap || first) setSelectedId(id);
+      if (tap) return memo;
+      // 2本指の操作が始まったら、1本指の移動はやめます
+      if (pinchingRef.current) {
+        cancel();
+        return memo;
+      }
+      const rect = cardRef.current?.getBoundingClientRect();
+      const item = items.find((it) => it.id === id);
+      if (!rect || !item) return memo;
+      const start: { x: number; y: number } = memo ?? { x: item.x, y: item.y };
+      // 指が動いたぶん(px)を、カードの中での割合に直して足します。
+      // カードの外へ出てしまわないように、0〜0.95 に収めます
+      updateItem(id, {
+        x: Math.min(0.95, Math.max(0, start.x + moveX / rect.width)),
+        y: Math.min(0.95, Math.max(0, start.y + moveY / rect.height)),
+      });
+      return start;
+    },
+    // filterTaps = 3px 以内の動きは「タップ」とみなし、ものを動かしません
+    { filterTaps: true },
+  );
+
+  // ▼ 2本指で挟むと、選んでいるものの大きさが変わります（下のつまみと同じ）。
+  //   小さい文字でも挟めるよう、カードのどこで挟んでもよいことにしています。
+  //   movement[0] = 挟み始めてから何倍に広げたか
+  usePinch(
+    ({ first, last, movement: [scale], memo }) => {
+      pinchingRef.current = !last;
+      // 背景のスワイプとして数えないようにします
+      swipeStartRef.current = null;
+      const item = items.find((it) => it.id === selectedId);
+      if (!item) return memo;
+      const start: CardItem = first || memo === undefined ? item : memo;
+      const width = Math.min(0.95, Math.max(0.15, start.width * scale));
+      // 真ん中の位置が動かないように、左の位置を直します
+      updateItem(item.id, {
+        width,
+        x: Math.min(0.95, Math.max(0, start.x + (start.width - width) / 2)),
+      });
+      return start;
+    },
+    { target: cardRef },
+  );
+
+  // ▼ iPhone の Safari は、2本指で挟むと画面ごと拡大しようとします。
+  //   ピンチをカードの操作に使うため、画面の拡大を止めます
+  useEffect(() => {
+    const stop = (event: Event) => event.preventDefault();
+    document.addEventListener("gesturestart", stop);
+    document.addEventListener("gesturechange", stop);
+    return () => {
+      document.removeEventListener("gesturestart", stop);
+      document.removeEventListener("gesturechange", stop);
+    };
+  }, []);
+
   // 文字や写真の大きさ・位置は、カードの幅に対する割合で決めます（lib/cardCanvas.ts と同じ）。
   // cqw = 「カードの横幅の1%」。カードに @container を付けているので使えます
   const fontSize = `${FONT_RATIO * 100}cqw`;
@@ -297,13 +335,13 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
         <div
           ref={cardRef}
           onPointerDown={(event) => {
+            // 2本目の指は数えません（2本指で挟んだときに、背景が切り替わらないように）
+            if (!event.isPrimary) return;
             // 置いたものの上ではなく、背景に触れたときだけ
             if (event.target !== event.currentTarget && !(event.target instanceof HTMLElement && event.target.dataset.cardBackground)) return;
             swipeStartRef.current = { x: event.clientX, y: event.clientY };
           }}
-          onPointerMove={handlePointerMove}
           onPointerUp={(event) => {
-            handlePointerUp();
             const start = swipeStartRef.current;
             swipeStartRef.current = null;
             if (start === null) return;
@@ -335,11 +373,8 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
             return (
               <div
                 key={item.id}
-                onPointerDown={(event) => {
-                  // 選んでいる文字の入力欄を押したときは、動かさずに文字を打てるようにします
-                  if (isSelected && event.target instanceof HTMLTextAreaElement) return;
-                  handlePointerDown(item.id)(event);
-                }}
+                // 押す・動かすの見分けは bindDrag（上の説明）にまかせます
+                {...bindDrag(item.id)}
                 className={`absolute cursor-move rounded ${
                   item.type === "text"
                     ? // 文字の枠は、いつも薄い点線で見せます（ここに文字が書ける、と分かるように）

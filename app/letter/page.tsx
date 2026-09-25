@@ -18,7 +18,9 @@
 // この画面はブラウザで動かします(ボタンや指の操作があるため)
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+// 指の動き(ドラッグ・2本指のピンチ)を見分けてくれるライブラリ
+import { useDrag, usePinch } from "@use-gesture/react";
 // PointerEvent … 指やマウスで押した・動かしたときの情報の型
 // ReactNode … 「画面に表示できるもの(文字やアイコンなど)」の型
 import type { PointerEvent, ReactNode } from "react";
@@ -199,6 +201,20 @@ const HANDLES: { handle: Handle; position: string; cursor: string }[] = [
   { handle: "r", position: "-right-[22px] top-1/2 -translate-y-1/2", cursor: "cursor-ew-resize" },
 ];
 
+// 回した角度を -180〜180 に直し、まっすぐ(0度)や真横(90度)の近くでは、ぴたっと止めます。
+// 指で少しだけ傾いてしまうのを防ぐためです。isStraight = ぴたっと止めたかどうか
+function snapRotation(value: number) {
+  let rotation = ((((value + 180) % 360) + 360) % 360) - 180;
+  let isStraight = false;
+  for (const snap of [-180, -90, 0, 90, 180]) {
+    if (Math.abs(rotation - snap) < 5) {
+      rotation = snap;
+      isStraight = true;
+    }
+  }
+  return { rotation, isStraight };
+}
+
 // 新しく1つ作る関数です。
 function createItem(id: number, type: ItemType, x: number, y: number): Item {
   return {
@@ -367,10 +383,12 @@ export default function LetterPage() {
   // 紙そのものを指す箱(紙の位置や大きさを測るのに使います)
   const paperRef = useRef<HTMLDivElement>(null);
 
-  // いまドラッグ中のものの情報(ドラッグしていないときは null)
-  const dragRef = useRef<{ id: number; offsetX: number; offsetY: number } | null>(
-    null
-  );
+  // 2本指で大きさ・向きを変えている最中か(画面に出さないので useRef)。
+  // その間は、1本指で動かすほうを止めます
+  const pinchingRef = useRef(false);
+  // 今回の指の操作で、2本指の操作をしたか。紙を軽く押したときに選ぶのをやめる処理を、
+  // ピンチのあとには動かさないために使います
+  const pinchedRef = useRef(false);
 
   // いま〇を引っぱって、大きさを変えている最中の情報(していないときは null)。
   // 押した瞬間の大きさを覚えておき、そこから指がどれだけ動いたかで計算します
@@ -507,51 +525,120 @@ export default function LetterPage() {
   // ドラッグ
   // =====================================================
 
-  // ----- 押した瞬間 -----
-  function handlePointerDown(e: PointerEvent<HTMLDivElement>, item: Item) {
-    setSelectedId(item.id);
+  // 指の動きの計算は @use-gesture/react にまかせています。
+  // 前は自分で書いていて、少し触れただけで動いたり、文字の欄の上ではつかめなかったりしました。
+  // このライブラリは「軽く押した(タップ)」と「押したまま動かした(ドラッグ)」を見分けてくれるので、
+  //   軽く押す         … 選ぶ(文字の欄なら、そのまま文字を打てる)
+  //   押したまま動かす … 動かす(文字の欄の上からでもつかめる)
+  // になります。
+  //
+  // bindDrag(item.id) を置いたものの枠に付けると、そのものを動かせます。
+  // memo = ドラッグの最初に返した値を、指を離すまで覚えておいてくれる入れ物です。
+  // ここでは「動かし始めたときの位置」を入れておき、そこから指が動いたぶん(movement)だけずらします
+  const bindDrag = useDrag(
+    ({ args, tap, first, movement: [moveX, moveY], memo, cancel }) => {
+      const id = args[0] as number;
+      if (tap || first) {
+        setSelectedId(id);
+      }
+      if (tap) {
+        return memo;
+      }
+      // 2本指の操作が始まったら、1本指の移動はやめます
+      if (pinchingRef.current) {
+        cancel();
+        return memo;
+      }
+      const paper = paperRef.current;
+      const item = items.find((it) => it.id === id);
+      if (paper === null || item === undefined) {
+        return memo;
+      }
+      const start: { x: number; y: number } = memo ?? { x: item.x, y: item.y };
+      // 紙の外へ出てしまわないように、少しは紙の中に残します
+      updateItem(id, {
+        x: Math.max(0, Math.min(start.x + moveX, paper.clientWidth - 60)),
+        y: Math.max(0, Math.min(start.y + moveY, paper.clientHeight - 40)),
+      });
+      return start;
+    },
+    // filterTaps = 3px 以内の動きは「タップ」とみなし、ものを動かしません
+    { filterTaps: true }
+  );
 
-    // 入力欄・ボタン・label の上を押したときは、ドラッグを始めません
-    const target = e.target as HTMLElement;
-    if (target.closest("textarea, input, button, label")) {
-      return;
-    }
+  // ▼ 2本指で、選んでいるものの大きさと向きを変えます(写真アプリと同じ操作)。
+  //   小さい文字でも2本指で挟めるよう、紙のどこで挟んでもよいことにしています。
+  //   movement = [何倍に広げたか, 何度回したか]
+  usePinch(
+    ({ first, last, movement: [scale, angle], memo }) => {
+      pinchingRef.current = !last;
+      pinchedRef.current = true;
+      if (last) {
+        setRotateGuide(null);
+      }
+      const item = items.find((it) => it.id === selectedId);
+      if (item === undefined) {
+        return memo;
+      }
 
-    if (paperRef.current === null) {
-      return;
-    }
-    const rect = paperRef.current.getBoundingClientRect();
+      // 挟み始めたときの大きさを覚えておき、そこから何倍にしたかで計算します
+      type PinchStart = Item & { height: number };
+      let start: PinchStart | undefined = memo;
+      if (first || start === undefined) {
+        const box = paperRef.current?.querySelector(`[data-item-id="${item.id}"]`);
+        start = { ...item, height: box instanceof HTMLElement ? box.offsetHeight : 0 };
+      }
 
-    e.currentTarget.setPointerCapture(e.pointerId);
+      let changes: Partial<Item>;
+      let k: number;
+      if (start.type === "photo") {
+        // 写真:写真そのもの(余白を除いた幅)を、縦横同じ倍率で変えます
+        const inner = start.width - ITEM_PADDING * 2;
+        k = Math.max(PHOTO_MIN_WIDTH / start.width, Math.min(PHOTO_MAX_WIDTH / start.width, scale));
+        changes = {
+          width: inner * k + ITEM_PADDING * 2,
+          photoHeight: start.photoHeight === null ? null : start.photoHeight * k,
+        };
+      } else {
+        // テキスト・URL:文字の大きさと枠の幅を、同じ倍率で変えます
+        k = Math.max(FONT_SIZE_MIN / start.fontSize, Math.min(FONT_SIZE_MAX / start.fontSize, scale));
+        changes = {
+          fontSize: Math.round(start.fontSize * k * 10) / 10,
+          width: Math.max(TEXT_MIN_WIDTH, Math.min(TEXT_MAX_WIDTH, start.width * k)),
+          boxHeight: start.boxHeight === null ? null : start.boxHeight * k,
+        };
+      }
 
-    dragRef.current = {
-      id: item.id,
-      offsetX: e.clientX - rect.left - item.x,
-      offsetY: e.clientY - rect.top - item.y,
+      const snapped = snapRotation(start.rotation + angle);
+      // 真ん中の位置が動かないように、左上の位置を直します
+      const width = changes.width ?? start.width;
+      const centerX = start.x + start.width / 2;
+      const centerY = start.y + start.height / 2;
+      updateItem(item.id, {
+        ...changes,
+        rotation: snapped.rotation,
+        x: centerX - width / 2,
+        y: centerY - (start.height * k) / 2,
+      });
+      // まっすぐになったら、回転のボタンと同じく点線を出して知らせます
+      setRotateGuide(snapped.isStraight && !last ? { x: centerX, y: centerY } : null);
+      return start;
+    },
+    // target = 紙そのものに付けます(紙の上のどこで挟んでもよいように)
+    { target: paperRef }
+  );
+
+  // ▼ iPhone の Safari は、2本指で挟むと画面ごと拡大しようとします。
+  //   ピンチを手紙のものの操作に使うため、画面の拡大を止めます
+  useEffect(() => {
+    const stop = (e: Event) => e.preventDefault();
+    document.addEventListener("gesturestart", stop);
+    document.addEventListener("gesturechange", stop);
+    return () => {
+      document.removeEventListener("gesturestart", stop);
+      document.removeEventListener("gesturechange", stop);
     };
-  }
-
-  // ----- 押したまま動かしている間 -----
-  function handlePointerMove(e: PointerEvent<HTMLDivElement>) {
-    const drag = dragRef.current;
-    if (drag === null || paperRef.current === null) {
-      return;
-    }
-    const rect = paperRef.current.getBoundingClientRect();
-
-    let x = e.clientX - rect.left - drag.offsetX;
-    let y = e.clientY - rect.top - drag.offsetY;
-
-    x = Math.max(0, Math.min(x, rect.width - 60));
-    y = Math.max(0, Math.min(y, rect.height - 40));
-
-    updateItem(drag.id, { x, y });
-  }
-
-  // ----- 離した瞬間 -----
-  function handlePointerUp() {
-    dragRef.current = null;
-  }
+  }, []);
 
   // =====================================================
   // 枠の〇を引っぱって、大きさや形を変える
@@ -563,6 +650,8 @@ export default function LetterPage() {
 
   // ----- 〇を押した瞬間 -----
   function handleResizeDown(e: PointerEvent<HTMLButtonElement>, item: Item, handle: Handle) {
+    // 外側の枠(ドラッグで動かす所)に伝えません。伝わると、大きさを変えながら動いてしまいます
+    e.stopPropagation();
     // ボタンの親 = 置いたものの枠。いまの高さを、画面から測ります
     const box = e.currentTarget.parentElement;
     if (box === null) {
@@ -706,6 +795,8 @@ export default function LetterPage() {
 
   // ----- 回転のボタンを押した瞬間 -----
   function handleRotateDown(e: PointerEvent<HTMLButtonElement>, item: Item) {
+    // 外側の枠(ドラッグで動かす所)に伝えません
+    e.stopPropagation();
     // このボタンが入っている「置いたものの枠」を探し、その真ん中を回す軸にします
     const box = e.currentTarget.closest("[data-item-id]");
     if (box === null) {
@@ -734,19 +825,10 @@ export default function LetterPage() {
       return;
     }
     // 押した瞬間から、指が真ん中のまわりを何度まわったか
-    let rotation = r.startRotation + angleFrom(r.centerX, r.centerY, e) - r.startAngle;
-    // -180〜180 の間に直します
-    rotation = ((((rotation + 180) % 360) + 360) % 360) - 180;
-
-    // まっすぐ(0度)や、真横(90度)の近くでは、ぴたっと止まるようにします。
-    // 指で少しだけ傾いてしまうのを防ぐためです
-    let isStraight = false;
-    for (const snap of [-180, -90, 0, 90, 180]) {
-      if (Math.abs(rotation - snap) < 5) {
-        rotation = snap;
-        isStraight = true;
-      }
-    }
+    // (-180〜180 に直し、まっすぐの近くでぴたっと止めます。snapRotation を参照)
+    const { rotation, isStraight } = snapRotation(
+      r.startRotation + angleFrom(r.centerX, r.centerY, e) - r.startAngle
+    );
     updateItem(r.id, { rotation });
 
     // まっすぐのときだけ、真ん中を通る縦と横の点線を出して、そろったことを知らせます
@@ -1278,8 +1360,17 @@ export default function LetterPage() {
         {/* ===== 手紙の紙 ===== */}
         <div
           ref={paperRef}
+          // ▼ 紙の何もない所を軽く押したら、選ぶのをやめます。
+          //   押した瞬間(onPointerDown)ではなく、離したあと(onClick)に判断します。
+          //   押した瞬間だと、2本指で挟もうとした1本目で、選んでいたものが外れてしまうためです
           onPointerDown={(e) => {
-            if (e.target === e.currentTarget) {
+            // 1本目の指のとき(isPrimary)に、前回のピンチの印を消します
+            if (e.isPrimary) {
+              pinchedRef.current = false;
+            }
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !pinchedRef.current) {
               setSelectedId(null);
             }
           }}
@@ -1308,10 +1399,8 @@ export default function LetterPage() {
                 key={item.id}
                 // 回転や画像を作るときに、この枠を探し出すための目印
                 data-item-id={item.id}
-                onPointerDown={(e) => handlePointerDown(e, item)}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
+                // 押す・動かすの見分けは bindDrag(上の「ドラッグ」)にまかせます
+                {...bindDrag(item.id)}
                 className={`absolute cursor-move select-none p-2 ${
                   isSelected ? "outline outline-1 outline-stone-700" : ""
                 }`}
