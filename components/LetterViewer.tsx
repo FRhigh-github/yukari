@@ -9,7 +9,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useDrag } from "@use-gesture/react";
 
 // ホームの ✈️ と同じ名前で覚えます（MemberCircles.tsx と合わせています）
 const READ_KEY = "read_letter_ids";
@@ -36,7 +37,6 @@ export default function LetterViewer({ letters, initialId }: LetterViewerProps) 
   const [index, setIndex] = useState(() =>
     Math.max(0, letters.findIndex((letter) => letter.id === initialId)),
   );
-  const startXRef = useRef<number | null>(null);
 
   const letter = letters[index];
   const isLocked = letter !== undefined && new Date(letter.openAt) > new Date();
@@ -56,6 +56,22 @@ export default function LetterViewer({ letters, initialId }: LetterViewerProps) 
 
   const goNewer = () => setIndex(Math.max(0, index - 1));
   const goOlder = () => setIndex(Math.min(letters.length - 1, index + 1));
+
+  // ▼ 左右のスライドは、@use-gesture/react というライブラリで受け取ります。
+  //   縦に送り始めた（本文をスクロールした）ときなど、途中で打ち切られた操作も
+  //   ライブラリが「離した」として知らせてくれます。
+  //   last = 指を離した瞬間 / movement = 触れた所から動いた量
+  const bindPaper = useDrag(
+    ({ last, movement: [dx] }) => {
+      if (!last) return;
+      // 左へスライド → 古い手紙へ、右へ → 新しい手紙へ
+      if (dx < -SWIPE) goOlder();
+      if (dx > SWIPE) goNewer();
+    },
+    // capture: false = 指をこの枠に縛りつけません。
+    // 縛ると、枠の中にある左右の矢印を押しても、押したことにならなくなるためです
+    { pointer: { capture: false } },
+  );
 
   // 「2030年4月1日」の形。書く画面の「〇年〇月〇日の私たちへ」と同じ言い方にします
   const dateText = letter
@@ -98,18 +114,7 @@ export default function LetterViewer({ letters, initialId }: LetterViewerProps) 
       {/* ▼ 真ん中：手紙の紙。左右にスライドすると、前後の手紙へ移ります */}
       <div
         className="relative flex min-h-0 flex-1 touch-pan-y items-center justify-center px-4 py-3"
-        onPointerDown={(event) => {
-          startXRef.current = event.clientX;
-        }}
-        onPointerUp={(event) => {
-          const start = startXRef.current;
-          startXRef.current = null;
-          if (start === null) return;
-          const dx = event.clientX - start;
-          // 左へスライド → 古い手紙へ、右へ → 新しい手紙へ
-          if (dx < -SWIPE) goOlder();
-          if (dx > SWIPE) goNewer();
-        }}
+        {...bindPaper()}
       >
         {letter === undefined ? (
           <p className="text-base text-stone-500">手紙はまだありません</p>

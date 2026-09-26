@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useGesture } from "@use-gesture/react";
 import MemberCircle from "@/components/MemberCircle";
 import MoodIcon from "@/components/MoodIcon";
 import { MOODS, SHOW_MOOD_ON_HOME } from "@/lib/mood";
@@ -23,8 +24,12 @@ const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 2.5;
 
 // 触れてから、これ以上指が動いたら「動かした」とみなします（px）。
-// 動かしたときは、指を離してもアイコンを押したことにしません
-const DRAG_THRESHOLD = 6;
+// 動かしたときは、指を離してもアイコンを押したことにせず、長押しも取り消します。
+// 指は止めているつもりでも少し揺れるので、0 ではなく少しゆとりを持たせます
+const DRAG_THRESHOLD = 10;
+
+// これだけ押し続けたら長押し（ミリ秒）。ご報告の一覧の長押しと同じ長さです
+const LONG_PRESS = 500;
 
 // 下タブと、右下・左下のボタンが重なる高さ（px）。
 // 模様は画面の下の端まで描きますが、中心はこのぶん上にずらして、ボタンに隠れないようにします
@@ -208,111 +213,160 @@ export default function MemberCircles({
   const clampZoom = (zoom: number) =>
     Math.min(MAX_ZOOM / fitZoom, Math.max(MIN_ZOOM / fitZoom, zoom));
 
-  // ▼ 指の動きを覚えておく場所。
-  //   描き直しのたびに消えては困るので、useRef に入れておきます。
-  //   pointers   = いま画面に触れている指の位置（指ごとの番号 → 位置）
-  //   startPoint = 1本目の指が触れた位置。どれだけ動いたかを測るのに使います
-  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
-  const startPointRef = useRef({ x: 0, y: 0 });
-  const draggedRef = useRef(false);
+  // ▼ 長押しで小さなプロフィールを出している人の id。出していなければ null
+  const [openMemberId, setOpenMemberId] = useState<string | null>(null);
+
+  // ▼ 指の操作のために覚えておくもの。描き直しで消えては困るので useRef に入れます
+  //   longPressTimer = 長押しを数える時計（取り消すときに止めるので持っておきます）
+  //   longPressed    = 長押しでプロフィールを出したか。出したあとは、指を動かしても模様を動かしません
+  //   moved          = 今回の操作で、DRAG_THRESHOLD より指を動かしたか
+  //   pinching       = いま2本指でつまんでいるか / pinched = 今回の操作の途中で、つまんだか
+  //   blockClick     = 指を離したときの「押した」を取り消すか（動かした・つまんだ・長押ししたとき）
+  //   lastTap        = 前に触れた時刻。ダブルタップを見分けるのに使います
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressedRef = useRef(false);
+  const movedRef = useRef(false);
+  const pinchingRef = useRef(false);
+  const pinchedRef = useRef(false);
+  const blockClickRef = useRef(false);
   const lastTapRef = useRef(0);
 
-  const handlePointerDown = (event: React.PointerEvent) => {
-    // ▼ isPrimary = 画面に何も触れていない状態から、最初に触れた指。
-    //   このときに一覧に残っている指は、離した合図を受け取りそこねた「幽霊」なので、消しておきます。
-    //   アイコンを長押ししたまま指を動かすと、スマホがリンクを運ぶ動き（ドラッグ）を始めて、
-    //   離した合図がここへ届かないことがありました。幽霊が残ると、次に触ったときに
-    //   「2本指でつまんでいる」と勘違いして、押しても開かず、動かしても動かない（固まった）状態になっていました
-    if (event.isPrimary) pointersRef.current.clear();
-
-    const point = { x: event.clientX, y: event.clientY };
-    pointersRef.current.set(event.pointerId, point);
-
-    if (pointersRef.current.size === 1) {
-      startPointRef.current = point;
-      draggedRef.current = false;
-      // ▼ ダブルタップ（0.3秒以内に2回触れた）で、最初の表示に戻します
-      const now = Date.now();
-      if (now - lastTapRef.current < 300) {
-        setView({ moveX: 0, moveY: 0, zoom: 1 });
-      }
-      lastTapRef.current = now;
-    } else {
-      // 2本目の指が触れたら、つまむ操作なので「動かした」扱いにします
-      draggedRef.current = true;
+  const stopLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
   };
 
-  const handlePointerMove = (event: React.PointerEvent) => {
-    const pointers = pointersRef.current;
-    const before = pointers.get(event.pointerId);
-    if (before === undefined) return;
-    const after = { x: event.clientX, y: event.clientY };
+  // 画面から消えるときに、数えかけの長押しの時計を止めます
+  useEffect(() => stopLongPressTimer, []);
 
-    if (pointers.size === 1) {
-      // ▼ 指1本：動いたぶんだけ移動
-      const dx = after.x - before.x;
-      const dy = after.y - before.y;
-      setView((v) => ({ ...v, moveX: v.moveX + dx, moveY: v.moveY + dy }));
+  // ▼ 指の操作（動かす・つまむ・長押し・ホイール）は、@use-gesture/react というライブラリで受け取ります。
+  //
+  //   前は画面に触れている指を自分で数えていました。ところが、指を離した合図を
+  //   1回でも受け取りそこねると、離したはずの指が残り続け、次に触ったときに
+  //   「2本指でつまんでいる」と勘違いして、ホームが固まることがありました。
+  //   ライブラリは、途中で打ち切られた操作や2本目の指の出入りも含めて数えてくれます。
+  //   （カードと手紙の画面でも同じライブラリを使っています）
+  //
+  //   target = この枠に直接つなぎます。ホイールで画面全体がスクロールするのを止めるため、
+  //            passive: false（「止めることがある」とブラウザに伝える指定）にしています
+  useGesture(
+    {
+      // ▼ 指1本で動かす。長押しも、ここで数えます。
+      //   triggerAllEvents（下の設定）のため、触れた瞬間から毎回呼ばれます。
+      //   指がほとんど動いていない間は「始まり・終わり」の目印（first / last）が付かないので、
+      //   届いた合図の種類（event.type）で見分けます。
+      //   途中で打ち切られた操作（pointercancel など）も、ライブラリが「離した」として1回だけ知らせてくれます
+      //   intentional = DRAG_THRESHOLD より動かした
+      onDrag: ({ intentional, delta: [dx, dy], event }) => {
+        const isStart = event.type === "pointerdown";
+        const isEnd =
+          event.type === "pointerup" ||
+          event.type === "pointercancel" ||
+          event.type === "lostpointercapture";
 
-      const start = startPointRef.current;
-      if (Math.hypot(after.x - start.x, after.y - start.y) > DRAG_THRESHOLD) {
-        draggedRef.current = true;
-      }
-    } else if (pointers.size === 2) {
-      // ▼ 指2本：2本の指のあいだの距離が何倍になったかで、拡大・縮小
-      const other = [...pointers.entries()].find(([id]) => id !== event.pointerId)?.[1];
-      if (other !== undefined) {
-        const distanceBefore = Math.hypot(before.x - other.x, before.y - other.y);
-        const distanceAfter = Math.hypot(after.x - other.x, after.y - other.y);
-        if (distanceBefore > 0) {
-          const ratio = distanceAfter / distanceBefore;
-          setView((v) => ({ ...v, zoom: clampZoom(v.zoom * ratio) }));
+        if (isStart) {
+          longPressedRef.current = false;
+          movedRef.current = false;
+          pinchedRef.current = false;
+          blockClickRef.current = false;
+
+          // ダブルタップ（0.3秒以内に2回触れた）で、最初の表示に戻します
+          const now = Date.now();
+          if (now - lastTapRef.current < 300) {
+            setView({ moveX: 0, moveY: 0, zoom: 1 });
+          }
+          lastTapRef.current = now;
+
+          // 誰かのマルの上で触れたら、長押しを数え始めます（目印は MemberCircle の data-member-id）
+          const circle =
+            event.target instanceof Element
+              ? event.target.closest<HTMLElement>("[data-member-id]")
+              : null;
+          const memberId = circle?.dataset.memberId;
+          if (memberId !== undefined) {
+            longPressTimerRef.current = window.setTimeout(() => {
+              longPressTimerRef.current = null;
+              longPressedRef.current = true;
+              setOpenMemberId(memberId);
+            }, LONG_PRESS);
+          }
         }
-      }
-    }
 
-    pointers.set(event.pointerId, after);
-  };
+        if (intentional) movedRef.current = true;
 
-  const handlePointerUp = (event: React.PointerEvent) => {
-    pointersRef.current.delete(event.pointerId);
-  };
+        // 指が動いた・離れた・2本指になったら、長押しは取り消します
+        if (isEnd || intentional || pinchingRef.current) {
+          stopLongPressTimer();
+        }
 
-  // ▼ パソコンで確かめるときのために、マウスのホイールでも拡大・縮小できるようにします。
-  //   React の onWheel では、画面全体のスクロールを止められません
-  //   （ブラウザが「止めない約束」で受け取る仕組みになっているため）。
-  //   そこで、ブラウザに直接「止めることがある」と伝えて受け取ります（passive: false）。
-  useEffect(() => {
-    const area = areaRef.current;
-    if (area === null) return;
-    const handleWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      const ratio = event.deltaY < 0 ? 1.1 : 1 / 1.1;
-      setView((v) => ({
-        ...v,
-        zoom: Math.min(MAX_ZOOM / fitZoom, Math.max(MIN_ZOOM / fitZoom, v.zoom * ratio)),
-      }));
-    };
-    area.addEventListener("wheel", handleWheel, { passive: false });
-    return () => area.removeEventListener("wheel", handleWheel);
-  }, [fitZoom]);
+        if (isEnd) {
+          // ほとんど動かさずに離したときだけ、アイコンを押したことにします
+          blockClickRef.current = movedRef.current || pinchedRef.current || longPressedRef.current;
+          return;
+        }
+
+        // まだ少ししか動いていない間、2本指でつまんでいる間、
+        // 長押しでプロフィールを出したあとは、模様を動かしません
+        if (!intentional || pinchingRef.current || longPressedRef.current) return;
+        setView((v) => ({ ...v, moveX: v.moveX + dx, moveY: v.moveY + dy }));
+      },
+
+      // ▼ 指2本：2本の指のあいだの距離で、拡大・縮小
+      onPinch: ({ offset: [zoom], last }) => {
+        pinchedRef.current = true;
+        pinchingRef.current = !last;
+        setView((v) => ({ ...v, zoom }));
+      },
+
+      // ▼ パソコンで確かめるときのために、マウスのホイールでも拡大・縮小できるようにします
+      onWheel: ({ event, delta: [, dy] }) => {
+        event.preventDefault();
+        if (dy === 0) return;
+        const ratio = dy < 0 ? 1.1 : 1 / 1.1;
+        setView((v) => ({ ...v, zoom: clampZoom(v.zoom * ratio) }));
+      },
+    },
+    {
+      target: areaRef,
+      eventOptions: { passive: false },
+      drag: {
+        // この距離より動かさずに離したら「押した（tap）」とみなします
+        filterTaps: true,
+        tapsThreshold: DRAG_THRESHOLD,
+        // ふつうは、指が DRAG_THRESHOLD より動くまで onDrag を呼びません。
+        // 長押しとダブルタップは「触れた瞬間」から数えたいので、最初から呼んでもらいます
+        //（動いたかどうかは intentional で見分けます）
+        triggerAllEvents: true,
+        // capture: false = 指をこの枠に縛りつけません。
+        // 縛ると、指を離したときの「押した」がアイコンではなく枠に届いてしまい、
+        // アイコンを押してもご報告が開かなくなるためです
+        pointer: { capture: false },
+      },
+      pinch: {
+        // 拡大・縮小できる範囲。ホイールやダブルタップで変えた倍率から続けてつまめるよう、
+        // 始まりの倍率は、いまの倍率を渡します
+        scaleBounds: { min: MIN_ZOOM / fitZoom, max: MAX_ZOOM / fitZoom },
+        from: () => [view.zoom, 0],
+      },
+    },
+  );
 
   return (
     <div
       ref={areaRef}
       // touch-none = ブラウザ自体のスクロールや拡大をさせない（指の動きをこちらで受け取るため）
       className="relative h-full w-full touch-none overflow-hidden"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      // 動かしたあとに指を離したときは、アイコンを押したことにしません（リンクへ飛ばない）
+      // 動かしたあと・長押ししたあとに指を離したときは、アイコンを押したことにしません（リンクへ飛ばない）
       onClickCapture={(event) => {
-        if (draggedRef.current) {
-          event.preventDefault();
-          event.stopPropagation();
-        }
+        if (!blockClickRef.current) return;
+        // 長押しのプロフィールは、画面のいちばん外側（body）に描いています。
+        // そこでの「押した」は、この枠の中の出来事ではないので止めません
+        if (!(event.target instanceof Node) || !areaRef.current?.contains(event.target)) return;
+        blockClickRef.current = false;
+        event.preventDefault();
+        event.stopPropagation();
       }}
     >
       {/* ▼ 未来への手紙の入口。絵文字ではなく、ほかのボタンと同じ線の絵（紙飛行機）にしています。
@@ -409,7 +463,7 @@ export default function MemberCircles({
           </Link>
         ) : null}
 
-        {/* ▼ まわりのメンバー。長押しでプロフィールが出るのは MemberCircle の働きです */}
+        {/* ▼ まわりのメンバー。長押しは上の onDrag で数え、プロフィールは MemberCircle が出します */}
         {others.map((member, index) => (
           <MemberCircle
             key={member.id}
@@ -417,6 +471,8 @@ export default function MemberCircles({
             x={spots[index].x}
             y={spots[index].y}
             hideName
+            isOpen={openMemberId === member.id}
+            onClose={() => setOpenMemberId(null)}
           />
         ))}
       </div>

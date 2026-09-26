@@ -6,14 +6,23 @@
 //
 // 書く場所（canvas）の上でスワイプすると線になってしまうので、
 // 送る・やめるの合図は、カードの外（写真が見えている所）で受け取ります。
+//
+// 指の動きは、どちらも @use-gesture/react というライブラリで受け取ります。
+// 指が枠の外へ出たときや、途中で打ち切られたとき（電話がかかってきた など）も、
+// ライブラリが「離した」として正しく知らせてくれます。
+// 前は打ち切られたときの合図を受け取っておらず、カードがずれたまま戻らなかったり、
+// パソコンではボタンを離したあとも線が引かれ続けたりすることがありました。
 
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useDrag } from "@use-gesture/react";
 import { createClient } from "@/lib/supabase/client";
 
 // これ以上指が上下に動いたら「スワイプした」とみなします（px）
 const SWIPE = 60;
+// これより動きが小さければ「押した」とみなします（px）
+const TAP = 10;
 
 type ReactionCardSheetProps = {
   postId: string;
@@ -31,7 +40,6 @@ export default function ReactionCardSheet({
 }: ReactionCardSheetProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
-  const swipeStartRef = useRef<number | null>(null);
   // カードの枠とつまみ。「それ以外の所を押したか」を調べるのに使います
   const cardRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
@@ -78,11 +86,36 @@ export default function ReactionCardSheet({
     setErrorText(null);
   };
 
-  // 指の位置を、canvas の中の座標に直します
-  const toPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  // 画面の上の指の位置を、canvas の中の座標に直します
+  const toPoint = (x: number, y: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    return { x: x - (rect?.left ?? 0), y: y - (rect?.top ?? 0) };
   };
+
+  // ▼ カードの中を指でなぞって書く。
+  //   first = 触れた瞬間 / last = 離した瞬間 / xy = いまの指の位置
+  const bindCanvas = useDrag(({ first, last, xy: [x, y], event }) => {
+    if (first) {
+      // このカードの中の動きは「書く」なので、外側のスワイプ（送る・やめる）に伝えません
+      event.stopPropagation();
+      lastPointRef.current = toPoint(x, y);
+      return;
+    }
+    if (last) {
+      lastPointRef.current = null;
+      return;
+    }
+    const before = lastPointRef.current;
+    const ctx = canvasRef.current?.getContext("2d");
+    if (before === null || !ctx) return;
+    const point = toPoint(x, y);
+    ctx.beginPath();
+    ctx.moveTo(before.x, before.y);
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+    lastPointRef.current = point;
+    setHasDrawn(true);
+  });
 
   const handleSend = async () => {
     const canvas = canvasRef.current;
@@ -144,6 +177,38 @@ export default function ReactionCardSheet({
     }
   };
 
+  // ▼ カードの外側でのスワイプ。上へ → 送る / 下へ → やめる / その場で押す → やめる。
+  //   ライブラリは、指がカードの上まで動いても、最後までこちらで受け取ります
+  //   （前は setPointerCapture という命令で、自分でそうしていました）。
+  //   active = 指が触れている間 / movement = 触れた所から動いた量 / tap = TAP より動かさずに離した
+  const bindOutside = useDrag(
+    ({ active, last, tap, movement: [, dy], xy: [x, y] }) => {
+      // 指が触れている間は、カードが指についてくるように動かします
+      setDragY(active ? dy : 0);
+      if (!last) return;
+
+      if (dy < -SWIPE) {
+        handleSend();
+        return;
+      }
+      if (dy > SWIPE) {
+        onClose();
+        return;
+      }
+      // ▼ ほとんど動かさずに、カードとつまみ以外の所を押したら閉じます（上でも下でも）
+      const isInside = (box: DOMRect | undefined) =>
+        box !== undefined && x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+      if (
+        tap &&
+        !isInside(cardRef.current?.getBoundingClientRect()) &&
+        !isInside(handleRef.current?.getBoundingClientRect())
+      ) {
+        onClose();
+      }
+    },
+    { tapsThreshold: TAP },
+  );
+
   // カードの位置。出てくる前は下、送ったら上へ
   const cardMove = isFlying ? "-translate-y-[120vh]" : isShown ? "translate-y-0" : "translate-y-[100vh]";
 
@@ -151,41 +216,7 @@ export default function ReactionCardSheet({
     // ▼ カードの外側。ここでのスワイプを「送る・やめる」の合図にします
     <div
       className="absolute inset-0 z-20 flex touch-none select-none flex-col justify-end bg-[#faf9f6]/60 px-4 backdrop-blur-sm pb-[calc(env(safe-area-inset-bottom)+1.5rem)]"
-      onPointerDown={(event) => {
-        swipeStartRef.current = event.clientY;
-        // 指がカードの上まで動いても、最後までこちらで受け取るための命令。
-        // これが無いと、下から上へスワイプしたとき、離した場所がカードの上になり、
-        // カード（書く場所）のほうに取られてしまっていました
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-      onPointerMove={(event) => {
-        const start = swipeStartRef.current;
-        if (start === null) return;
-        setDragY(event.clientY - start);
-      }}
-      onPointerUp={(event) => {
-        const start = swipeStartRef.current;
-        swipeStartRef.current = null;
-        setDragY(0);
-        if (start === null) return;
-        const dy = event.clientY - start;
-        if (dy < -SWIPE) handleSend();
-        if (dy > SWIPE) onClose();
-        // ▼ ほとんど動かさずに、カードとつまみ以外の所を押したら閉じます（上でも下でも）
-        const isInside = (box: DOMRect | undefined) =>
-          box !== undefined &&
-          event.clientX >= box.left &&
-          event.clientX <= box.right &&
-          event.clientY >= box.top &&
-          event.clientY <= box.bottom;
-        if (
-          Math.abs(dy) < 10 &&
-          !isInside(cardRef.current?.getBoundingClientRect()) &&
-          !isInside(handleRef.current?.getBoundingClientRect())
-        ) {
-          onClose();
-        }
-      }}
+      {...bindOutside()}
     >
       <div
         className={`${dragY === 0 ? "transition-transform duration-500 ease-out" : ""} ${cardMove}`}
@@ -241,28 +272,7 @@ export default function ReactionCardSheet({
           ) : null}
           <canvas
             ref={canvasRef}
-            // このカードの中の動きは「書く」なので、外側のスワイプに伝えません
-            onPointerDown={(event) => {
-              event.stopPropagation();
-              event.currentTarget.setPointerCapture(event.pointerId);
-              lastPointRef.current = toPoint(event);
-            }}
-            onPointerMove={(event) => {
-              const last = lastPointRef.current;
-              const ctx = canvasRef.current?.getContext("2d");
-              if (last === null || !ctx) return;
-              const point = toPoint(event);
-              ctx.beginPath();
-              ctx.moveTo(last.x, last.y);
-              ctx.lineTo(point.x, point.y);
-              ctx.stroke();
-              lastPointRef.current = point;
-              setHasDrawn(true);
-            }}
-            onPointerUp={(event) => {
-              event.stopPropagation();
-              lastPointRef.current = null;
-            }}
+            {...bindCanvas()}
             className="aspect-square w-full touch-none rounded-xl bg-[#faf9f6]"
           />
         </div>

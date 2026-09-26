@@ -131,4 +131,7 @@ RLS の外にいる。`app/api/recovery/` が `SUPABASE_SERVICE_ROLE_KEY` を使
 - **コメントは日本語で、「なぜ」を書く**。既存のファイルがその書き方になっている
 - カスタムフックや状態管理ライブラリは使わない。
   `useState` / `async-await` / `.map()` / 三項演算子 / `?.` の範囲で書く
+- 指の操作（なぞる・つまむ・スワイプ）は、pointer イベントを自分で数えずに `@use-gesture/react`（`useDrag` / `usePinch` / `useGesture`）を使う。
+  自分で数えると、途中で打ち切られた操作（pointercancel）を取りこぼして、画面が固まることがあった。
+  写真の切り取りは `react-easy-crop`。ライブラリのフックは使ってよい（自分でフックを作らない、という決まり）
 - 一度に大きく変えない。1つの変更で1つのことだけ直す
