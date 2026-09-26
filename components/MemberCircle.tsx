@@ -3,20 +3,18 @@
 //   ふつうに押す  → その人のご報告へ
 //   長押しする    → その人の小さなプロフィールが出る
 //
-// 長押しは「押してから指を離さずに0.5秒たったか」で判定します。
-// 途中で指が動いたり離れたりしたら取り消します。
+// 長押しを数えるのは、このマルではなく外側の相関図（MemberCircles）です。
+// 指の動き（動かす・つまむ・長押し）を1か所でまとめて受け取るためです。
+// 前はマルと相関図が別々に指を数えていて、食い違うと画面が固まることがありました。
+// ここでは data-member-id で「誰のマルか」を知らせ、出す・閉じるの合図を受け取るだけです。
 
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MOODS, SHOW_MOOD_ON_HOME } from "@/lib/mood";
 import type { Member } from "@/lib/home";
 import MoodIcon from "@/components/MoodIcon";
-
-// これだけ押し続けたら長押し（ミリ秒）
-const LONG_PRESS = 500;
 
 type MemberCircleProps = {
   member: Member;
@@ -25,6 +23,9 @@ type MemberCircleProps = {
   // 名前を出さないとき true。
   // 水引の輪の中に置くと、名前が紐に重なって読めなくなるためです。
   hideName?: boolean;
+  // 長押しで小さなプロフィールを出しているとき true（MemberCircles が決めます）
+  isOpen: boolean;
+  onClose: () => void;
 };
 
 export default function MemberCircle({
@@ -32,32 +33,9 @@ export default function MemberCircle({
   x,
   y,
   hideName,
+  isOpen,
+  onClose,
 }: MemberCircleProps) {
-  // 数え終わるまでの時計。取り消すときに止めるので、持っておきます
-  const timerRef = useRef<number | null>(null);
-
-  // 長押しになったかどうか。
-  // これが立っていると、指を離したときの「移動」を止めます
-  // （長押ししたのにご報告へ飛んでしまうのを防ぎます）
-  const longPressedRef = useRef(false);
-
-  const [isOpen, setIsOpen] = useState(false);
-
-  const start = () => {
-    longPressedRef.current = false;
-    timerRef.current = window.setTimeout(() => {
-      longPressedRef.current = true;
-      setIsOpen(true);
-    }, LONG_PRESS);
-  };
-
-  const cancel = () => {
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-
   const mood = MOODS.find((item) => item.value === member.mood);
 
   return (
@@ -73,21 +51,10 @@ export default function MemberCircle({
         //   一度取ったものは3分間使い回します（next.config.ts の staleTimes）。
         //   （先読みは本番のときだけ動きます。npm run dev では動きません）
         prefetch={member.hasNews ? true : "auto"}
-        onPointerDown={start}
-        onPointerUp={cancel}
-        onPointerLeave={cancel}
-        onPointerMove={(event) => {
-          // 長押しでプロフィールを出したあとは、指を動かしても後ろの相関図を動かしません
-          // （出ているプロフィールの裏で、模様だけが勝手にずれていくのを防ぎます）
-          if (longPressedRef.current) event.stopPropagation();
-          cancel();
-        }}
+        // 誰のマルかの目印。長押ししたときに、相関図（MemberCircles）がこれを読みます
+        data-member-id={member.id}
         // 長押ししたまま動かしたときに、リンクをつまんで運ぶ動き（ドラッグ）を始めないようにします
         draggable={false}
-        // 長押しで開いたときは、移動させません
-        onClick={(event) => {
-          if (longPressedRef.current) event.preventDefault();
-        }}
         // 長押しで出る「リンクのプレビュー」を止めます。
         // 出ると、こちらの表示と重なって邪魔になります。
         onContextMenu={(event) => event.preventDefault()}
@@ -163,12 +130,7 @@ export default function MemberCircle({
             （isOpen は押したあとにしか true にならないので、document はブラウザの中でだけ使います） */}
       {isOpen ? createPortal(
         <div
-          onClick={() => setIsOpen(false)}
-          // 外側（MemberCircles）の「指で動かす」処理に、ここでの操作を伝えません。
-          // portal で外に描いても、React の中では親子のままなので、止めないと後ろの模様が動きます
-          onPointerDown={(event) => event.stopPropagation()}
-          onPointerMove={(event) => event.stopPropagation()}
-          onPointerUp={(event) => event.stopPropagation()}
+          onClick={onClose}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-8"
         >
           {/* stopPropagation = ここを押したときに、背景の「閉じる」を動かさない */}
