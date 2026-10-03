@@ -65,11 +65,10 @@ export default function RecoveryCodeButton({
 
       setCode(newCode);
     } catch (issueError) {
-      setMessage(
-        issueError instanceof Error
-          ? issueError.message
-          : "コードを発行できませんでした",
-      );
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      // （DB のエラー文には、表の名前など中の作りが書かれているため）
+      console.error("復旧のコードを発行できませんでした", issueError);
+      setMessage("コードを発行できませんでした。もう一度お試しください");
     }
 
     setIsSending(false);

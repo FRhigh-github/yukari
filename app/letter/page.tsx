@@ -1034,10 +1034,10 @@ export default function LetterPage() {
       // ここまで来たら全部成功
       setIsSent(true);
     } catch (error) {
-      // error instanceof Error は「error が Error の形をしているか」を調べます
-      const message =
-        error instanceof Error ? error.message : "不明なエラーが起きました";
-      setErrorText(message);
+      // ▼ 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します。
+      //   DB のエラー文には表の名前など中の作りが書かれているので、そのまま見せません
+      console.error("手紙を送れませんでした", error);
+      setErrorText("送れませんでした。電波の良いところで、もう一度お試しください");
     } finally {
       setIsSending(false);
       // 失敗したときにエラーが見えるよう、封筒は閉じます(成功時は送信完了の画面になります)

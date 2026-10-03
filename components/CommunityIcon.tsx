@@ -125,9 +125,11 @@ export default function CommunityIcon({
       // 画面を取り直して、上のバーなどにも新しい絵を出します
       router.refresh();
     } catch (error) {
-      // 何で止まったかが分かるように、エラーの中身も出します
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      // （DB のエラー文には、表の名前など中の作りが書かれているため）
+      console.error("コミュニティのアイコンを保存できませんでした", error);
       setMessage({
-        text: `保存できませんでした（${error instanceof Error ? error.message : "原因不明"}）`,
+        text: "保存できませんでした。電波の良いところで、もう一度お試しください",
         isError: true,
       });
     } finally {
