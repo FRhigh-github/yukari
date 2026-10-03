@@ -302,6 +302,26 @@ create table public.recovery_vetoes (
 alter table public.recovery_vetoes enable row level security;
 
 
+-- ------------------------------------------------------------
+--  回数制限のための記録（under_rate_limit で数えます）
+--  join_attempts     … 招待コードで参加しようとした記録（当たり外れに関係なく1回ずつ）
+--  recovery_attempts … 思い出ログインのコードを試した記録。まだログインしていない人なので、
+--                      アクセス元（IP アドレス）で数えます。サーバー（service_role）だけが書きます
+--  どちらも許可を1つも出していないので、画面からは読めません・書けません
+-- ------------------------------------------------------------
+create table public.join_attempts (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  attempted_at timestamptz not null default now()
+);
+alter table public.join_attempts enable row level security;
+
+create table public.recovery_attempts (
+  ip text not null,
+  attempted_at timestamptz not null default now()
+);
+alter table public.recovery_attempts enable row level security;
+
+
 -- ============================================================
 --  3. 索引（探すときの目次）
 --     よく使う「絞り込み + 並べ替え」の組み合わせに付けます。
@@ -335,6 +355,12 @@ create index interactions_user_b_occurred_at_idx on public.interactions (user_b,
 
 create index recovery_codes_target_user_idx on public.recovery_codes (target_user);
 create index recovery_requests_community_id_status_idx on public.recovery_requests (community_id, status);
+
+-- 回数制限（under_rate_limit）で「この人の、この1時間の分」を数えるため
+create index post_reactions_from_user_created_at_idx on public.post_reactions (from_user, created_at desc);
+create index messages_user_id_created_at_idx on public.messages (user_id, created_at desc);
+create index join_attempts_user_id_attempted_at_idx on public.join_attempts (user_id, attempted_at desc);
+create index recovery_attempts_ip_attempted_at_idx on public.recovery_attempts (ip, attempted_at desc);
 
 
 -- ============================================================
@@ -452,6 +478,53 @@ as $$
     or url ~ '^/demo/avatars/[a-z0-9-]+\.svg$';
 $$;
 
+-- 回数制限。この1時間に、自分が kind をした回数が max_count より少なければ true。
+--   許可（RLS）の with check に「and under_rate_limit('posts', 20)」のように足して使います。
+-- ▼ なぜ要るのか
+--   回数の制限が無いと、プログラムで何万回も投稿・アップロードしたり、
+--   招待コードを手当たり次第に試したりできてしまいます（保管庫がいっぱいになる・よそのコミュニティに入られる）。
+--   ふつうに使う人が困らない回数にしています。
+-- ▼ security definer にしている理由
+--   数えるときに、その表の許可（RLS）に止められないようにするためです
+--   （たとえば、抜けたコミュニティに投稿した分も数えます）。数えるのは自分の分だけです
+create function public.under_rate_limit(kind text, max_count integer)
+returns boolean
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+  select (
+    case kind
+      when 'posts' then (
+        select count(*) from posts
+        where author_id = auth.uid() and created_at > now() - interval '1 hour')
+      when 'reactions' then (
+        select count(*) from post_reactions
+        where from_user = auth.uid() and created_at > now() - interval '1 hour')
+      when 'cards' then (
+        select count(*) from card_sends
+        where from_user = auth.uid() and sent_at > now() - interval '1 hour')
+      when 'capsules' then (
+        select count(*) from time_capsules
+        where author_id = auth.uid() and sealed_at > now() - interval '1 hour')
+      when 'messages' then (
+        select count(*) from messages
+        where user_id = auth.uid() and created_at > now() - interval '1 hour')
+      when 'joins' then (
+        select count(*) from join_attempts
+        where user_id = auth.uid() and attempted_at > now() - interval '1 hour')
+      -- 保管庫に置いたファイル（自分のフォルダの分。アイコンも含みます）
+      when 'uploads' then (
+        select count(*) from storage.objects o
+        where (storage.foldername(o.name))[1] = auth.uid()::text
+          and o.created_at > now() - interval '1 hour')
+      -- 知らない種類は、止めておきます（書き間違いで制限が効かなくならないように）
+      else max_count
+    end
+  ) < max_count;
+$$;
+
 -- ------------------------------------------------------------
 --  画面から呼ぶ関数（supabase.rpc(...)）
 --  communities / memberships には、画面から直接足す許可を出していません。
@@ -504,18 +577,30 @@ as $$
 $$;
 
 -- 招待コードで参加します。見つかればそのコミュニティの id、見つからなければ null。
--- もう入っているときも、そのコミュニティの id を返します
+-- もう入っているときも、そのコミュニティの id を返します。
+-- ▼ 1時間に20回まで
+--   試すたびに join_attempts に1行残し、この1時間に20回試していたら、合っていても入れません。
+--   手当たり次第にコードを試して、よそのコミュニティに入るのを防ぐためです。
+--   1日より前の記録は、ついでに消します（表が大きくなり続けないように）
 create function public.join_community(code text)
 returns uuid
 language sql
 security definer
 set search_path to 'public'
 as $$
-  with target as (
+  with attempt as (
+    insert into join_attempts (user_id)
+    select auth.uid() where auth.uid() is not null
+  ),
+  cleanup as (
+    delete from join_attempts where attempted_at < now() - interval '1 day'
+  ),
+  target as (
     select id from communities
     where invite_code = upper(trim(code))
       and auth.uid() is not null
       and not is_demo_guest()
+      and under_rate_limit('joins', 20)
   ),
   joined as (
     insert into memberships (user_id, community_id)
@@ -803,7 +888,7 @@ create policy "posts for members"
 create policy "posts insert"
   on public.posts for insert
   to authenticated
-  with check (author_id = auth.uid() and is_member(community_id) and is_own_file(image_url));
+  with check (author_id = auth.uid() and is_member(community_id) and is_own_file(image_url) and under_rate_limit('posts', 20));
 
 -- 書き換えたあとも「自分の投稿で、自分が入っているコミュニティ」でなければいけません
 -- （入っていないコミュニティへ投稿を移せないようにするため）
@@ -834,6 +919,7 @@ create policy "reactions insert"
     from_user = auth.uid()
     and is_member(community_id)
     and is_own_file(drawing_url)
+    and under_rate_limit('reactions', 100)
     and exists (
       select 1 from posts p
       where p.id = post_reactions.post_id
@@ -869,6 +955,7 @@ create policy "cards insert"
     from_user = auth.uid()
     and is_member(community_id)
     and (drawing_url is null or is_own_file(drawing_url))
+    and under_rate_limit('cards', 50)
     and exists (
       select 1 from memberships m
       where m.user_id = card_sends.to_user
@@ -900,6 +987,7 @@ create policy "capsules insert"
     author_id = auth.uid()
     and is_member(community_id)
     and (image_url is null or is_own_file(image_url))
+    and under_rate_limit('capsules', 20)
   );
 
 -- ------------------------------------------------------------
@@ -1018,6 +1106,7 @@ create policy "messages insert own"
   to authenticated
   with check (
     user_id = auth.uid()
+    and under_rate_limit('messages', 300)
     and exists (select 1 from events e where e.id = messages.event_id)
   );
 
@@ -1108,7 +1197,8 @@ revoke execute on function
   public.is_demo_guest(),
   public.capsule_is_open(uuid),
   public.is_own_file(text),
-  public.is_allowed_avatar(text)
+  public.is_allowed_avatar(text),
+  public.under_rate_limit(text, integer)
 from public, anon;
 
 grant execute on function
@@ -1121,7 +1211,8 @@ grant execute on function
   public.is_demo_guest(),
   public.capsule_is_open(uuid),
   public.is_own_file(text),
-  public.is_allowed_avatar(text)
+  public.is_allowed_avatar(text),
+  public.under_rate_limit(text, integer)
 to authenticated, service_role;
 
 -- 招待コードを作る関数：画面からは直接呼ばせません（create_community の中で使います）
@@ -1180,6 +1271,7 @@ create policy "avatar insert own"
   to authenticated
   with check (
     bucket_id = 'avatars'
+    and under_rate_limit('uploads', 100)
     and name ~ ('^' || auth.uid()::text || '/[0-9a-f-]{36}\.jpg$')
   );
 
@@ -1212,6 +1304,7 @@ create policy "community icon insert"
     bucket_id = 'avatars'
     and name ~ '^communities/[0-9a-f-]{36}/[0-9a-f-]{36}\.jpg$'
     and not public.is_demo_guest()
+    and public.under_rate_limit('uploads', 100)
     and exists (
       select 1 from public.memberships m
       where m.user_id = auth.uid()
@@ -1261,6 +1354,7 @@ create policy "photos upload own folder"
   with check (
     bucket_id in ('posts', 'drawings', 'cards')
     and (storage.foldername(name))[1] = auth.uid()::text
+    and public.under_rate_limit('uploads', 100)
   );
 
 create policy "photos read own folder"

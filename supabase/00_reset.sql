@@ -58,6 +58,8 @@ drop table if exists
   public.events,
   public.time_capsules,
   public.interactions,
+  public.join_attempts,
+  public.recovery_attempts,
   public.card_sends,
   public.card_templates,
   public.post_reactions,
@@ -94,7 +96,8 @@ drop function if exists
   public.reject_recovery_request(),
   public.rename_community(uuid, text),
   public.set_community_icon(uuid, text),
-  public.shares_community(uuid)
+  public.shares_community(uuid),
+  public.under_rate_limit(text, integer)
 cascade;
 
 -- ------------------------------------------------------------

@@ -39,6 +39,7 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `2026-10-04_03_random_avatar_names.sql` | |
 | `2026-10-04_04_allowed_avatar_urls.sql` | |
 | `2026-10-04_05_recovery_visible_to_all.sql` | |
+| `2026-10-04_06_rate_limits.sql` | |
 
 ## 新しく作り直す手順
 

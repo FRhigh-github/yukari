@@ -39,6 +39,35 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
+  // ▼ 回数制限。同じアクセス元から、1時間に10回までしか試せません。
+  //   コードは6文字なので、制限が無いと手当たり次第に試されるおそれがあります。
+  //   まだログインしていない人なので、アクセス元（IP アドレス）で数えます。
+  //   x-forwarded-for は、Vercel が「元のアクセス元」を入れてくれる欄です（先頭が本人）
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown";
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const [{ count: recentTries }] = await Promise.all([
+    supabase
+      .from("recovery_attempts")
+      .select("*", { count: "exact", head: true })
+      .eq("ip", ip)
+      .gt("attempted_at", hourAgo),
+    supabase.from("recovery_attempts").insert({ ip }),
+    // 1日より前の記録は消します（表が大きくなり続けないように）
+    supabase
+      .from("recovery_attempts")
+      .delete()
+      .lt("attempted_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+  ]);
+  if ((recentTries ?? 0) >= 10) {
+    return NextResponse.json(
+      { error: "試した回数が多すぎます。1時間ほどおいてから、もう一度お試しください" },
+      { status: 429 },
+    );
+  }
+
   const { data: found } = await supabase
     .from("recovery_codes")
     .select("code, target_user, issued_by, expires_at, used")
