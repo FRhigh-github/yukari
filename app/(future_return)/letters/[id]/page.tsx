@@ -9,7 +9,7 @@
 //   自分が書いた手紙（まだ開かないものも）だけが返ってきます。
 //   それを開封日の新しい順に並べて、左右に送って読めるようにします（LetterViewer）。
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import { getSignedUrls } from "@/lib/signedUrls";
 import LetterViewer from "@/components/LetterViewer";
 
@@ -26,6 +26,8 @@ export default async function LetterDetailPage({
     .order("open_at", { ascending: false });
 
   const list = letters ?? [];
+  // 自分が書いた手紙だけ消せるようにするため（通信なしで済みます）
+  const myId = await getCurrentUserId(supabase);
 
   // 2回目：この3つは、手紙の一覧がそろえば同時に出せます
   //   ・紙の画像のURL（lib/signedUrls.ts。同じ手紙には同じURLを返すので、2回目からすぐ出ます）
@@ -55,6 +57,7 @@ export default async function LetterDetailPage({
         openAt: letter.open_at,
         imageUrl: findImageUrl(letter.image_url),
         eventId: events?.find((event) => event.capsule_id === letter.id)?.id ?? null,
+        isMine: letter.author_id === myId,
         authorName:
           authors?.find((author) => author.id === letter.author_id)?.display_name ?? null,
       }))}

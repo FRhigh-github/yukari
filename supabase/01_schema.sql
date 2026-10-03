@@ -1091,6 +1091,12 @@ create policy "cards insert"
     )
   );
 
+-- 消せる：送った人だけ（送り間違えたときに取り消せるように）
+create policy "cards delete by sender"
+  on public.card_sends for delete
+  to authenticated
+  using (from_user = auth.uid());
+
 -- ------------------------------------------------------------
 --  未来への手紙
 --  読める：書いた本人はいつでも。
@@ -1117,6 +1123,12 @@ create policy "capsules insert"
     and (image_url is null or is_own_file(image_url))
     and under_rate_limit('capsules', 20)
   );
+
+-- 消せる：書いた本人だけ（付いている日程調整・チャットも連鎖で消えます）
+create policy "capsules delete own"
+  on public.time_capsules for delete
+  to authenticated
+  using (author_id = auth.uid());
 
 -- ------------------------------------------------------------
 --  イベント
@@ -1237,6 +1249,12 @@ create policy "messages insert own"
     and under_rate_limit('messages', 300)
     and exists (select 1 from events e where e.id = messages.event_id)
   );
+
+-- 消せる：自分の発言だけ
+create policy "messages delete own"
+  on public.messages for delete
+  to authenticated
+  using (user_id = auth.uid());
 
 -- ------------------------------------------------------------
 --  やりとりの記録

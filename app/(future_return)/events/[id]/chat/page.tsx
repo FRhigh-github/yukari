@@ -33,6 +33,8 @@ export default function EventChatPage() {
   const [votes, setVotes] = useState<{ id: string; date: string; ok: number; maybe: number; ng: number }[]>([]);
   // 送れなかったときの知らせ。前はブラウザの alert でしたが、画面の中に出します
   const [errorText, setErrorText] = useState<string | null>(null);
+  // 消すかどうかを確かめている、自分の発言の id（自分のふきだしを押すと出ます）
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentUserIdRef = useRef<string | null>(null);
 
@@ -200,6 +202,16 @@ export default function EventChatPage() {
           handleNewMessage(payload.new as Message);
         }
       )
+      // ▼ 誰かが発言を消したら、こちらの画面からも消します。
+      //   消えた行は id しか届かないので（中身は届きません）、絞り込みは付けずに id で探します
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "messages" },
+        (payload) => {
+          const removedId = (payload.old as { id?: string }).id;
+          setMessages((prev) => prev.filter((message) => message.id !== removedId));
+        }
+      )
       .subscribe();
 
     // 2. 初期データの取得。
@@ -219,6 +231,21 @@ export default function EventChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // 自分の発言を消します（DB の許可で、自分のもの以外は消えません）
+  const handleDeleteMessage = async (messageId: string) => {
+    const { data, error } = await supabase
+      .from("messages")
+      .delete()
+      .eq("id", messageId)
+      .select("id");
+    if (error || data?.length !== 1) {
+      setErrorText("消せませんでした。もう一度お試しください");
+      return;
+    }
+    setConfirmingId(null);
+    setMessages((prev) => prev.filter((message) => message.id !== messageId));
+  };
 
   // メッセージ送信処理
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -344,16 +371,27 @@ export default function EventChatPage() {
                 {!isMe && (
                   <span className="mb-1 ml-1 text-sm text-kin">{msg.user_name || "メンバー"}</span>
                 )}
-                {/* 自分のふきだしは紅、ほかの人は白に金のふち */}
+                {/* 自分のふきだしは紅、ほかの人は白に金のふち。
+                    自分のふきだしを押すと、下に「消す」が出ます */}
                 <div
+                  onClick={isMe ? () => setConfirmingId(confirmingId === msg.id ? null : msg.id) : undefined}
                   className={`max-w-[78%] break-words rounded-2xl px-4 py-2 text-base ${
                     isMe
-                      ? "rounded-br-sm bg-beni text-white"
+                      ? "cursor-pointer rounded-br-sm bg-beni text-white"
                       : "rounded-bl-sm bg-white text-stone-800 ring-1 ring-kin/30"
                   }`}
                 >
                   {msg.content}
                 </div>
+                {isMe && confirmingId === msg.id ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMessage(msg.id)}
+                    className="h-11 px-2 text-sm text-beni underline"
+                  >
+                    この発言を消す
+                  </button>
+                ) : null}
                 <span className="mt-0.5 px-1 text-xs text-stone-400">
                   {new Date(msg.created_at).toLocaleTimeString("ja-JP", {
                     hour: "2-digit",

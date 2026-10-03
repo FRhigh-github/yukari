@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import CardTemplate, { type CardKind } from "@/components/CardTemplate";
+import DeleteItemButton from "@/components/DeleteItemButton";
 
 type ReceivedCardProps = {
   imageUrl: string | null;
@@ -15,6 +16,8 @@ type ReceivedCardProps = {
   // 画像がまだ無い古いカード用の、代わりの見た目
   kind: CardKind;
   backgroundName: string;
+  // 自分が送ったカードのときだけ、その id。大きく開いたときに「消す」を出します
+  deletableId?: string;
 };
 
 export default function ReceivedCard({
@@ -24,6 +27,7 @@ export default function ReceivedCard({
   sentAt,
   kind,
   backgroundName,
+  deletableId,
 }: ReceivedCardProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -82,6 +86,8 @@ export default function ReceivedCard({
           <p className="text-xs text-white/70">
             {partnerName ?? "名無し"} {suffix}
           </p>
+          {/* 送ったカードは、ここから取り消せます（押しても拡大は閉じません） */}
+          {deletableId ? <DeleteItemButton kind="card" id={deletableId} /> : null}
         </div>
       ) : null}
     </>

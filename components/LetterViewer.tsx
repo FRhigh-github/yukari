@@ -10,6 +10,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import DeleteItemButton from "@/components/DeleteItemButton";
 
 // ホームの ✈️ と同じ名前で覚えます（MemberCircles.tsx と合わせています）
 const READ_KEY = "read_letter_ids";
@@ -24,6 +25,8 @@ export type Letter = {
   // 付いているイベント（日程調整）の id。無ければ null
   eventId: string | null;
   authorName: string | null;
+  // 自分が書いた手紙か。自分の手紙だけ消せます
+  isMine: boolean;
 };
 
 type LetterViewerProps = {
@@ -160,6 +163,13 @@ export default function LetterViewer({ letters, initialId }: LetterViewerProps) 
           </button>
         ) : null}
       </div>
+
+      {/* ▼ 自分が書いた手紙は消せます（付いている日程調整とチャットも一緒に消えます） */}
+      {letter && letter.isMine ? (
+        <div className="flex shrink-0 justify-center">
+          <DeleteItemButton kind="letter" id={letter.id} afterHref="/" />
+        </div>
+      ) : null}
 
       {/* ▼ 下：日程調整へ。イベントが付いていて、開封済みの手紙のときだけ出します */}
       {letter && letter.eventId && !isLocked ? (
