@@ -75,7 +75,13 @@ export async function getSignedUrls(bucket: string, paths: (string | null)[]) {
     ),
   );
 
-  // 1枚ずつ同時に作ります。覚えているものは通信なしですぐ返ってきます
+  // 1枚ずつ同時に作ります。覚えているものは通信なしですぐ返ってきます。
+  // ▼ まとめて作る命令（createSignedUrls）を使わない理由
+  //   まとめて作ると、覚えておく単位が「写真の組み合わせ」になります。
+  //   ご報告が1つ増えるだけで組み合わせが変わり、全部の写真が新しい URL になって、
+  //   ブラウザが前にダウンロードした写真を使い回せなくなります。
+  //   1枚ずつなら、同じ写真にはいつも同じ URL を返せます。
+  //   初めての写真のときだけ枚数ぶんの通信になりますが、同時に出すので、待ち時間は1回ぶんほどです
   const urls = await Promise.all(
     unique.map((path) => signOne(bucket, path).catch(() => null)),
   );
