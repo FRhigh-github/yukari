@@ -25,7 +25,10 @@
 npm install
 npm run dev      # http://localhost:3000
 npm run lint
+npm test         # テスト（DB の許可も、手元の Postgres = PGlite で確かめます）
 ```
+
+GitHub に push すると、lint・型チェック・テスト・ビルドが自動で走ります（`.github/workflows/ci.yml`）。
 
 `.env.local` に次のものを入れます（中身は Supabase のダッシュボードと Vercel にあります。
 くわしくは `supabase/README.md` の「鍵について」）。

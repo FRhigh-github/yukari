@@ -29,6 +29,11 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 1. `01_schema.sql` … 「今の正しい形」。新しく作り直すときは、これだけで最新になります
 2. `migrations/` に新しいファイルを1つ … 今ある DB を、最新の形に変えるための差分
 
+DB を変えたら、`npm test` で確かめます（`tests/db/`）。
+新しく作った DB（01）と、本番の形の DB（`tests/fixtures/schema_before_migrations.sql` に migrations を流したもの）の
+両方で同じテストを通すので、01 と migrations がずれていると失敗します。
+`tests/fixtures/schema_before_migrations.sql` は、migrations を始める前の本番の形です。書き換えないでください。
+
 本番に流すのは 2 だけです。ファイル名の順（日付と番号の順）に、まだ流していないものを流します。
 **どこまで流したかは、下の表に書き足してください。**（流し忘れ・二重に流すのを防ぐため）
 

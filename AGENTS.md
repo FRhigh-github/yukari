@@ -135,3 +135,4 @@ RLS の外にいる。`app/api/recovery/` が `SUPABASE_SERVICE_ROLE_KEY` を使
 
 - **コメントは日本語で、「なぜ」を書く**。既存のファイルがその書き方になっている
 - 一度に大きく変えない。1つの変更で1つのことだけ直す
+- DB の許可を変えたら、`tests/db/rls.test.ts` にテストを足して `npm test` で確かめる
