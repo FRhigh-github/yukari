@@ -35,7 +35,10 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    router.push("/");
+    // 思い出ログインで戻ってきた人は、続けてメールアドレスも決め直します（/account/email）。
+    // window.location.search = URL の ? 以降。押したときに1回読むだけなので、これで足ります
+    const fromRecover = new URLSearchParams(window.location.search).get("from") === "recover";
+    router.push(fromRecover ? "/account/email" : "/");
     router.refresh();
   };
 

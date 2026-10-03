@@ -44,6 +44,25 @@ export default async function ProfileEditPage() {
         birthday={profile?.birthday ?? ""}
         mood={profile?.mood ?? null}
       />
+
+      {/* ▼ ログインの鍵（メールアドレス・パスワード）を変える入口。
+          プロフィールの中身とは別の画面です。変えるときに確認のメールが要るなど、手順が違うためです */}
+      <nav className="space-y-2 px-4 pb-24">
+        <Link
+          href="/account/email"
+          className="flex h-12 items-center justify-between rounded-xl bg-white px-4 text-sm text-stone-700 ring-1 ring-kin/30"
+        >
+          メールアドレスを変える
+          <span aria-hidden="true" className="text-kin">›</span>
+        </Link>
+        <Link
+          href="/reset-password"
+          className="flex h-12 items-center justify-between rounded-xl bg-white px-4 text-sm text-stone-700 ring-1 ring-kin/30"
+        >
+          パスワードを変える
+          <span aria-hidden="true" className="text-kin">›</span>
+        </Link>
+      </nav>
     </main>
   );
 }

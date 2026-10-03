@@ -139,7 +139,9 @@ export default function RecoverPage() {
     }
 
     localStorage.removeItem(SAVED_KEY);
-    router.push("/");
+    // ▼ 戻ってきた人は、パスワードもメールも使えなくなっています。
+    //   次からふつうにログインできるよう、新しいパスワード → 新しいメールアドレスの順に決めてもらいます
+    router.push("/reset-password?from=recover");
     router.refresh();
   };
 

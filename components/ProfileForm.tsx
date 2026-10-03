@@ -138,7 +138,8 @@ export default function ProfileForm({
   };
 
   return (
-    <div className="pb-24">
+    // 下の余白は、続けて並ぶ「メールアドレス・パスワードを変える」（app/profile/edit/page.tsx）の側で取ります
+    <div className="pb-6">
       {/* ▼ アイコン */}
       <section className="flex flex-col items-center gap-2 bg-[#fdf6f0] py-6">
         {/* label で囲むと、写真の丸そのものを押して選べます。
