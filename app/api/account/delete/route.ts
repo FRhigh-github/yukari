@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { removeUserFiles } from "@/lib/removeUserFiles";
+import { removeStorageFiles } from "@/lib/removeStorageFiles";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -25,6 +26,17 @@ export async function POST(request: Request) {
   if (body?.confirm !== "delete") {
     return NextResponse.json({ error: "確認が取れませんでした" }, { status: 400 });
   }
+
+  // ▼ ほかの人のフォルダにある、自分あてのファイルの場所を控えておきます。
+  //   自分のご報告に付いた手書きのお祝いと、自分あてに届いたカードです。
+  //   アカウントを消すと行は連鎖で消えますが、ファイルは描いた人・送った人のフォルダに残るためです
+  const [{ data: reactionsOnMine }, { data: cardsToMe }] = await Promise.all([
+    supabase
+      .from("post_reactions")
+      .select("drawing_url, posts!inner(author_id)")
+      .eq("posts.author_id", userId),
+    supabase.from("card_sends").select("drawing_url").eq("to_user", userId),
+  ]);
 
   try {
     await removeUserFiles(userId);
@@ -44,6 +56,11 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+
+  await Promise.all([
+    removeStorageFiles("drawings", reactionsOnMine?.map((reaction) => reaction.drawing_url) ?? []),
+    removeStorageFiles("cards", cardsToMe?.map((card) => card.drawing_url) ?? []),
+  ]);
 
   // ログインの証明書（Cookie）も消しておきます
   await supabase.auth.signOut();

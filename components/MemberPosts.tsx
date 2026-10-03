@@ -10,7 +10,6 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import StoryViewer, { type StoryPost } from "@/components/StoryViewer";
 import ReportPostcard from "@/components/ReportPostcard";
 
@@ -83,16 +82,16 @@ export default function MemberPosts({
     setIsDeleting(true);
     setMessage(null);
 
-    // .select() を付けると、実際に消えた行が返ってきます。
-    // 許可が無くて消えなかったときも「エラー」にはならないので、件数で確かめます
-    const { data, error } = await createClient()
-      .from("posts")
-      .delete()
-      .eq("id", menuPost.id)
-      .select("id");
+    // サーバーで消します（app/api/posts/delete）。
+    // 行を消したあとに、保管庫の写真のファイルも一緒に消すためです
+    const response = await fetch("/api/posts/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postId: menuPost.id }),
+    }).catch(() => null);
 
     setIsDeleting(false);
-    if (error || data?.length !== 1) {
+    if (!response?.ok) {
       setMessage("消せませんでした。もう一度お試しください");
       return;
     }
