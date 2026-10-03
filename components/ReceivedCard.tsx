@@ -48,7 +48,8 @@ export default function ReceivedCard({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={imageUrl}
-                alt=""
+                // 読み上げ機能のための説明（「〇〇さんからのカード」）
+                alt={`${partnerName ?? "名無し"}${suffix}のカード`}
                 loading="lazy"
                 className="h-full w-full object-cover"
               />
@@ -80,7 +81,7 @@ export default function ReceivedCard({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl}
-            alt=""
+            alt={`${partnerName ?? "名無し"}${suffix}のカード`}
             className="max-h-[75vh] w-auto rounded-xl bg-white p-2 shadow-2xl ring-1 ring-kin"
           />
           <p className="text-xs text-white/70">

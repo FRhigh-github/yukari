@@ -139,7 +139,7 @@ export default function ImageCropper({ file, round, onDone, onCancel }: ImageCro
         <img
           ref={imgRef}
           src={src}
-          alt=""
+          alt="切り取る写真"
           draggable={false}
           onLoad={(event) =>
             setNatural({

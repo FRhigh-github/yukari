@@ -480,7 +480,7 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
                   />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.src} alt="" className="block w-full" draggable={false} />
+                  <img src={item.src} alt="カードに置いた写真" className="block w-full" draggable={false} />
                 )}
 
                 {/* ▼ 選んでいるものの右上に、消すボタンを出します。
