@@ -1,5 +1,37 @@
 import type { NextConfig } from "next";
 
+// ▼ 読み込んでよい場所の一覧（Content-Security-Policy）
+//   万一、誰かが画面にプログラムや画像を紛れ込ませても、ここに無い場所からは読み込めません。
+//   たとえば、よそのサイトの画像（見た人を記録する仕掛け）や、よそへのデータの送信を止めます。
+//
+//   self      = このアプリ自身
+//   supabase  = DB・保管庫（写真）・リアルタイム（チャット）
+//   lh3.googleusercontent.com = Google で登録した人のアイコン
+//   data: / blob: = その場で作った画像（カードの写真、手紙の写真のお試しなど）
+//   フォントは next/font がアプリの中に取り込むので、self だけで足ります。
+//
+//   script-src の 'unsafe-inline' は、app/layout.tsx の小さな処理と、
+//   Next.js が HTML に埋め込む処理のために要ります。
+//   開発中（npm run dev）だけは、React の開発用の道具が eval を使うので 'unsafe-eval' も足します
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const supabaseWs = supabaseUrl.replace(/^https:/, "wss:");
+const isDev = process.env.NODE_ENV !== "production";
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${supabaseUrl} https://lh3.googleusercontent.com`,
+  "font-src 'self' data:",
+  `connect-src 'self' ${supabaseUrl} ${supabaseWs}${isDev ? " ws: wss:" : ""}`,
+  "worker-src 'self'",
+  "manifest-src 'self'",
+  "frame-src 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   // ▼ 本番の速さを測りたいときのための指定
   // 開発サーバー(npm run dev)は .next を使い続けているので、
@@ -46,7 +78,9 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          // 読み込んでよい場所の一覧（上の contentSecurityPolicy）。
+          // frame-ancestors 'none' も含めています（X-Frame-Options と同じ役目）
+          { key: "Content-Security-Policy", value: contentSecurityPolicy },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
