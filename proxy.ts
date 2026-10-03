@@ -18,6 +18,8 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = [
   "/login",
   "/signup",
+  // パスワードを忘れた人が、再設定のメールを受け取る画面
+  "/forgot",
   "/recover",
   "/auth/callback",
   "/api/recovery",

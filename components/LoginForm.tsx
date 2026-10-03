@@ -70,6 +70,11 @@ export default function LoginForm({ initialMessage }: LoginFormProps) {
           <PasswordField value={password} onChange={setPassword} />
         </Field>
 
+        {/* パスワードを忘れた人の入口（/forgot）。メールで再設定のリンクを受け取ります */}
+        <Link href="/forgot" className="block py-2 text-right text-xs text-stone-500 underline">
+          パスワードを忘れた
+        </Link>
+
         <button
           type="submit"
           disabled={isSending}

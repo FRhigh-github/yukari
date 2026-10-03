@@ -9,6 +9,10 @@ export async function GET(request: Request) {
   // searchParams = ?以降の部分 / origin = http://localhost:3000 の部分
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  // ▼ ログインのあとに開く画面。パスワードの再設定（/forgot）のときだけ /reset-password が付いてきます。
+  //   決まった行き先しか受け付けません。何でも受け付けると、
+  //   ?next=https://よそのサイト のリンクで、ログインのあとによそへ飛ばされてしまうためです
+  const next = searchParams.get('next') === '/reset-password' ? '/reset-password' : null
 
   // 交換に失敗したときの理由を、あとで画面に出すために控えておきます
   let exchangeError: string | null = null
@@ -19,6 +23,10 @@ export async function GET(request: Request) {
     // code を渡して、ログイン情報（セッション）に交換してもらう。
     // 成功すると、Cookieにログイン状態が保存される。
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (!error && next !== null) {
+      return NextResponse.redirect(`${origin}${next}`)
+    }
 
     if (!error) {
       // ▼ 初めての人か、すでに使っている人かで行き先を変えます。

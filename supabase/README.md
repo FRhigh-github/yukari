@@ -127,6 +127,12 @@ Authentication → Providers → Email
 
 Authentication → Providers → Google
   有効にしておく
+
+Authentication → URL Configuration → Redirect URLs
+  https://<本番のドメイン>/auth/callback**
+  http://localhost:3000/auth/callback**
+  （最後の ** は、?next=/reset-password のような後ろの部分も認めるための印です。
+    パスワードの再設定のメールから戻ってくるときに使います）
 ```
 
 ## 鍵について
