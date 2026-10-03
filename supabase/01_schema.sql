@@ -1242,15 +1242,24 @@ grant execute on function public.recovery_is_unlocked(uuid) to service_role;
 --   そのときは、流したあとに「NOTICE: バケットを…」と出るので、README.md の手順で
 --   ダッシュボードから作ってください（すでにあるなら、何もしなくて大丈夫です）。
 --   exception = begin〜end の間で起きたエラーを受け止める書き方です
+--
+-- ▼ 大きさと種類の上限（file_size_limit / allowed_mime_types）
+--   アプリが置くのは、縮めた JPEG（写真・カード・アイコン）と PNG（手書き・手紙の紙）だけです。
+--   上限が無いと、自分のフォルダになら巨大なファイルや、HTML・SVG のような
+--   「開くとプログラムが動くかもしれないファイル」も置けてしまいます。
+--   ふだんの大きさ：写真 0.2MB ほど / 手紙の紙 1〜2MB ほど。余裕を持たせています
 do $$
 begin
-  insert into storage.buckets (id, name, public)
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
   values
-    ('avatars', 'avatars', true),
-    ('posts', 'posts', false),
-    ('drawings', 'drawings', false),
-    ('cards', 'cards', false)
-  on conflict (id) do update set public = excluded.public;
+    ('avatars', 'avatars', true, 1048576, array['image/jpeg']),
+    ('posts', 'posts', false, 2097152, array['image/jpeg']),
+    ('drawings', 'drawings', false, 5242880, array['image/png']),
+    ('cards', 'cards', false, 2097152, array['image/jpeg'])
+  on conflict (id) do update set
+    public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
 exception
   when insufficient_privilege then
     raise notice 'バケットを SQL から作る権限がありませんでした。supabase/README.md の「保管庫」を見て、ダッシュボードで作ってください';
