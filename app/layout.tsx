@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import OpeningAnimation from "@/components/OpeningAnimation";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 // フォントは globals.css で端末の標準フォントを指定しています。
 
@@ -108,6 +109,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {/* アプリを開いたときのアニメーション。
               この枠いっぱいにかぶさるので、スマホの画面に収まります。 */}
           <OpeningAnimation />
+          {/* 電波が届かないときの画面を出すための、裏で動くプログラムを入れます（画面には何も出ません） */}
+          <ServiceWorkerRegister />
         </div>
       </body>
     </html>

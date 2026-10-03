@@ -1,6 +1,41 @@
 // Service Worker（スマホの裏で動く小さなプログラム）です。
 // アプリを閉じていても、通知が届いたときにここが目を覚まして、通知を出します。
 // サーバーから通知を送る処理は lib/push.ts です。
+//
+// ▼ 電波が届かないとき
+//   画面を開こうとして電波が届かなかったら、端末に保存しておいた offline.html を出します。
+//   保存するのは offline.html だけです。ほかの画面（ご報告や手紙など）は保存しません。
+//   1台のスマホを何人かで使うこともあるので、人のデータを端末に残さないためです。
+const OFFLINE_CACHE = "yukari-offline-v1";
+const OFFLINE_URL = "/offline.html";
+
+// 入ったとき：offline.html を保存しておきます
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(OFFLINE_CACHE).then((cache) => cache.add(OFFLINE_URL)).then(() => self.skipWaiting()),
+  );
+});
+
+// 新しい版になったとき：前の版の保存を消して、すぐに今の画面にも効くようにします
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== OFFLINE_CACHE).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+// 画面を開くとき（navigate）だけ見張ります。ふだんはそのままサーバーへ取りに行き、
+// 失敗したときだけ offline.html を出します（写真や API の通信には手を出しません）
+self.addEventListener("fetch", (event) => {
+  if (event.request.mode !== "navigate") return;
+  event.respondWith(
+    fetch(event.request).catch(() =>
+      caches.match(OFFLINE_URL).then((response) => response || Response.error()),
+    ),
+  );
+});
 
 // 通知が届いたとき
 self.addEventListener("push", (event) => {

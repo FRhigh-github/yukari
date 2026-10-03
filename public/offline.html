@@ -1,0 +1,38 @@
+<!doctype html>
+<!--
+  電波が届かず、画面を開けなかったときに出すページです。
+  Service Worker（public/sw.js）が、最初に端末へ保存しておき、つながらないときに出します。
+  つながらない状態でも出せるよう、絵も見た目も、このファイルの中だけで完結させています。
+-->
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>ゆかり</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+        background: #faf9f6; color: #44403c; text-align: center; padding: 32px; box-sizing: border-box;
+        font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+      }
+      h1 { font-size: 18px; margin: 0; color: #292524; }
+      p { font-size: 15px; line-height: 1.7; margin: 0; color: #78716c; }
+      button {
+        height: 48px; padding: 0 28px; border: none; border-radius: 999px;
+        background: #b7282e; color: #fff; font-size: 15px; font-weight: bold;
+        box-shadow: 0 0 0 1px #c2a14d, 0 0 0 3px #faf9f6, 0 0 0 4px #c2a14d;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 紅と白の紐を結んだ絵（アプリの印と同じ色） -->
+    <svg width="96" height="64" viewBox="0 0 96 64" aria-hidden="true">
+      <path d="M8 52 C 30 10, 66 10, 88 52" fill="none" stroke="#b7282e" stroke-width="6" stroke-linecap="round" />
+      <path d="M8 12 C 30 54, 66 54, 88 12" fill="none" stroke="#e7dfd0" stroke-width="6" stroke-linecap="round" />
+    </svg>
+    <h1>電波が届いていません</h1>
+    <p>つながるところで、<br />もう一度開いてください。</p>
+    <button type="button" onclick="location.reload()">もう一度開く</button>
+  </body>
+</html>
