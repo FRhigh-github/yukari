@@ -113,19 +113,21 @@ export default function EventDetailPage() {
     // (前はここで setLoading(true) にしていましたが、保存のあとに取り直すたびに
     //  画面が一瞬まっさらになっていたので外しました。最初の読み込み中は、はじめから true です)
 
-    // 1. ユーザー情報取得
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const myId = user?.id || null;
+    // ▼ 待ち時間を減らすため、お互いを必要としないものは同時に取ります。
+    //   前は「本人確認 → イベント → 候補日 → 出欠 → 名前」と5回続けて通信していましたが、
+    //   今は2回です。列も「*」（全部）ではなく、使うものだけを並べます。
+    //
+    // 1回目：本人確認（getClaims は通信なしで済みます）と、イベント本体
+    const [{ data: claims }, { data: eventData, error: eventErr }] = await Promise.all([
+      supabase.auth.getClaims(),
+      supabase
+        .from("events")
+        .select("id, name, created_by, confirmed_option_id, capsule_id")
+        .or(`id.eq.${rawId},capsule_id.eq.${rawId}`)
+        .maybeSingle(),
+    ]);
+    const myId = claims?.claims.sub ?? null;
     setCurrentUserId(myId);
-
-    // 2. イベント本体の取得
-    const { data: eventData, error: eventErr } = await supabase
-      .from("events")
-      .select("*")
-      .or(`id.eq.${rawId},capsule_id.eq.${rawId}`)
-      .maybeSingle();
 
     if (eventErr) console.error("イベント取得エラー:", eventErr);
 
@@ -137,11 +139,22 @@ export default function EventDetailPage() {
 
     const targetEventId = eventData.id;
 
-    // 3. 日時候補の取得
-    const { data: dateOptions, error: optErr } = await supabase
-      .from("event_date_options")
-      .select("*")
-      .eq("event_id", targetEventId);
+    // 2回目：候補日と、出欠の答えを同時に取ります。
+    //   出欠は event_date_options!inner(event_id) で「このイベントの候補日への答え」に絞り、
+    //   profiles(display_name) で答えた人の名前も一緒にもらいます（名前のために、もう1回取らずに済みます）
+    const [
+      { data: dateOptions, error: optErr },
+      { data: responsesData, error: respErr },
+    ] = await Promise.all([
+      supabase
+        .from("event_date_options")
+        .select("id, event_date")
+        .eq("event_id", targetEventId),
+      supabase
+        .from("event_responses")
+        .select("option_id, user_id, answer, comment, profiles(display_name), event_date_options!inner(event_id)")
+        .eq("event_date_options.event_id", targetEventId),
+    ]);
 
     if (optErr) console.error("日時候補取得エラー:", optErr);
 
@@ -150,70 +163,56 @@ export default function EventDetailPage() {
       event_date_options: dateOptions || [],
     });
 
-    // 4. 回答一覧およびコメントの取得
-    const optionIds = (dateOptions || []).map((opt: DateOption) => opt.id);
-    if (optionIds.length > 0) {
-      const { data: responsesData, error: respErr } = await supabase
-        .from("event_responses")
-        .select("option_id, user_id, answer, comment")
-        .in("option_id", optionIds);
+    // 回答一覧およびコメント
+    if (respErr) console.error("回答データ取得エラー:", respErr);
 
-      if (respErr) console.error("回答データ取得エラー:", respErr);
+    if (responsesData && responsesData.length > 0) {
+      // 答えた人の名前（profiles(display_name) で一緒に届いたもの）
+      const profileMap = new Map<string, string>(
+        responsesData.map((r) => [
+          r.user_id,
+          (r.profiles as unknown as { display_name: string | null } | null)?.display_name ||
+            "メンバー",
+        ]),
+      );
 
-      if (responsesData && responsesData.length > 0) {
-        const userIds = Array.from(new Set(responsesData.map((r) => r.user_id)));
+      const userMap: Record<string, MemberResponse> = {};
+      const myRespMap: Record<string, ResponseStatus> = {};
+      let currentUserComment = "";
 
-        let profileMap = new Map<string, string>();
-        if (userIds.length > 0) {
-          const { data: profilesData } = await supabase
-            .from("profiles")
-            // 名前の列は display_name です（前は無い列を読んでいて、全員「メンバー」と出ていました）
-            .select("id, display_name")
-            .in("id", userIds);
+      responsesData.forEach((row) => {
+        const uId = row.user_id || "unknown";
+        const uName = uId === myId ? "自分" : profileMap.get(uId) || "メンバー";
 
-          profileMap = new Map(
-            (profilesData || []).map((p) => [p.id, p.display_name || "メンバー"])
-          );
+        if (!userMap[uId]) {
+          userMap[uId] = {
+            user_id: uId,
+            user_name: uName,
+            comment: null,
+            responses: {},
+          };
         }
 
-        const userMap: Record<string, MemberResponse> = {};
-        const myRespMap: Record<string, ResponseStatus> = {};
-        let currentUserComment = "";
+        if (row.comment && row.comment.trim() !== "") {
+          userMap[uId].comment = row.comment;
+        }
 
-        responsesData.forEach((row) => {
-          const uId = row.user_id || "unknown";
-          const uName = uId === myId ? "自分" : profileMap.get(uId) || "メンバー";
+        const normAns = normalizeAnswer(row.answer);
+        if (normAns) {
+          userMap[uId].responses[row.option_id] = normAns;
+        }
 
-          if (!userMap[uId]) {
-            userMap[uId] = {
-              user_id: uId,
-              user_name: uName,
-              comment: null,
-              responses: {},
-            };
-          }
+        if (uId === myId) {
+          if (normAns) myRespMap[row.option_id] = normAns;
+          if (row.comment) currentUserComment = row.comment;
+        }
+      });
 
-          if (row.comment && row.comment.trim() !== "") {
-            userMap[uId].comment = row.comment;
-          }
-
-          const normAns = normalizeAnswer(row.answer);
-          if (normAns) {
-            userMap[uId].responses[row.option_id] = normAns;
-          }
-
-          if (uId === myId) {
-            if (normAns) myRespMap[row.option_id] = normAns;
-            if (row.comment) currentUserComment = row.comment;
-          }
-        });
-
-        setMemberResponses(Object.values(userMap));
-        setMyResponses(myRespMap);
-        setMyComment(currentUserComment);
-      } else {
-        setMemberResponses([]);
-      }
+      setMemberResponses(Object.values(userMap));
+      setMyResponses(myRespMap);
+      setMyComment(currentUserComment);
+    } else {
+      setMemberResponses([]);
     }
 
     setLoading(false);
