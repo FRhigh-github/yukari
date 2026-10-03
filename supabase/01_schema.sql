@@ -410,6 +410,24 @@ as $$
   );
 $$;
 
+-- 保管庫の場所が「自分のフォルダの、アプリが作った名前のファイル」か。
+--   形は「<自分の id>/<ランダムな id>.jpg（または .png）」だけを認めます。
+-- ▼ なぜ要るのか
+--   写真を見せるときは、サーバーが service_role の鍵（RLS を通らない鍵）で期限付きURLを作ります
+--   （lib/signedUrls.ts）。ここで確かめないと、自分の投稿に「他人の写真の場所」を書くだけで、
+--   サーバーがその写真のURLを作ってくれてしまいます
+create function public.is_own_file(path text)
+returns boolean
+language sql
+stable
+set search_path to 'public'
+as $$
+  select coalesce(
+    path ~ ('^' || auth.uid()::text || '/[0-9a-f-]{36}\.(jpg|png)$'),
+    false
+  );
+$$;
+
 -- ------------------------------------------------------------
 --  画面から呼ぶ関数（supabase.rpc(...)）
 --  communities / memberships には、画面から直接足す許可を出していません。
@@ -736,10 +754,11 @@ create policy "posts for members"
   to authenticated
   using (is_member(community_id));
 
+-- 写真の場所は、自分のフォルダのものだけ（is_own_file を参照）
 create policy "posts insert"
   on public.posts for insert
   to authenticated
-  with check (author_id = auth.uid() and is_member(community_id));
+  with check (author_id = auth.uid() and is_member(community_id) and is_own_file(image_url));
 
 -- 書き換えたあとも「自分の投稿で、自分が入っているコミュニティ」でなければいけません
 -- （入っていないコミュニティへ投稿を移せないようにするため）
@@ -747,7 +766,7 @@ create policy "posts update own"
   on public.posts for update
   to authenticated
   using (author_id = auth.uid())
-  with check (author_id = auth.uid() and is_member(community_id));
+  with check (author_id = auth.uid() and is_member(community_id) and is_own_file(image_url));
 
 create policy "posts delete own"
   on public.posts for delete
@@ -769,6 +788,7 @@ create policy "reactions insert"
   with check (
     from_user = auth.uid()
     and is_member(community_id)
+    and is_own_file(drawing_url)
     and exists (
       select 1 from posts p
       where p.id = post_reactions.post_id
@@ -803,6 +823,7 @@ create policy "cards insert"
   with check (
     from_user = auth.uid()
     and is_member(community_id)
+    and (drawing_url is null or is_own_file(drawing_url))
     and exists (
       select 1 from memberships m
       where m.user_id = card_sends.to_user
@@ -830,7 +851,11 @@ create policy "capsules readable"
 create policy "capsules insert"
   on public.time_capsules for insert
   to authenticated
-  with check (author_id = auth.uid() and is_member(community_id));
+  with check (
+    author_id = auth.uid()
+    and is_member(community_id)
+    and (image_url is null or is_own_file(image_url))
+  );
 
 -- ------------------------------------------------------------
 --  イベント
@@ -1030,7 +1055,8 @@ revoke execute on function
   public.is_member(uuid),
   public.shares_community(uuid),
   public.is_demo_guest(),
-  public.capsule_is_open(uuid)
+  public.capsule_is_open(uuid),
+  public.is_own_file(text)
 from public, anon;
 
 grant execute on function
@@ -1041,7 +1067,8 @@ grant execute on function
   public.is_member(uuid),
   public.shares_community(uuid),
   public.is_demo_guest(),
-  public.capsule_is_open(uuid)
+  public.capsule_is_open(uuid),
+  public.is_own_file(text)
 to authenticated, service_role;
 
 -- 思い出ログインの判定：サーバー（service_role）だけ
