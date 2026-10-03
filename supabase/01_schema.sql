@@ -840,6 +840,21 @@ as $$
   select exists (select 1 from removed);
 $$;
 
+-- DB と保管庫が、いまどれだけ使われているか（バイト）。
+-- 1日1回の処理（app/api/cron/daily）が、無料プランの上限に近づいていないかを見るのに使います。
+-- サーバー（service_role）だけが呼べます
+create function public.app_usage()
+returns table (db_bytes bigint, storage_bytes bigint)
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+  select
+    pg_database_size(current_database()),
+    coalesce((select sum((o.metadata ->> 'size')::bigint) from storage.objects o), 0)::bigint;
+$$;
+
 -- ------------------------------------------------------------
 --  思い出ログインの判定（サーバーの service_role だけが使います）
 --  申請から24時間たっていて、誰も止めていなければ true
@@ -1542,6 +1557,10 @@ grant execute on function
   public.remove_member(uuid, uuid),
   public.regenerate_invite_code(uuid)
 to authenticated, service_role;
+
+-- 使用量：サーバー（service_role）だけ
+revoke execute on function public.app_usage() from public, anon, authenticated;
+grant execute on function public.app_usage() to service_role;
 
 -- 招待コードを作る関数：画面からは直接呼ばせません（create_community の中で使います）
 revoke execute on function public.make_invite_code() from public, anon, authenticated;

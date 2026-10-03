@@ -3,6 +3,7 @@
 // ▼ やること
 //   ・DB に軽く問い合わせて、Supabase の無料プランが「使われていない」と止まらないようにする
 //   ・開封日が来た未来への手紙を、届いた人のスマホに知らせる
+//   ・DB と保管庫の使用量を測り、無料プランの上限の8割を超えたら記録する（エラーのまとめで届く）
 //   ・この1日に記録されたエラー（error_reports）を、運営者にメールでまとめて知らせる
 //
 // ▼ 呼べるのは Vercel だけ
@@ -36,10 +37,12 @@ export async function GET(request: Request) {
     return 0;
   });
 
+  const usage = await checkUsage(admin);
+
   // 最後に、エラーのまとめを送ります（上の処理で起きたエラーも入るように、いちばん最後にします）
   const errors = await sendErrorDigest(admin);
 
-  return NextResponse.json({ ok: true, profiles, letters, errors });
+  return NextResponse.json({ ok: true, profiles, letters, usage, errors });
 }
 
 // ▼ この1日のあいだに開封日が来た手紙を、届いた人に知らせます。
@@ -128,4 +131,33 @@ async function sendErrorDigest(admin: ReturnType<typeof createAdminClient>) {
     ].join("\n"),
   });
   return count;
+}
+
+// ▼ 容量の見張り。Supabase の無料プランの上限（DB 500MB・保管庫 1GB）の8割を超えたら、
+//   error_reports に「usage」として残します（その日のエラーのまとめのメールで届きます）。
+//   上限を超えると、書き込めなくなったりプロジェクトが止まったりするので、その前に気づけるようにします。
+//   有料プランにしたら、環境変数 DB_LIMIT_MB / STORAGE_LIMIT_MB で上限を変えられます
+async function checkUsage(admin: ReturnType<typeof createAdminClient>) {
+  const { data, error } = await admin.rpc("app_usage").single<{
+    db_bytes: number;
+    storage_bytes: number;
+  }>();
+  if (error || !data) {
+    await reportError({ source: "cron", message: `使用量を測れませんでした: ${error?.message ?? ""}` });
+    return null;
+  }
+  const MB = 1024 * 1024;
+  const dbLimit = Number(process.env.DB_LIMIT_MB ?? 500) * MB;
+  const storageLimit = Number(process.env.STORAGE_LIMIT_MB ?? 1024) * MB;
+  const dbRate = data.db_bytes / dbLimit;
+  const storageRate = data.storage_bytes / storageLimit;
+
+  if (dbRate > 0.8 || storageRate > 0.8) {
+    await reportError({
+      source: "usage",
+      message: `容量が上限に近づいています（DB ${Math.round(dbRate * 100)}%・保管庫 ${Math.round(storageRate * 100)}%）`,
+      detail: { db_bytes: data.db_bytes, storage_bytes: data.storage_bytes },
+    });
+  }
+  return { db: Math.round(dbRate * 100), storage: Math.round(storageRate * 100) };
 }

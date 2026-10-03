@@ -83,6 +83,7 @@ cascade;
 --  4. 関数（古い版で作ったものも含めて、全部の名前を並べています）
 -- ------------------------------------------------------------
 drop function if exists
+  public.app_usage(),
   public.are_web_links(text[]),
   public.capsule_is_open(uuid),
   public.capsule_is_visible(uuid),
