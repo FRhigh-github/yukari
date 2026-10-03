@@ -49,7 +49,10 @@ export default async function MemberPage({
         .from("post_reactions")
         .select("id, post_id, from_user, drawing_url, posts!inner(author_id)")
         .eq("posts.author_id", id)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        // ご報告は30件までしか出さないので、お祝いも新しい順に上限を付けます。
+        // 上限が無いと、お祝いが何千件にもなったときに、全部を運んでくることになります
+        .limit(300),
       getCurrentUserId(supabase),
       // 自分が作成者のコミュニティ。そのご報告は、作成者として消せます（MemberPosts）
       supabase.from("memberships").select("community_id, user_id").eq("role", "owner"),
