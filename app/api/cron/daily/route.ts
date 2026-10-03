@@ -3,6 +3,7 @@
 // ▼ やること
 //   ・DB に軽く問い合わせて、Supabase の無料プランが「使われていない」と止まらないようにする
 //   ・開封日が来た未来への手紙を、届いた人のスマホに知らせる
+//   ・この1日に記録されたエラー（error_reports）を、運営者にメールでまとめて知らせる
 //
 // ▼ 呼べるのは Vercel だけ
 //   Vercel は、環境変数 CRON_SECRET の値を「Authorization: Bearer ...」に付けて呼んでくれます。
@@ -11,6 +12,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { claimPush, sendPush } from "@/lib/push";
+import { sendMail } from "@/lib/mail";
+import { reportError } from "@/lib/reportError";
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -28,9 +31,15 @@ export async function GET(request: Request) {
     .select("id", { count: "exact", head: true });
   if (keepAliveError) console.error("DB に問い合わせできませんでした", keepAliveError);
 
-  const letters = await notifyOpenedLetters(admin);
+  const letters = await notifyOpenedLetters(admin).catch(async (error) => {
+    await reportError({ source: "cron", message: `手紙の通知: ${String(error)}` });
+    return 0;
+  });
 
-  return NextResponse.json({ ok: true, profiles, letters });
+  // 最後に、エラーのまとめを送ります（上の処理で起きたエラーも入るように、いちばん最後にします）
+  const errors = await sendErrorDigest(admin);
+
+  return NextResponse.json({ ok: true, profiles, letters, errors });
 }
 
 // ▼ この1日のあいだに開封日が来た手紙を、届いた人に知らせます。
@@ -84,4 +93,39 @@ async function notifyOpenedLetters(admin: ReturnType<typeof createAdminClient>) 
     sent += 1;
   }
   return sent;
+}
+
+// ▼ この1日に記録されたエラーを、運営者にメールでまとめて知らせます。
+//   宛先は環境変数 OPS_EMAIL。無ければ送りません（記録は DB に残っています）。
+//   30日より前の記録は、ついでに消します（表が大きくなり続けないように）
+async function sendErrorDigest(admin: ReturnType<typeof createAdminClient>) {
+  await admin
+    .from("error_reports")
+    .delete()
+    .lt("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: recent, count } = await admin
+    .from("error_reports")
+    .select("source, message, path, created_at", { count: "exact" })
+    .gt("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  const to = process.env.OPS_EMAIL;
+  if (!to || !count) return count ?? 0;
+
+  await sendMail({
+    to,
+    subject: `【ゆかり】この1日のエラー ${count}件`,
+    text: [
+      `この1日に ${count} 件のエラーが記録されました（新しいものから20件まで）。`,
+      "くわしくは Supabase の Table Editor で error_reports を見てください。",
+      "",
+      ...(recent ?? []).map(
+        (row) => `・[${row.source}] ${row.path ?? ""} ${row.message.slice(0, 200)}（${row.created_at}）`,
+      ),
+    ].join("\n"),
+  });
+  return count;
 }

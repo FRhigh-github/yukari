@@ -51,6 +51,7 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `2026-10-04_15_regenerate_invite_code.sql` | |
 | `2026-10-04_16_push_notifications.sql` | |
 | `2026-10-04_17_letter_links.sql` | |
+| `2026-10-04_18_error_reports.sql` | |
 
 ## 新しく作り直す手順
 
@@ -156,6 +157,7 @@ Authentication → URL Configuration → Redirect URLs
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | 両方 | スマホへの通知の公開鍵（公開してよい）。`VAPID_PRIVATE_KEY` と組で作る。作り方：`npx web-push generate-vapid-keys` |
 | `VAPID_PRIVATE_KEY` | 両方 | **出さない**。スマホへの通知の署名に使う秘密の鍵 |
 | `VAPID_SUBJECT` | 両方 | 通知サーバーに伝える連絡先。`mailto:運営の連絡用アドレス` か、アプリの https の URL |
+| `OPS_EMAIL` | Vercel | 運営者のメールアドレス。この1日のエラー（`error_reports`）と、容量の見張りの知らせが届く。無ければ送らない |
 | `CRON_SECRET` | Vercel | **出さない**。1日1回の処理（`/api/cron/daily`）を Vercel だけが呼べるようにする合言葉。32文字以上のでたらめな文字 |
 | `RESEND_API_KEY` | Vercel | メールを送るサービス（Resend）の鍵。思い出ログインの申請を本人にメールで知らせる。無ければメールは送らない（`lib/mail.ts`） |
 | `MAIL_FROM` | Vercel | メールの送り主。例：`ゆかり <noreply@あなたのドメイン>`。Resend で確認したドメインのアドレス |

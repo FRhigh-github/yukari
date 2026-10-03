@@ -24,9 +24,21 @@ export default function Error({
   error: Error & { digest?: string };
   retry: () => void;
 }) {
-  // 原因は開発者向けに、ブラウザのコンソールへ残しておきます
+  // ▼ 原因は開発者向けに、ブラウザのコンソールへ残し、サーバーにも記録してもらいます
+  //   （app/api/client-error → DB の error_reports。運営者に1日1回メールで届きます）
   useEffect(() => {
     console.error(error);
+    fetch("/api/client-error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: error.message,
+        digest: error.digest,
+        path: window.location.pathname,
+      }),
+    }).catch(() => {
+      // 記録できなくても、この画面は出せているので困りません
+    });
   }, [error]);
 
   return (
