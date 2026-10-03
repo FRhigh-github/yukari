@@ -12,3 +12,11 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 }
+// ▼ ログインしている人の id を返します。ログインしていなければ null。
+//   getUser() は毎回 Supabase まで「この人は本物？」と聞きに行きますが、
+//   getClaims() は証明書の署名をこの場で確かめるので、通信なしで済みます
+//   （サーバー側の getCurrentUserId と同じ考え方。lib/supabase/server.ts）
+export async function getMyId(supabase: ReturnType<typeof createClient>) {
+  const { data } = await supabase.auth.getClaims()
+  return data?.claims.sub ?? null
+}

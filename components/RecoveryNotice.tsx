@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 import type { RecoveryRequest } from "@/lib/home";
 
 type RecoveryNoticeProps = {
@@ -32,12 +32,13 @@ export default function RecoveryNotice({ requests }: RecoveryNoticeProps) {
     setMessage(null);
 
     const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) return;
+    // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+    if (!myId) return;
 
     const { error } = await supabase
       .from("recovery_vetoes")
-      .insert({ request_id: requestId, user_id: data.user.id });
+      .insert({ request_id: requestId, user_id: myId });
 
     if (error) {
       console.error("復旧を止められませんでした", error);

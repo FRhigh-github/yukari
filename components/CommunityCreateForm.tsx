@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 
 type CommunityCreateFormProps = {
   // true = ホームの切り替えの中で使う。作ったら、そのコミュニティのホームを出します。
@@ -23,8 +23,9 @@ export default function CommunityCreateForm({ inline = false }: CommunityCreateF
     setIsSending(true);
 
     const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
+    // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+    if (!myId) {
       router.push("/login");
       return;
     }

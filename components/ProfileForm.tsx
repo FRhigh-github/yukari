@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 import { avatarPathFromUrl, newAvatarPath } from "@/lib/avatarFile";
 import ImageCropper from "@/components/ImageCropper";
 import CameraBadge from "@/components/CameraBadge";
@@ -68,8 +68,9 @@ export default function ProfileForm({
 
     try {
       const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
+      // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+      if (!myId) {
         router.push("/login");
         return;
       }
@@ -82,7 +83,7 @@ export default function ProfileForm({
       if (newAvatar !== null) {
         // ファイル名は毎回ランダムな id にします（lib/avatarFile.ts）。
         // 名前が毎回ちがうので、古い画像が表示され続けることもありません
-        const path = newAvatarPath(data.user.id);
+        const path = newAvatarPath(myId);
         const upload = await supabase.storage
           .from("avatars")
           .upload(path, newAvatar, { contentType: "image/jpeg" });
@@ -108,7 +109,7 @@ export default function ProfileForm({
           birthday: date === "" ? null : date,
           mood: selectedMood,
         })
-        .eq("id", data.user.id)
+        .eq("id", myId)
         .select("id");
 
       if (error) throw new Error(error.message);

@@ -10,7 +10,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 
 // 口頭で伝える前提なので、紛らわしい文字は外します。
 // 0とO、1とI、そして小文字は使いません。
@@ -42,8 +42,9 @@ export default function RecoveryCodeButton({
 
     try {
       const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) return;
+      // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+      if (!myId) return;
 
       // 前に発行したぶんを消してから入れ直します。
       // 1人1つの縛りがあるので、消さずに入れるとぶつかります。
@@ -51,14 +52,14 @@ export default function RecoveryCodeButton({
         .from("recovery_codes")
         .delete()
         .eq("target_user", targetUserId)
-        .eq("issued_by", data.user.id);
+        .eq("issued_by", myId);
 
       const newCode = makeCode();
 
       const { error } = await supabase.from("recovery_codes").insert({
         code: newCode,
         target_user: targetUserId,
-        issued_by: data.user.id,
+        issued_by: myId,
       });
 
       if (error) throw new Error(error.message);

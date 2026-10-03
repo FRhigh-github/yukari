@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 
 type CommunitySettingsProps = {
   communityId: string;
@@ -59,8 +59,9 @@ export default function CommunitySettings({
     setIsSaving(true);
 
     const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
+    // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+    if (!myId) {
       router.push("/login");
       return;
     }
@@ -71,7 +72,7 @@ export default function CommunitySettings({
       .from("memberships")
       .delete()
       .eq("community_id", communityId)
-      .eq("user_id", data.user.id)
+      .eq("user_id", myId)
       .select("user_id");
 
     if (error || deleted?.length === 0) {

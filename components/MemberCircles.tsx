@@ -6,7 +6,7 @@ import MemberCircle from "@/components/MemberCircle";
 import MoodIcon from "@/components/MoodIcon";
 import { MOODS, SHOW_MOOD_ON_HOME } from "@/lib/mood";
 import type { Member } from "@/lib/home";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 
 // 水引の色（globals.css と同じ）
 const BENI = "#b7282e";
@@ -114,8 +114,9 @@ export default function MemberCircles({
   useEffect(() => {
     async function checkLetter() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+      if (!myId) return;
 
       // 手紙が存在するか確認（飛行機マーク自体の表示判定用）
       const { data: allLetters, error } = await supabase

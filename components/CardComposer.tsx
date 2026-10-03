@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 // 指の動き(ドラッグ・2本指のピンチ)を見分けてくれるライブラリ
 import { useDrag, usePinch } from "@use-gesture/react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import {
   renderCardToBlob,
@@ -129,12 +129,13 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
 
     const supabase = createClient();
 
-    const [{ data: userData }, { data: communities }] = await Promise.all([
-      supabase.auth.getUser(),
+    const [myId, { data: communities }] = await Promise.all([
+      // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      getMyId(supabase),
       supabase.from("communities").select("id, name").order("created_at", { ascending: true }),
     ]);
 
-    if (!userData.user) {
+    if (!myId) {
       router.push("/login");
       return;
     }
@@ -144,7 +145,7 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       .from("memberships")
       .select("user_id, community_id")
       .in("community_id", communities?.map((item) => item.id) ?? [])
-      .neq("user_id", userData.user.id);
+      .neq("user_id", myId);
 
     const { data: profiles } = await supabase
       .from("profiles")
@@ -179,8 +180,9 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
 
     try {
       const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
+      // 本人確認（通信なしで済みます）
+      const myId = await getMyId(supabase);
+      if (!myId) {
         router.push("/login");
         return;
       }
@@ -190,7 +192,7 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
 
       // 置き場所は「自分の id / でたらめな id.jpg」。
       // 自分の id のフォルダにしか置けない決まりにしているためです（supabase/01_schema.sql）
-      const path = `${data.user.id}/${crypto.randomUUID()}.jpg`;
+      const path = `${myId}/${crypto.randomUUID()}.jpg`;
       const upload = await supabase.storage
         .from("cards")
         // cacheControl = ブラウザに「この写真は1年間そのまま使い回してよい」と伝えます。
@@ -229,7 +231,7 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       const { error: insertError } = await supabase.from("card_sends").insert({
         id: cardId,
         template_id: template?.id ?? null,
-        from_user: data.user.id,
+        from_user: myId,
         to_user: toUser,
         community_id: communityId,
         drawing_url: upload.data.path,

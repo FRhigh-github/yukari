@@ -3,7 +3,7 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 import { isUuid } from "@/lib/isUuid";
 
 type DateOption = {
@@ -277,10 +277,8 @@ export default function EventDetailPage() {
   const handleSaveResponses = async () => {
     let userId = currentUserId;
     if (!userId) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      userId = user?.id || null;
+      // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      userId = await getMyId(supabase);
       if (userId) setCurrentUserId(userId);
     }
 
