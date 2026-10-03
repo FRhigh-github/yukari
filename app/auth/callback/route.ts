@@ -58,14 +58,19 @@ export async function GET(request: Request) {
   //
   //   Google 側で断られた場合、?error=... と ?error_description=... が付いてきます。
   //   何も出さずにログイン画面へ戻すと「押したのに戻された」としか分からないので、
-  //   理由をそのまま持って帰って、画面に出します。
-  const reason =
-    searchParams.get('error_description') ??
-    searchParams.get('error') ??
-    exchangeError ??
-    'Googleから返事がありませんでした'
+  //   ログイン画面に「何が起きたか」の合図だけを渡します。
+  //
+  //   理由の文そのものは渡しません。
+  //   前は文をそのまま ?error= に入れて画面に出していたので、
+  //   誰かが ?error=好きな文 のリンクを作ると、アプリの画面に偽の案内を出せてしまいました。
+  //   合図は決まった2つだけで、出す文はログイン画面（app/login/page.tsx）が決めます
+  const cancelled = searchParams.get('error') === 'access_denied'
+  console.error(
+    'Google ログインに失敗しました',
+    searchParams.get('error_description') ?? searchParams.get('error') ?? exchangeError,
+  )
 
   return NextResponse.redirect(
-    `${origin}/login?error=${encodeURIComponent(reason)}`,
+    `${origin}/login?error=${cancelled ? 'google_cancelled' : 'google_failed'}`,
   )
 }
