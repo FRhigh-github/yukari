@@ -57,10 +57,15 @@ export async function renderCardToBlob(
     // 写真は、読み込みを待ってから描きます（src は選んだ写真の中身そのもの data:...）。
     // 縦は元の比率のまま
     const image = item.type === "image" ? await loadImage(item.src) : null;
+
+    // ▼ 文字は、枠の幅で折り返した行に分けます（wrapLines）。
+    //   画面の入力欄も、折り返したぶんだけ縦に伸びるので、行の数がそのまま高さになります
+    ctx.font = `bold ${Math.round(OUT_WIDTH * FONT_RATIO)}px sans-serif`;
+    const lines = item.type === "text" ? wrapLines(ctx, item.text, contentWidth) : [];
+
     const contentHeight =
       item.type === "text"
-        ? // 文字は、画面の入力欄と同じく「改行の数」ぶんの高さです
-          item.text.split("\n").length * lineHeight
+        ? lines.length * lineHeight
         : image
           ? (contentWidth / image.width) * image.height
           : 0;
@@ -77,32 +82,12 @@ export async function renderCardToBlob(
     const x = padding;
     const y = padding;
 
-    if (item.type === "image") {
-      if (image) ctx.drawImage(image, x, y, contentWidth, contentHeight);
-      ctx.restore();
-      continue;
+    if (image) {
+      ctx.drawImage(image, x, y, contentWidth, contentHeight);
     }
 
     ctx.fillStyle = TEXT_COLORS[kind];
     ctx.textBaseline = "top";
-    ctx.font = `bold ${Math.round(OUT_WIDTH * FONT_RATIO)}px sans-serif`;
-
-    // ▼ 枠の幅で折り返して、1行ずつ下にずらして描きます。
-    //   canvas は「ここで折り返す」をやってくれないので、1文字ずつ足していき、
-    //   はみ出したところで次の行に送ります（画面の折り返しと合わせるため）
-    const lines: string[] = [];
-    for (const paragraph of item.text.split("\n")) {
-      let line = "";
-      for (const ch of paragraph) {
-        if (line !== "" && ctx.measureText(line + ch).width > contentWidth) {
-          lines.push(line);
-          line = ch;
-        } else {
-          line += ch;
-        }
-      }
-      lines.push(line);
-    }
     lines.forEach((line, index) => {
       ctx.fillText(line, x, y + index * lineHeight);
     });
@@ -115,6 +100,26 @@ export async function renderCardToBlob(
 
   if (blob === null) throw new Error("画像の書き出しに失敗しました");
   return blob;
+}
+
+// ▼ 文字を、枠の幅で折り返して「行の配列」にします。
+//   canvas は「ここで折り返す」をやってくれないので、1文字ずつ足していき、
+//   はみ出したところで次の行に送ります（画面の折り返しと合わせるため）
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+  const lines: string[] = [];
+  for (const paragraph of text.split("\n")) {
+    let line = "";
+    for (const ch of paragraph) {
+      if (line !== "" && ctx.measureText(line + ch).width > maxWidth) {
+        lines.push(line);
+        line = ch;
+      } else {
+        line += ch;
+      }
+    }
+    lines.push(line);
+  }
+  return lines;
 }
 
 const loadImage = (src: string) =>

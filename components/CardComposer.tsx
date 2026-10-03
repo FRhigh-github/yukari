@@ -22,6 +22,12 @@ import CardTemplate, {
 import { requestNotify } from "@/lib/notify";
 import { removeOwnUpload } from "@/lib/removeOwnUpload";
 
+// 入力欄の高さを、中身の行数（折り返しも含む）に合わせて伸び縮みさせます
+function autoResize(el: HTMLTextAreaElement) {
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
 export type Recipient = {
   userId: string;
   communityId: string;
@@ -295,6 +301,47 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
     { filterTaps: true },
   );
 
+  // ▼ 右下の〇を引っぱって、大きさ（横幅）を変えます。
+  //   2本指で挟んでも変えられますが、それに気づかない人もいるので、目に見える〇も置きます
+  //   （未来への手紙の〇と同じ見た目です）。
+  //   押した瞬間の横幅を覚えておき、指が動いたぶんだけ広げます
+  const resizeRef = useRef<{
+    id: string;
+    startX: number;
+    startY: number;
+    startWidth: number;
+    rotation: number;
+  } | null>(null);
+
+  const handleResizeDown = (event: React.PointerEvent<HTMLButtonElement>, item: CardItem) => {
+    // 外側の「動かす」（bindDrag）に伝えません。伝わると、大きさを変えながら動いてしまいます
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeRef.current = {
+      id: item.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: item.width,
+      rotation: item.rotation ?? 0,
+    };
+  };
+
+  const handleResizeMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const r = resizeRef.current;
+    const rect = cardRef.current?.getBoundingClientRect();
+    if (r === null || !rect) return;
+    // 回っているときは、指の動きを「枠の向き」に直してから使います（右の〇は、枠の右へ引くと広がる）
+    const rad = (r.rotation * Math.PI) / 180;
+    const along = (event.clientX - r.startX) * Math.cos(rad) + (event.clientY - r.startY) * Math.sin(rad);
+    updateItem(r.id, {
+      width: Math.min(0.95, Math.max(0.15, r.startWidth + along / rect.width)),
+    });
+  };
+
+  const handleResizeUp = () => {
+    resizeRef.current = null;
+  };
+
   // ▼ 2本指で挟むと、選んでいるものの大きさと向きが変わります（写真アプリと同じ操作）。
   //   小さい文字でも挟めるよう、カードのどこで挟んでもよいことにしています。
   //   movement = [挟み始めてから何倍に広げたか, 何度回したか]
@@ -412,14 +459,22 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
                     placeholder="ここに文字"
                     // 1つの枠に書けるのは300文字まで（カード1枚に収まる長さ）
                     maxLength={300}
-                    rows={Math.max(1, item.text.split("\n").length)}
-                    onChange={(event) =>
+                    rows={1}
+                    // ▼ 中身の高さに合わせて、入力欄を縦に伸ばします（autoResize）。
+                    //   前は「改行の数」ぶんの高さしかなく、長い文を自動で折り返すと、
+                    //   はみ出た行が見えなくなっていました。
+                    //   枠の幅や文字を変えたときにも合わせ直すよう、描くたびに測ります
+                    ref={(el) => {
+                      if (el !== null) autoResize(el);
+                    }}
+                    onChange={(event) => {
+                      autoResize(event.target);
                       setItems((current) =>
                         current.map((it) =>
                           it.id === item.id ? { ...it, text: event.target.value } : it,
                         ),
-                      )
-                    }
+                      );
+                    }}
                     className="block w-full resize-none overflow-hidden bg-transparent font-bold leading-[1.5] outline-none placeholder:text-current placeholder:opacity-40"
                     style={{ fontSize, color: TEXT_COLORS[background.kind] }}
                   />
@@ -431,6 +486,23 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
                 {/* ▼ 選んでいるものの右上に、消すボタンを出します。
                     見た目は 28px の丸ですが、押せる範囲は 44px あります。
                     押したときに、外側の「動かす」に伝えないようにします */}
+                {/* ▼ 右下の〇。引っぱると大きさが変わります。
+                    見た目は 12px ですが、押せる範囲は 44px あります */}
+                {isSelected ? (
+                  <button
+                    type="button"
+                    aria-label="大きさを変える"
+                    onPointerDown={(event) => handleResizeDown(event, item)}
+                    onPointerMove={handleResizeMove}
+                    onPointerUp={handleResizeUp}
+                    onPointerCancel={handleResizeUp}
+                    className="absolute -bottom-[22px] -right-[22px] z-10 flex h-11 w-11 cursor-nwse-resize items-center justify-center"
+                    style={{ touchAction: "none" }}
+                  >
+                    <span className="h-3 w-3 rounded-full border border-kin bg-white" />
+                  </button>
+                ) : null}
+
                 {isSelected ? (
                   <button
                     type="button"
