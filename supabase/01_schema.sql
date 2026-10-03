@@ -421,8 +421,11 @@ as $$
   select coalesce(auth.jwt() ->> 'email', '') like '%@demo.yukari.invalid';
 $$;
 
--- 手紙の開封日が来ているか（イベントの許可で使います）
-create function public.capsule_is_open(target_capsule uuid)
+-- 自分がその手紙を読めるか（イベントの許可で使います）。
+-- 「capsules readable」の許可と同じ条件です：書いた本人か、開封日を過ぎていて宛先が「全員」か「自分」。
+-- ▼ 前は「開封日が来ているか」だけを見ていました
+--   宛先が特定の人の手紙でも、付いている日程調整とチャットは、コミュニティの全員に見えていました
+create function public.capsule_is_visible(target_capsule uuid)
 returns boolean
 language sql
 stable
@@ -432,7 +435,10 @@ as $$
   select exists (
     select 1 from time_capsules
     where id = target_capsule
-      and open_at <= now()
+      and (
+        author_id = auth.uid()
+        or (open_at <= now() and (to_user is null or to_user = auth.uid()))
+      )
   );
 $$;
 
@@ -992,14 +998,14 @@ create policy "capsules insert"
 
 -- ------------------------------------------------------------
 --  イベント
---  読める：同じコミュニティの人で、手紙が開いたあと。作った人はいつでも
+--  読める：同じコミュニティの人で、その手紙を読める人（開封日を過ぎていて、宛先が全員か自分）。作った人はいつでも
 -- ------------------------------------------------------------
 create policy "events readable"
   on public.events for select
   to authenticated
   using (
     is_member(community_id)
-    and (capsule_is_open(capsule_id) or created_by = auth.uid())
+    and (capsule_is_visible(capsule_id) or created_by = auth.uid())
   );
 
 -- 作れる：自分が書いた手紙に、その手紙と同じコミュニティで
@@ -1195,7 +1201,7 @@ revoke execute on function
   public.is_member(uuid),
   public.shares_community(uuid),
   public.is_demo_guest(),
-  public.capsule_is_open(uuid),
+  public.capsule_is_visible(uuid),
   public.is_own_file(text),
   public.is_allowed_avatar(text),
   public.under_rate_limit(text, integer)
@@ -1209,7 +1215,7 @@ grant execute on function
   public.is_member(uuid),
   public.shares_community(uuid),
   public.is_demo_guest(),
-  public.capsule_is_open(uuid),
+  public.capsule_is_visible(uuid),
   public.is_own_file(text),
   public.is_allowed_avatar(text),
   public.under_rate_limit(text, integer)

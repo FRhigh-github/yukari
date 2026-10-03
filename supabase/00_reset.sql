@@ -79,6 +79,7 @@ cascade;
 -- ------------------------------------------------------------
 drop function if exists
   public.capsule_is_open(uuid),
+  public.capsule_is_visible(uuid),
   public.check_recovery_threshold(),
   public.create_community(text, text),
   public.create_community(text),
