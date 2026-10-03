@@ -9,6 +9,9 @@
 //   環境変数 RESEND_API_KEY と MAIL_FROM（送り主のアドレス）が無ければ、何もせずに false を返します。
 //   メールが送れなくても、アプリの中の知らせ（ホームの上の黄色い帯）は出ます。
 
+// server-only = "use client" の側から読み込むと、ビルドの時点でエラーにする印です（メールの鍵を使うため）
+import "server-only";
+
 type Mail = {
   to: string;
   subject: string;

@@ -24,6 +24,8 @@
 //   （posts・post_reactions・card_sends から取った image_url / drawing_url など）
 //   画面から送られてきた文字をそのまま渡すと、見てはいけない写真のURLまで作れてしまいます。
 
+// server-only = "use client" の側から読み込むと、ビルドの時点でエラーにする印です（service_role の鍵を使うため）
+import "server-only";
 import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 

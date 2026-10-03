@@ -15,6 +15,8 @@
 //
 //   DB に何かを保存する必要がないので、表を増やさずに済みます。
 
+// server-only = "use client" の側から読み込むと、ビルドの時点でエラーにする印です（署名の鍵を使うため）
+import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 // 署名に使う鍵。
