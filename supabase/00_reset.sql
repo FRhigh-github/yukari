@@ -59,6 +59,8 @@ drop table if exists
   public.time_capsules,
   public.interactions,
   public.reports,
+  public.push_subscriptions,
+  public.push_log,
   public.blocks,
   public.join_attempts,
   public.recovery_attempts,

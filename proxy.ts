@@ -23,6 +23,8 @@ const PUBLIC_PATHS = [
   "/recover",
   "/auth/callback",
   "/api/recovery",
+  // 1日1回、Vercel が自動で呼ぶ処理。中で CRON_SECRET を確かめます（app/api/cron/daily）
+  "/api/cron",
 ];
 
 const isPublic = (path: string) =>

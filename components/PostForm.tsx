@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import type { Community } from "@/components/CommunitySwitcher";
 import ReportPostcard from "@/components/ReportPostcard";
+import { requestNotify } from "@/lib/notify";
 
 type PostFormProps = {
   communities: Community[];
@@ -91,7 +92,10 @@ export default function PostForm({ communities, initialCommunityId }: PostFormPr
 
       if (upload.error) throw new Error(upload.error.message);
 
+      // id はこちらで決めます。書いたあと、通知を頼むときに使うためです
+      const postId = crypto.randomUUID();
       const { error: insertError } = await supabase.from("posts").insert({
+        id: postId,
         title: title.trim(),
         body,
         image_url: upload.data.path,
@@ -100,6 +104,9 @@ export default function PostForm({ communities, initialCommunityId }: PostFormPr
       });
 
       if (insertError) throw new Error(insertError.message);
+
+      // コミュニティのみんなのスマホに知らせます（lib/notify.ts。待たずに頼むだけ）
+      requestNotify("post", postId);
 
       // 投稿したコミュニティのホームへ戻ります（?c= が無いと、一番上のコミュニティが出るため）。
       // refresh() が無いと、ホームに戻っても さっきの投稿が出ないことがあります

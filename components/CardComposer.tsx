@@ -19,6 +19,7 @@ import CardTemplate, {
   CARD_KINDS,
   type CardKind,
 } from "@/components/CardTemplate";
+import { requestNotify } from "@/lib/notify";
 
 export type Recipient = {
   userId: string;
@@ -216,7 +217,10 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
         item.type === "image" ? { ...item, src: "" } : item,
       );
 
+      // id はこちらで決めます。送ったあと、通知を頼むときに使うためです
+      const cardId = crypto.randomUUID();
       const { error: insertError } = await supabase.from("card_sends").insert({
+        id: cardId,
         template_id: template?.id ?? null,
         from_user: data.user.id,
         to_user: toUser,
@@ -226,6 +230,9 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
       });
 
       if (insertError) throw new Error(insertError.message);
+
+      // 受け取った人のスマホに知らせます（lib/notify.ts。待たずに頼むだけ）
+      requestNotify("card", cardId);
 
       router.push("/cards/inbox");
       router.refresh();

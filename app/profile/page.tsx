@@ -12,6 +12,7 @@ import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
 import LogoutButton from "@/components/LogoutButton";
 import DeleteAccountButton from "@/components/DeleteAccountButton";
+import PushToggle from "@/components/PushToggle";
 import { getSignedUrls } from "@/lib/signedUrls";
 // バージョンの番号は package.json の1か所だけで管理します（CHANGELOG.md も合わせて書く）。
 // この画面はサーバーで作るので、package.json がブラウザに配られることはありません
@@ -89,6 +90,11 @@ export default async function ProfilePage() {
           })) ?? []
         }
       />
+
+      {/* スマホに通知を受け取る（受け取れない端末では出ません） */}
+      <div className="px-4 pt-10">
+        <PushToggle />
+      </div>
 
       {/* ログアウト。いちばん下の、押し間違えにくい場所に置きます */}
       <div className="px-4 pt-10">

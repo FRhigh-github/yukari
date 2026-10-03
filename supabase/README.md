@@ -49,6 +49,7 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `2026-10-04_13_delete_own_items.sql` | |
 | `2026-10-04_14_owner_handover.sql` | |
 | `2026-10-04_15_regenerate_invite_code.sql` | |
+| `2026-10-04_16_push_notifications.sql` | |
 
 ## 新しく作り直す手順
 
@@ -151,6 +152,10 @@ Authentication → URL Configuration → Redirect URLs
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 両方 | 公開してよい（RLS が守る） |
 | `SUPABASE_SERVICE_ROLE_KEY` | 両方 | **絶対に出さない**。RLS を無視できる |
 | `RECOVERY_SECRET` | 両方 | **出さない**。思い出ログインの引換券の署名に使う、32文字以上のでたらめな文字。無いと思い出ログインが動かない（`lib/recoveryTicket.ts`）。作り方：`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | 両方 | スマホへの通知の公開鍵（公開してよい）。`VAPID_PRIVATE_KEY` と組で作る。作り方：`npx web-push generate-vapid-keys` |
+| `VAPID_PRIVATE_KEY` | 両方 | **出さない**。スマホへの通知の署名に使う秘密の鍵 |
+| `VAPID_SUBJECT` | 両方 | 通知サーバーに伝える連絡先。`mailto:運営の連絡用アドレス` か、アプリの https の URL |
+| `CRON_SECRET` | Vercel | **出さない**。1日1回の処理（`/api/cron/daily`）を Vercel だけが呼べるようにする合言葉。32文字以上のでたらめな文字 |
 | `RESEND_API_KEY` | Vercel | メールを送るサービス（Resend）の鍵。思い出ログインの申請を本人にメールで知らせる。無ければメールは送らない（`lib/mail.ts`） |
 | `MAIL_FROM` | Vercel | メールの送り主。例：`ゆかり <noreply@あなたのドメイン>`。Resend で確認したドメインのアドレス |
 

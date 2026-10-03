@@ -338,6 +338,32 @@ create table public.blocks (
 alter table public.blocks enable row level security;
 
 -- ------------------------------------------------------------
+--  スマホへの通知（プッシュ通知）
+--  push_subscriptions … 通知を受け取る端末の宛先。1台につき1行。本人だけが読める・足せる・消せる
+--  push_log           … もう通知を送ったもの（同じご報告やカードで、二度送らないため）。
+--                       サーバー（service_role）だけが書きます
+-- ------------------------------------------------------------
+create table public.push_subscriptions (
+  -- ブラウザが決める、その端末の宛先 URL
+  endpoint text primary key,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  -- 中身を暗号化するための鍵（ブラウザがくれます）
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+alter table public.push_subscriptions enable row level security;
+
+create table public.push_log (
+  -- 'post' / 'card' / 'reaction' / 'letter'
+  kind text not null,
+  ref_id uuid not null,
+  sent_at timestamptz not null default now(),
+  primary key (kind, ref_id)
+);
+alter table public.push_log enable row level security;
+
+-- ------------------------------------------------------------
 --  回数制限のための記録（under_rate_limit で数えます）
 --  join_attempts     … 招待コードで参加しようとした記録（当たり外れに関係なく1回ずつ）
 --  recovery_attempts … 思い出ログインのコードを試した記録。まだログインしていない人なので、
@@ -396,6 +422,9 @@ create index post_reactions_from_user_created_at_idx on public.post_reactions (f
 create index messages_user_id_created_at_idx on public.messages (user_id, created_at desc);
 create index join_attempts_user_id_attempted_at_idx on public.join_attempts (user_id, attempted_at desc);
 create index recovery_attempts_ip_attempted_at_idx on public.recovery_attempts (ip, attempted_at desc);
+
+-- 通知を送るとき、その人の端末をまとめて引くため
+create index push_subscriptions_user_id_idx on public.push_subscriptions (user_id);
 
 -- 作成者が、自分のコミュニティの報告を新しい順に見るため
 create index reports_community_id_created_at_idx on public.reports (community_id, created_at desc);
@@ -1317,6 +1346,30 @@ create policy "interactions visible"
   on public.interactions for select
   to authenticated
   using (user_a = auth.uid() or user_b = auth.uid());
+
+-- ------------------------------------------------------------
+--  スマホへの通知の宛先：自分の端末の分だけ
+-- ------------------------------------------------------------
+create policy "push subscriptions own"
+  on public.push_subscriptions for select
+  to authenticated
+  using (user_id = auth.uid());
+
+create policy "push subscriptions insert own"
+  on public.push_subscriptions for insert
+  to authenticated
+  with check (user_id = auth.uid());
+
+create policy "push subscriptions update own"
+  on public.push_subscriptions for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+create policy "push subscriptions delete own"
+  on public.push_subscriptions for delete
+  to authenticated
+  using (user_id = auth.uid());
 
 -- ------------------------------------------------------------
 --  報告とブロック
