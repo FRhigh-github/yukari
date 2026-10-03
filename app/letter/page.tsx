@@ -22,283 +22,49 @@ import { useEffect, useRef, useState } from "react";
 // 指の動き(ドラッグ・2本指のピンチ)を見分けてくれるライブラリ
 import { useDrag, usePinch } from "@use-gesture/react";
 // PointerEvent … 指やマウスで押した・動かしたときの情報の型
-// ReactNode … 「画面に表示できるもの(文字やアイコンなど)」の型
-import type { PointerEvent, ReactNode } from "react";
+import type { PointerEvent } from "react";
 // Supabase(データベース)とつながる窓口を作る関数(手書き機能と同じもの)
 import { createClient } from "@/lib/supabase/client";
 import HorizontalScroller from "@/components/HorizontalScroller";
 import { shrinkImage } from "@/lib/image";
 // 回した角度を、まっすぐの近くでぴたっと止める計算(カード作りと共通)
 import { snapRotation } from "@/lib/rotation";
-// 選べるフォントのうち、Google Fonts から読み込むもの
-import { WEB_FONTS } from "./fonts";
 import { removeOwnUpload } from "@/lib/removeOwnUpload";
-
-// =====================================================
-// 保存に使う設定
-// =====================================================
-
-// 画像を保存する Storage のバケット名(手書き機能と同じ場所)
-const BUCKET = "drawings";
-
-// 開封日の年を、今年から何年先まで選べるようにするか
-const MAX_YEARS_AHEAD = 30;
-
-// 開封日の select の見た目(年・月・日の3つで共通)
-const DATE_SELECT = "h-12 rounded-lg bg-[#fdfbf5] px-3 text-[17px] shadow-sm ring-1 ring-kin/40";
-
-// 封筒を上に何px以上スワイプしたら「送る」とみなすか
-const SWIPE_SEND_DISTANCE = 120;
-
-// =====================================================
-// 見た目の設定(画面と PNG 画像で同じ値を使います)
-// =====================================================
-
-const PAPER_COLOR = "#fdfbf5"; // 紙の色
-const TEXT_COLOR = "#292524"; // 文字の色(Tailwind の stone-800)
-const LINK_COLOR = "#44403c"; // URL の文字の色(Tailwind の stone-700)
-const ITEM_WIDTH = 208; // 置いたものの最初の横幅(Tailwind の w-52 = 208px)
-const ITEM_PADDING = 8; // 置いたものの内側の余白(Tailwind の p-2 = 8px)
-
-// ===== 文字の見た目の選択肢 =====
-
-// 文字の大きさ(px)。四つ角を引っぱって、この間で変えられます。
-// 最初は 14px(これまでの大きさ)。10px より小さいと読めないので、そこを下限にしています
-const FONT_SIZE_MIN = 10;
-const FONT_SIZE_MAX = 72;
-
-// フォント。
-// 最初の3つは、iPhone に最初から入っているもの(無い端末では、後ろに書いたものが代わりに使われます)。
-// そのあとは Google Fonts から読み込むもので、どの端末でも同じ見た目になります(fonts.ts)
-const FONTS = [
-  { key: "gothic", label: "ゴシック", family: `"Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif` },
-  { key: "mincho", label: "明朝", family: `"Hiragino Mincho ProN", "Yu Mincho", serif` },
-  { key: "maru", label: "丸文字", family: `"Hiragino Maru Gothic ProN", "Zen Maru Gothic", sans-serif` },
-  ...WEB_FONTS,
-];
-
-// 文字の色。日本の伝統色の名前をつけて、色の並び(黒→赤→黄→緑→青→紫→茶)にしています。
-// 紅と金は、アプリの水引の色(globals.css)と同じです
-const COLORS = [
-  { label: "墨", value: TEXT_COLOR },
-  { label: "鼠", value: "#78716c" },
-  { label: "白", value: "#ffffff" },
-  { label: "紅", value: "#b7282e" },
-  { label: "朱", value: "#d9482b" },
-  { label: "桜", value: "#e89aae" },
-  { label: "橙", value: "#ea8a2e" },
-  { label: "山吹", value: "#f0b323" },
-  { label: "金", value: "#c2a14d" },
-  { label: "若草", value: "#8fb04a" },
-  { label: "緑", value: "#3f6212" },
-  { label: "浅葱", value: "#2a9fb0" },
-  { label: "空", value: "#6fa8dc" },
-  { label: "藍", value: "#1e3a8a" },
-  { label: "藤", value: "#9b86c2" },
-  { label: "紫", value: "#6b3fa0" },
-  { label: "茶", value: "#7b4a2a" },
-];
-
-// 写真の横幅(px)の、いちばん小さい / 大きい値
-const PHOTO_MIN_WIDTH = 80;
-const PHOTO_MAX_WIDTH = 360;
-
-// 写真の高さ(px)の、いちばん小さい / 大きい値(上下の〇で変えるとき)
-const PHOTO_MIN_HEIGHT = 40;
-const PHOTO_MAX_HEIGHT = 600;
-
-// テキスト・URL の横幅(px)の、いちばん小さい / 大きい値。
-// 横幅を広げると、そのぶん1行に入る文字が増えて、改行の位置が変わります
-const TEXT_MIN_WIDTH = 60;
-const TEXT_MAX_WIDTH = 360;
-
-// 1行の高さ。文字の大きさに合わせて伸ばします(14px のとき、これまでと同じ 24px)
-function lineHeightOf(fontSize: number) {
-  return Math.round((fontSize * 12) / 7);
-}
-
-// フォントの名前(key)から、実際に使う書体の指定を取り出します
-function fontFamilyOf(key: string) {
-  return FONTS.find((f) => f.key === key)?.family ?? FONTS[0].family;
-}
-
-// =====================================================
-// 型(データの形)の決まりごと
-// =====================================================
-
-// 紙の上に置けるものの種類。3種類のどれかしか入りません。
-type ItemType = "text" | "photo" | "url";
-
-// 紙の上に置く「1つ分」のデータの形です。
-// C言語の struct(構造体)とほぼ同じ考え方です。
-type Item = {
-  id: number; // 見分けるための番号
-  type: ItemType; // 種類
-  x: number; // 紙の左端からの距離(px)
-  y: number; // 紙の上端からの距離(px)
-  text: string; // テキストの文字
-  imageSrc: string; // 写真の画像
-  url: string; // URL
-  width: number; // 横幅(px)
-  // 写真の高さ(px)。null のときは、元の写真の比率のままの高さです。
-  // 左右や上下の〇で形を変えると、ここに数が入ります
-  photoHeight: number | null;
-  // テキスト・URL の枠の高さ(px)。null のときは、中身の行数ぴったりの高さです。
-  // 上下の〇で広げると、ここに数が入ります(中身より低くはなりません)
-  boxHeight: number | null;
-  rotation: number; // 回した角度(度)。時計回りがプラス
-  fontSize: number; // 文字の大きさ(px)。テキストと URL で使います
-  fontKey: string; // フォントの名前(FONTS の key)
-  color: string; // 文字の色
-};
-
-// イベント(日程調整)のデータの形です。紙の上のものとは別に覚えておきます。
-type EventPlan = {
-  name: string; // イベント名(events.name に入れる)
-  dates: string[]; // 候補日の一覧(event_date_options.event_date に入れる)
-};
-
-// 入力中の候補日1行ぶん。
-//   end が "" … その日1日だけ
-//   end が入っている … start から end までの「期間」。保存するときに1日ずつに分けます
-//   (DB の候補日は1日ずつの形なので、期間のまま入れる場所がないためです)
-type DateRow = { start: string; end: string; isRange: boolean };
-
-// 入力中のイベント。候補日だけ、期間を入れられる形で持ちます
-type EventDraft = { name: string; rows: DateRow[] };
-
-// 期間を1日ずつの一覧にします。長すぎる期間で候補日が何百個もできないよう、62日で止めます
-const MAX_RANGE_DAYS = 62;
-function expandRow(row: DateRow): string[] {
-  if (row.start === "") return [];
-  if (!row.isRange || row.end === "" || row.end <= row.start) return [row.start];
-  const days: string[] = [];
-  const day = new Date(`${row.start}T00:00:00`);
-  const last = new Date(`${row.end}T00:00:00`);
-  while (day <= last && days.length < MAX_RANGE_DAYS) {
-    // "sv-SE" = "2030-04-01" の形の文字にする書き方です
-    days.push(day.toLocaleDateString("sv-SE"));
-    day.setDate(day.getDate() + 1);
-  }
-  return days;
-}
-
-// 枠についている〇(引っぱる所)の場所。
-//   四つ角 … "tl" = 左上、"tr" = 右上、"bl" = 左下、"br" = 右下
-//   辺の中点 … "t" = 上、"b" = 下、"l" = 左、"r" = 右
-type Handle = "tl" | "tr" | "bl" | "br" | "t" | "b" | "l" | "r";
-
-// 〇の一覧です。
-//   position … 置く位置。44px の当たり判定の真ん中が、枠の角や辺の中点に来るようにずらしています
-//   cursor   … PC で〇の上にのせたときのマウスの形(↔ や ↕ のやじるしになります)
-// 辺の中点を後ろに書いているのは、小さい文字で〇どうしが重なったとき、
-// 中点のほうを上にして、つかめるようにするためです
-const HANDLES: { handle: Handle; position: string; cursor: string }[] = [
-  { handle: "tl", position: "-left-[22px] -top-[22px]", cursor: "cursor-nwse-resize" },
-  { handle: "tr", position: "-right-[22px] -top-[22px]", cursor: "cursor-nesw-resize" },
-  { handle: "bl", position: "-bottom-[22px] -left-[22px]", cursor: "cursor-nesw-resize" },
-  { handle: "br", position: "-bottom-[22px] -right-[22px]", cursor: "cursor-nwse-resize" },
-  { handle: "t", position: "-top-[22px] left-1/2 -translate-x-1/2", cursor: "cursor-ns-resize" },
-  { handle: "b", position: "-bottom-[22px] left-1/2 -translate-x-1/2", cursor: "cursor-ns-resize" },
-  { handle: "l", position: "-left-[22px] top-1/2 -translate-y-1/2", cursor: "cursor-ew-resize" },
-  { handle: "r", position: "-right-[22px] top-1/2 -translate-y-1/2", cursor: "cursor-ew-resize" },
-];
-
-// 新しく1つ作る関数です。
-function createItem(id: number, type: ItemType, x: number, y: number): Item {
-  return {
-    id,
-    type,
-    x,
-    y,
-    text: "",
-    imageSrc: "",
-    url: "",
-    width: ITEM_WIDTH,
-    photoHeight: null,
-    boxHeight: null,
-    rotation: 0,
-    fontSize: 14,
-    fontKey: "gothic",
-    // URL は、これまでどおり少しだけ薄い色から始めます
-    color: type === "url" ? LINK_COLOR : TEXT_COLOR,
-  };
-}
-
-// ===== アイコン =====
-// ※ コピーで行が消えないように、1つのアイコンを1行で書いています
-
-// 写真のアイコン
-const ImageIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5-8 8" /></svg>;
-
-// リンクのアイコン
-const LinkIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" /><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" /></svg>;
-
-// カレンダーのアイコン(イベント用)
-const CalendarIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18" /><path d="M8 3v4" /><path d="M16 3v4" /></svg>;
-
-// 紙飛行機のアイコン(「未来へ送る」ボタン用)
-const SendIcon = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" className="h-5 w-5"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>;
-
-// 紙の右上に並べる、黒い丸ボタンの一覧(上から順番に表示されます)
-const TOOLS: { type: ItemType | "event"; label: string; icon: ReactNode }[] = [
-  { type: "text", label: "テキスト", icon: <span className="font-serif text-xl font-bold">T</span> },
-  { type: "photo", label: "写真", icon: ImageIcon },
-  { type: "url", label: "URL", icon: LinkIcon },
-  { type: "event", label: "イベント", icon: CalendarIcon },
-];
-
-// テキスト入力欄の高さを、中身の行数に合わせて伸び縮みさせる関数です
-function autoResize(el: HTMLTextAreaElement) {
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
-}
-
-// =====================================================
-// PNG 画像を作るための道具
-// =====================================================
-
-// 文字を、決めた横幅で折り返して「行の配列」にする関数です
-// ctx.measureText(...).width は「その文字を描いたときの横幅(px)」を返します
-// 日本語は単語の区切り(スペース)がないので、1文字ずつ足していき、
-// はみ出したところで次の行に送ります
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number
-): string[] {
-  const lines: string[] = [];
-
-  // まず改行(\n)で段落に分けます
-  for (const paragraph of text.split("\n")) {
-    // for (const ch of 文字列) は、文字列を1文字ずつ取り出すくり返しです
-    // (C言語の for (i = 0; s[i] != '\0'; i++) に近いものです)
-    let line = "";
-    for (const ch of paragraph) {
-      if (line !== "" && ctx.measureText(line + ch).width > maxWidth) {
-        lines.push(line); // はみ出すので、ここまでを1行にする
-        line = ch; // 次の行は、この文字から始める
-      } else {
-        line += ch;
-      }
-    }
-    lines.push(line); // 段落の最後の行
-  }
-  return lines;
-}
-
-// 文字が横幅に入りきらないとき、後ろを「…」にして縮める関数です
-function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
-  if (ctx.measureText(text).width <= maxWidth) {
-    return text;
-  }
-  let t = text;
-  // .slice(0, -1) は「最後の1文字を取った文字列」です
-  while (t.length > 0 && ctx.measureText(t + "…").width > maxWidth) {
-    t = t.slice(0, -1);
-  }
-  return t + "…";
-}
+// 日程調整を作るパネル（このファイルが長くなりすぎたので分けました）
+import EventPanel from "./EventPanel";
+// 決まりごと・型・アイコン・画像を作る道具（このファイルが長くなりすぎたので分けました）
+import {
+  BUCKET,
+  MAX_YEARS_AHEAD,
+  DATE_SELECT,
+  SWIPE_SEND_DISTANCE,
+  PAPER_COLOR,
+  ITEM_PADDING,
+  FONT_SIZE_MIN,
+  FONT_SIZE_MAX,
+  FONTS,
+  COLORS,
+  PHOTO_MIN_WIDTH,
+  PHOTO_MAX_WIDTH,
+  PHOTO_MIN_HEIGHT,
+  PHOTO_MAX_HEIGHT,
+  TEXT_MIN_WIDTH,
+  TEXT_MAX_WIDTH,
+  lineHeightOf,
+  fontFamilyOf,
+  HANDLES,
+  createItem,
+  LinkIcon,
+  SendIcon,
+  TOOLS,
+  autoResize,
+  wrapText,
+  fitText,
+  type ItemType,
+  type Item,
+  type EventPlan,
+  type Handle,
+} from "./letterParts";
 
 // =====================================================
 // ページ本体
@@ -313,8 +79,8 @@ export default function LetterPage() {
   // 決定済みのイベント(まだ作っていないときは null)
   const [eventPlan, setEventPlan] = useState<EventPlan | null>(null);
 
-  // パネルで入力中のイベント(パネルを閉じているときは null)
-  const [draft, setDraft] = useState<EventDraft | null>(null);
+  // イベントのパネルを開いているか(入力中の内容は、パネルの中で持ちます。./EventPanel.tsx)
+  const [isEventPanelOpen, setIsEventPanelOpen] = useState(false);
 
   // ===== 開封日(何年何月何日の私たちへ) =====
   // 封筒の画面で、年・月・日を1つずつ選びます。最初は空(""＝未入力)。
@@ -434,63 +200,10 @@ export default function LetterPage() {
   // =====================================================
 
   // ----- パネルを開く -----
+  // (入力中の内容と、決定・削除の処理は ./EventPanel.tsx にあります)
   function openEventPanel() {
     setSelectedId(null);
-    if (eventPlan === null) {
-      setDraft({ name: "", rows: [{ start: "", end: "", isRange: false }] });
-    } else {
-      // 決めたあとの候補日は1日ずつになっているので、1日ずつの行に戻して開きます
-      setDraft({
-        name: eventPlan.name,
-        rows: eventPlan.dates.map((d) => ({ start: d, end: "", isRange: false })),
-      });
-    }
-  }
-
-  // ----- 候補日の行を1つだけ書き換える -----
-  function updateRow(index: number, changes: Partial<DateRow>) {
-    if (draft === null) return;
-    setDraft({
-      ...draft,
-      rows: draft.rows.map((row, i) => (i === index ? { ...row, ...changes } : row)),
-    });
-  }
-
-  // ----- パネルを閉じる(キャンセル) -----
-  function closeEventPanel() {
-    setDraft(null);
-  }
-
-  // 入力済みの候補日だけを取り出します(空の入力欄は除く)
-  // (期間の行は、1日ずつに分けてから数えます)
-  const filledDates = draft === null ? [] : draft.rows.flatMap(expandRow);
-
-  // 同じ日が2回入っていないかを調べます
-  const hasDuplicate = new Set(filledDates).size !== filledDates.length;
-
-  // 「決定」を押してよいかどうか
-  const canSaveEvent =
-    draft !== null &&
-    draft.name.trim() !== "" &&
-    filledDates.length > 0 &&
-    !hasDuplicate;
-
-  // ----- 決定する -----
-  function saveEvent() {
-    if (draft === null || !canSaveEvent) {
-      return;
-    }
-    setEventPlan({
-      name: draft.name.trim(),
-      dates: [...filledDates].sort(),
-    });
-    setDraft(null);
-  }
-
-  // ----- イベントを削除する -----
-  function removeEvent() {
-    setEventPlan(null);
-    setDraft(null);
+    setIsEventPanelOpen(true);
   }
 
   // =====================================================
@@ -1722,139 +1435,21 @@ export default function LetterPage() {
       )}
 
       {/* ===================================================== */}
-      {/* イベントのパネル(draft が null でないときだけ表示) */}
+      {/* イベントのパネル(開いているときだけ表示。中身は ./EventPanel.tsx) */}
       {/* ===================================================== */}
-      {draft !== null && (
-        <div
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              closeEventPanel();
-            }
+      {isEventPanelOpen && (
+        <EventPanel
+          plan={eventPlan}
+          onSave={(plan) => {
+            setEventPlan(plan);
+            setIsEventPanelOpen(false);
           }}
-          // absolute = アプリの枠(スマホ幅)の中だけに重ねます。前は fixed で、PC では画面全体を覆っていました。
-          // z-50 = 下タブ(z-40)より手前。前は z-10 で、決定ボタンが下タブの裏に隠れていました
-          className="absolute inset-0 z-50 flex items-end justify-center bg-black/30"
-        >
-          <div className="max-h-[80vh] w-full max-w-[430px] overflow-y-auto rounded-t-2xl bg-[#fdfbf5] p-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]">
-            <p className="mb-4 flex items-center gap-2 font-bold">
-              {CalendarIcon}
-              イベントを企画する
-            </p>
-
-            {/* イベント名 */}
-            <label className="mb-1 block text-xs text-stone-500">イベント名</label>
-            <input
-              type="text"
-              value={draft.name}
-              autoFocus
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              placeholder="例：飲み会"
-              className="mb-4 w-full border-b border-stone-300 bg-transparent py-1 outline-none placeholder:text-stone-300"
-            />
-
-            {/* 候補日 */}
-            <p className="mb-1 text-xs text-stone-500">イベント候補日</p>
-            {draft.rows.map((row, index) => (
-              <div key={index} className="mb-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={row.start}
-                    onChange={(e) => updateRow(index, { start: e.target.value })}
-                    aria-label="候補日"
-                    className="h-11 min-w-0 flex-1 border-b border-stone-300 bg-transparent text-base outline-none"
-                  />
-                  {/* 期間のときだけ、終わりの日の欄を出します */}
-                  {row.isRange && (
-                    <>
-                      <span className="text-stone-500">〜</span>
-                      <input
-                        type="date"
-                        value={row.end}
-                        min={row.start}
-                        onChange={(e) => updateRow(index, { end: e.target.value })}
-                        aria-label="期間の終わりの日"
-                        className="h-11 min-w-0 flex-1 border-b border-stone-300 bg-transparent text-base outline-none"
-                      />
-                    </>
-                  )}
-                  {draft.rows.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDraft({ ...draft, rows: draft.rows.filter((_, i) => i !== index) })
-                      }
-                      aria-label="この候補日を消す"
-                      className="flex h-11 w-11 shrink-0 items-center justify-center text-xl text-stone-500"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-                {/* 1日 / 期間 の切り替え */}
-                <div className="mt-1 flex gap-1">
-                  {[false, true].map((isRange) => (
-                    <button
-                      key={String(isRange)}
-                      type="button"
-                      onClick={() => updateRow(index, { isRange, end: isRange ? row.end : "" })}
-                      className={`h-9 rounded-full px-3 text-sm ${
-                        row.isRange === isRange
-                          ? "bg-white font-bold text-kin ring-1 ring-kin"
-                          : "text-stone-500"
-                      }`}
-                    >
-                      {isRange ? "期間" : "1日"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            {hasDuplicate && (
-              <p className="mb-2 text-xs text-beni">同じ日が入っています</p>
-            )}
-
-            <button
-              type="button"
-              onClick={() =>
-                setDraft({ ...draft, rows: [...draft.rows, { start: "", end: "", isRange: false }] })
-              }
-              className="mb-6 h-11 rounded-full border border-kin/60 px-4 text-sm text-kin"
-            >
-              ＋ 候補日を追加
-            </button>
-
-            {/* 決定・キャンセル */}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={closeEventPanel}
-                className="h-11 flex-1 rounded-xl border border-stone-300 text-sm text-stone-600"
-              >
-                キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={saveEvent}
-                disabled={!canSaveEvent}
-                className="h-11 flex-1 rounded-xl bg-beni text-sm font-bold text-white disabled:opacity-40"
-              >
-                決定
-              </button>
-            </div>
-
-            {eventPlan !== null && (
-              <button
-                type="button"
-                onClick={removeEvent}
-                className="mt-3 h-11 w-full text-xs text-beni"
-              >
-                イベントを削除
-              </button>
-            )}
-          </div>
-        </div>
+          onRemove={() => {
+            setEventPlan(null);
+            setIsEventPanelOpen(false);
+          }}
+          onClose={() => setIsEventPanelOpen(false)}
+        />
       )}
     </main>
   );
