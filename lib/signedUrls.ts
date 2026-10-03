@@ -26,6 +26,14 @@
 
 // server-only = "use client" の側から読み込むと、ビルドの時点でエラーにする印です（service_role の鍵を使うため）
 import "server-only";
+// ▼ unstable_cache について（2026年10月に、Next.js 16 の説明書きで確かめました）
+//   Next.js 16 では、unstable_cache は「use cache」という書き方に置き換わる予定です。
+//   ただし「use cache」を使うには、アプリ全体の作りを Cache Components という方式に変える必要があり、
+//   画面ごとに読み込み中の区切り（Suspense）を足すなど、変更が大きくなります。
+//   unstable_cache は Next.js 16 でもそのまま動くので、いまはこのままにしています。
+//   移すときは、next.config.ts に cacheComponents: true を足し、signOne を
+//   「"use cache"; cacheLife({ revalidate: REUSE_FOR })」を使う関数に書き換えます
+//   （node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md）
 import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 
