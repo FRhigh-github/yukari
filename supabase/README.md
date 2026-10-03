@@ -58,6 +58,7 @@ DB を変えたら、`npm test` で確かめます（`tests/db/`）。
 | `2026-10-04_17_letter_links.sql` | |
 | `2026-10-04_18_error_reports.sql` | |
 | `2026-10-04_19_app_usage.sql` | |
+| `2026-10-04_20_delete_own_photos.sql` | |
 
 ## 新しく作り直す手順
 

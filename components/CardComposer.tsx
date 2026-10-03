@@ -20,6 +20,7 @@ import CardTemplate, {
   type CardKind,
 } from "@/components/CardTemplate";
 import { requestNotify } from "@/lib/notify";
+import { removeOwnUpload } from "@/lib/removeOwnUpload";
 
 export type Recipient = {
   userId: string;
@@ -229,7 +230,11 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
         drawing_data: layout,
       });
 
-      if (insertError) throw new Error(insertError.message);
+      if (insertError) {
+        // 上げたカードの絵だけが残らないよう、消してから知らせます（lib/removeOwnUpload.ts）
+        await removeOwnUpload("cards", upload.data.path);
+        throw new Error(insertError.message);
+      }
 
       // 受け取った人のスマホに知らせます（lib/notify.ts。待たずに頼むだけ）
       requestNotify("card", cardId);

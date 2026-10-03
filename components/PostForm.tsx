@@ -8,6 +8,7 @@ import { shrinkImage } from "@/lib/image";
 import type { Community } from "@/components/CommunitySwitcher";
 import ReportPostcard from "@/components/ReportPostcard";
 import { requestNotify } from "@/lib/notify";
+import { removeOwnUpload } from "@/lib/removeOwnUpload";
 
 type PostFormProps = {
   communities: Community[];
@@ -103,7 +104,11 @@ export default function PostForm({ communities, initialCommunityId }: PostFormPr
         community_id: communityId,
       });
 
-      if (insertError) throw new Error(insertError.message);
+      if (insertError) {
+        // 上げた写真だけが残らないよう、消してから知らせます（lib/removeOwnUpload.ts）
+        await removeOwnUpload("posts", upload.data.path);
+        throw new Error(insertError.message);
+      }
 
       // コミュニティのみんなのスマホに知らせます（lib/notify.ts。待たずに頼むだけ）
       requestNotify("post", postId);

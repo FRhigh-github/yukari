@@ -32,6 +32,7 @@ import { shrinkImage } from "@/lib/image";
 import { snapRotation } from "@/lib/rotation";
 // 選べるフォントのうち、Google Fonts から読み込むもの
 import { WEB_FONTS } from "./fonts";
+import { removeOwnUpload } from "@/lib/removeOwnUpload";
 
 // =====================================================
 // 保存に使う設定
@@ -1006,6 +1007,8 @@ export default function LetterPage() {
         open_at: openAt.toISOString(),
       });
       if (capsuleResult.error !== null) {
+        // 上げた紙の絵だけが残らないよう、消してから知らせます（lib/removeOwnUpload.ts）
+        await removeOwnUpload("drawings", path);
         throw new Error("手紙の保存: " + capsuleResult.error.message);
       }
 

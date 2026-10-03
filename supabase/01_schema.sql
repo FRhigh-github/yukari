@@ -1699,7 +1699,7 @@ create policy "community icon delete"
     )
   );
 
--- 写真・お祝い・手紙・カード：「<自分の id>/<ファイル名>」に置く、自分が置いたものを読む、だけ。
+-- 写真・お祝い・手紙・カード：「<自分の id>/<ファイル名>」に置く、自分が置いたものを読む・消す、だけ。
 -- 他人のものを読む・上書きする・消すは、誰にも許しません
 -- （見せるときは、サーバーが RLS を通して取った場所にだけ期限付きURLを作ります）
 create policy "photos upload own folder"
@@ -1713,6 +1713,16 @@ create policy "photos upload own folder"
 
 create policy "photos read own folder"
   on storage.objects for select
+  to authenticated
+  using (
+    bucket_id in ('posts', 'drawings', 'cards')
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- 消す：自分のフォルダのものだけ。
+-- 写真を上げたあとに DB への書き込みが失敗したとき、上げた写真を残さないように、画面から消します
+create policy "photos delete own folder"
+  on storage.objects for delete
   to authenticated
   using (
     bucket_id in ('posts', 'drawings', 'cards')
