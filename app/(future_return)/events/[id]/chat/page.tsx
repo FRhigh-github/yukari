@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useState, useRef, Fragment } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isUuid } from "@/lib/isUuid";
 
 type Message = {
   id: string;
@@ -51,7 +52,7 @@ export default function EventChatPage() {
 
   // メッセージ取得用関数
   const fetchMessages = async (myId: string | null) => {
-    if (!rawId) return;
+    if (!isUuid(rawId)) return;
 
     const { data: msgData, error } = await supabase
       .from("messages")
@@ -176,7 +177,9 @@ export default function EventChatPage() {
   });
 
   useEffect(() => {
-    if (!rawId) return;
+    // id の形でなければ、問い合わせも購読もしません（lib/isUuid.ts）。
+    // リアルタイムの絞り込み（filter）の文字にも埋め込むためです
+    if (!isUuid(rawId)) return;
 
     // supabase の窓口は、ブラウザでは1つを使い回す作りなので、ここで呼んでも上の supabase と同じものです。
     // （上の supabase をそのまま使うと、useEffect の依存に入れる必要が出てくるため、ここで受け取り直しています）
@@ -220,7 +223,7 @@ export default function EventChatPage() {
   // メッセージ送信処理
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || !rawId) return;
+    if (!inputText.trim() || !isUuid(rawId)) return;
 
     const {
       data: { user },

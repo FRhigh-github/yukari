@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isUuid } from "@/lib/isUuid";
 
 type DateOption = {
   id: string;
@@ -104,7 +105,11 @@ export default function EventDetailPage() {
   const supabase = createClient();
 
   const fetchEventData = async () => {
-    if (!rawId) return;
+    // id の形でなければ、問い合わせずに「見つからない」にします（lib/isUuid.ts）
+    if (!isUuid(rawId)) {
+      setLoading(false);
+      return;
+    }
     // (前はここで setLoading(true) にしていましたが、保存のあとに取り直すたびに
     //  画面が一瞬まっさらになっていたので外しました。最初の読み込み中は、はじめから true です)
 
