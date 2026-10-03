@@ -68,7 +68,9 @@ create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null default '名前未設定'
     check (char_length(trim(display_name)) between 1 and 40),
-  birthday date,
+  -- 誕生日。使うのは月と日だけなので、年はいつも2000年にします（components/BirthdayPicker.tsx）。
+  -- 生まれ年は人に知られたくない情報なので、DB にも本当の年を持たないようにしています
+  birthday date check (extract(year from birthday) = 2000),
   avatar_url text,
   -- 今の気持ち。want_to_meet = 会いたい！ / busy = 多忙です / null = なし
   mood text check (mood in ('want_to_meet', 'busy')),

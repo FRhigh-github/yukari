@@ -43,6 +43,7 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `2026-10-04_07_bucket_limits.sql` | |
 | `2026-10-04_08_private_letter_events.sql` | |
 | `2026-10-04_09_text_length_limits.sql` | |
+| `2026-10-04_10_birthday_without_year.sql` | |
 
 ## 新しく作り直す手順
 
