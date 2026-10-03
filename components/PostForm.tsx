@@ -217,6 +217,8 @@ export default function PostForm({ communities, initialCommunityId }: PostFormPr
         />
 
         <textarea
+          // 本文は2,000文字まで（DB の上限と同じ。supabase/01_schema.sql の posts）
+          maxLength={2000}
           placeholder="本文を入力"
           value={body}
           onChange={(event) => setBody(event.target.value)}

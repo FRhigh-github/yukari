@@ -504,6 +504,8 @@ export default function EventDetailPage() {
             <input
               type="text"
               value={myComment}
+              // ひとことは200文字まで（DB の上限と同じ。supabase/01_schema.sql の event_responses）
+              maxLength={200}
               onChange={(e) => setMyComment(e.target.value)}
               placeholder="ひとこと"
               className="h-12 w-full rounded-xl border border-kin/40 bg-white px-4 text-base focus:border-kin focus:outline-none"

@@ -398,6 +398,8 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
                     value={item.text}
                     readOnly={!isSelected}
                     placeholder="ここに文字"
+                    // 1つの枠に書けるのは300文字まで（カード1枚に収まる長さ）
+                    maxLength={300}
                     rows={Math.max(1, item.text.split("\n").length)}
                     onChange={(event) =>
                       setItems((current) =>

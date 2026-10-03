@@ -1138,6 +1138,8 @@ export default function LetterPage() {
       return (
         <textarea
           rows={1}
+          // 1つの枠に書けるのは1,000文字まで（手紙ぜんたいは DB で10,000文字まで）
+          maxLength={1000}
           value={item.text}
           // 文字の大きさを変えたときにも、高さを合わせ直すためです
           // (onChange だけだと、文字を打ったときにしか高さが変わりません)

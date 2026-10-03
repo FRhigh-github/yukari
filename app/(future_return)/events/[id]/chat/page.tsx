@@ -377,6 +377,8 @@ export default function EventChatPage() {
         <input
           type="text"
           value={inputText}
+          // 1回に送れるのは1,000文字まで（DB の上限と同じ。supabase/01_schema.sql の messages）
+          maxLength={1000}
           onChange={(e) => setInputText(e.target.value)}
           placeholder="メッセージ"
           className="h-11 min-w-0 flex-1 rounded-full bg-[#faf9f6] px-4 text-base ring-1 ring-kin/30 focus:outline-none focus:ring-kin"

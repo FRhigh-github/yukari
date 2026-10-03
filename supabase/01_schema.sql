@@ -111,7 +111,8 @@ create table public.posts (
   author_id uuid not null references public.profiles (id) on delete cascade,
   community_id uuid not null references public.communities (id) on delete cascade,
   title text not null check (char_length(trim(title)) between 1 and 100),
-  body text,
+  -- 本文は2,000文字まで（はがき1枚に収まる長さ。画面の入力欄も同じ上限です）
+  body text check (char_length(body) <= 2000),
   -- 保管庫（posts バケット）の場所。http で始まるものと / で始まるものは、
   -- ダミーデータ用の画像のURLとして、そのまま表示します（lib/signedUrls.ts）
   image_url text not null,
@@ -160,8 +161,9 @@ create table public.card_sends (
   community_id uuid not null references public.communities (id) on delete cascade,
   -- 保管庫（cards バケット）の場所。カードを1枚の絵にしたもの
   drawing_url text,
-  -- カードに置いた文字や写真の並び（作り直すときのための記録）
-  drawing_data jsonb,
+  -- カードに置いた文字や写真の並び（作り直すときのための記録）。
+  -- 写真の中身は外して入れるので、ふつうは数KBです。100KB までにします
+  drawing_data jsonb check (pg_column_size(drawing_data) <= 102400),
   sent_at timestamptz not null default now(),
   check (from_user <> to_user)
 );
@@ -178,7 +180,8 @@ create table public.time_capsules (
   author_id uuid not null references public.profiles (id) on delete cascade,
   -- 宛先。null = コミュニティ全員へ
   to_user uuid references public.profiles (id) on delete cascade,
-  body text,
+  -- 手紙に書いた文字（紙の上の文字をつなげたもの）。10,000文字まで
+  body text check (char_length(body) <= 10000),
   -- 保管庫（drawings バケット）の場所。手紙の紙を1枚の絵にしたもの
   image_url text,
   sealed_at timestamptz not null default now(),
@@ -228,7 +231,8 @@ create table public.event_responses (
   option_id uuid not null references public.event_date_options (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,
   answer public.attendance,
-  comment text not null default '',
+  -- ひとこと。200文字まで（画面の入力欄も同じ上限です）
+  comment text not null default '' check (char_length(comment) <= 200),
   responded_at timestamptz not null default now(),
   primary key (option_id, user_id)
 );
