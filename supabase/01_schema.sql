@@ -811,6 +811,40 @@ begin
 end;
 $$;
 
+-- 誰かがコミュニティを抜けたとき（自分で抜けた・外された・退会した）の後片づけです。
+--   ・作成者（owner）がいなくなったら、いちばん前から入っている人を作成者にします
+--     （作成者がいないと、メンバーを外す・報告を読む人がいなくなるため）
+--   ・最後の1人が抜けたら、コミュニティを消します（誰も見られないものが残り続けないように）
+-- if を使わずに、where の条件に合ったときだけ書き換える形にしています（このファイルの先頭を参照）
+create function public.handle_member_left()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $$
+begin
+  update memberships
+    set role = 'owner'
+    where community_id = old.community_id
+      and user_id = (
+        select m.user_id from memberships m
+        where m.community_id = old.community_id
+        order by m.joined_at, m.user_id
+        limit 1
+      )
+      and not exists (
+        select 1 from memberships m
+        where m.community_id = old.community_id and m.role = 'owner'
+      );
+
+  delete from communities c
+    where c.id = old.community_id
+      and not exists (select 1 from memberships m where m.community_id = old.community_id);
+
+  return old;
+end;
+$$;
+
 -- 誰か1人でも「止める」を押したら、申請を止めます
 create function public.reject_recovery_request()
 returns trigger
@@ -885,6 +919,10 @@ $$;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+create trigger on_member_left
+  after delete on public.memberships
+  for each row execute function public.handle_member_left();
 
 create trigger on_recovery_veto
   after insert on public.recovery_vetoes

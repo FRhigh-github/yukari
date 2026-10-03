@@ -47,6 +47,7 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `2026-10-04_11_remove_demo_guests.sql` | |
 | `2026-10-04_12_reports_and_blocks.sql` | |
 | `2026-10-04_13_delete_own_items.sql` | |
+| `2026-10-04_14_owner_handover.sql` | |
 
 ## 新しく作り直す手順
 

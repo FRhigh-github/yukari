@@ -115,7 +115,8 @@ export default function CommunitySettings({
           <div className="space-y-2">
             <p className="text-xs text-stone-600">
               このコミュニティから退出します。よろしいですか？
-              {isOwner ? "（あなたは作成者です）" : ""}
+              {/* 作成者が抜けると、いちばん前から入っている人に作成者が引き継がれます（DB の handle_member_left） */}
+              {isOwner ? "（作成者は、いちばん前から入っている人に引き継がれます）" : ""}
             </p>
             <div className="flex gap-2">
               <button
