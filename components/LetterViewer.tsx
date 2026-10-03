@@ -27,6 +27,8 @@ export type Letter = {
   authorName: string | null;
   // 自分が書いた手紙か。自分の手紙だけ消せます
   isMine: boolean;
+  // 紙に置いたリンク（紙の絵の中では押せないので、下に並べます）
+  links: string[];
 };
 
 type LetterViewerProps = {
@@ -163,6 +165,27 @@ export default function LetterViewer({ letters, initialId }: LetterViewerProps) 
           </button>
         ) : null}
       </div>
+
+      {/* ▼ 紙に置いてあったリンク。紙は1枚の絵なので、ここから開けるようにします。
+          開封日前（鍵の絵）のときは出しません */}
+      {letter && !isLocked && letter.links.length > 0 ? (
+        <ul className="flex shrink-0 flex-col gap-2 px-4 pb-2">
+          {letter.links.map((link) => (
+            <li key={link}>
+              {/* rel="noopener noreferrer" = 開いた先のページから、このアプリを操作されないようにする指定 */}
+              <a
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm text-stone-700 ring-1 ring-kin/30"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="h-5 w-5 shrink-0 text-kin"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" /><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" /></svg>
+                <span className="truncate">{link.replace(/^https?:\/\//, "")}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {/* ▼ 自分が書いた手紙は消せます（付いている日程調整とチャットも一緒に消えます） */}
       {letter && letter.isMine ? (

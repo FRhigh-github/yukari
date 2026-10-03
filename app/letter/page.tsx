@@ -995,6 +995,13 @@ export default function LetterPage() {
         author_id: user.id,
         image_url: path,
         body: bodyText === "" ? null : bodyText,
+        // ▼ 紙に置いたリンク。紙は1枚の絵になって押せないので、別に送ります。
+        //   受け取った人は、読む画面（LetterViewer）でリンクとして開けます。
+        //   http / https で始まるものだけ、10個まで（DB の決まりと同じ）
+        links: items
+          .filter((it) => it.type === "url" && /^https?:\/\/\S+$/.test(it.url.trim()))
+          .map((it) => it.url.trim().slice(0, 500))
+          .slice(0, 10),
         // toISOString() は、日時をデータベースが読める文字の形にする関数です
         open_at: openAt.toISOString(),
       });

@@ -50,6 +50,7 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `2026-10-04_14_owner_handover.sql` | |
 | `2026-10-04_15_regenerate_invite_code.sql` | |
 | `2026-10-04_16_push_notifications.sql` | |
+| `2026-10-04_17_letter_links.sql` | |
 
 ## 新しく作り直す手順
 

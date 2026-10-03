@@ -22,7 +22,7 @@ export default async function LetterDetailPage({
   // 1回目：読める手紙の一覧
   const { data: letters } = await supabase
     .from("time_capsules")
-    .select("id, body, image_url, open_at, author_id")
+    .select("id, body, image_url, open_at, author_id, links")
     .order("open_at", { ascending: false });
 
   const list = letters ?? [];
@@ -58,6 +58,7 @@ export default async function LetterDetailPage({
         imageUrl: findImageUrl(letter.image_url),
         eventId: events?.find((event) => event.capsule_id === letter.id)?.id ?? null,
         isMine: letter.author_id === myId,
+        links: letter.links ?? [],
         authorName:
           authors?.find((author) => author.id === letter.author_id)?.display_name ?? null,
       }))}

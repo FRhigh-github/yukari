@@ -53,6 +53,19 @@ create type public.member_role as enum ('owner', 'member');
 create type public.recovery_status as enum ('pending', 'approved', 'rejected', 'expired');
 
 
+-- 手紙に付けるリンクの一覧が、ふつうの web のリンクだけか（time_capsules の check で使います）。
+-- javascript: のような、押すとプログラムが動くものを入れさせないためです
+create function public.are_web_links(links text[])
+returns boolean
+language sql
+immutable
+set search_path to 'public'
+as $$
+  -- 長さは char_length で見ます（Postgres の正規表現は、{1,500} のような255より大きい回数を書けないため）
+  select coalesce(bool_and(link ~ '^https?://[^[:space:]]+$' and char_length(link) <= 500), true)
+  from unnest(links) as link;
+$$;
+
 -- ============================================================
 --  2. テーブル
 --     作ったらすぐに RLS を入れます。
@@ -186,6 +199,9 @@ create table public.time_capsules (
   body text check (char_length(body) <= 10000),
   -- 保管庫（drawings バケット）の場所。手紙の紙を1枚の絵にしたもの
   image_url text,
+  -- 紙に置いたリンク。紙は1枚の絵になって押せないので、受け取った人が開けるよう別に持ちます。
+  -- 10個まで。http / https で始まるものだけ（are_web_links）
+  links text[] check (cardinality(links) <= 10 and are_web_links(links)),
   sealed_at timestamptz not null default now(),
   open_at timestamptz not null,
   check (open_at > sealed_at)
