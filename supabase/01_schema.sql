@@ -434,9 +434,30 @@ $$;
 --  足すのは、この関数を通したときだけです（条件をまとめて確かめられるため）
 -- ------------------------------------------------------------
 
+-- 招待コードを作ります。紛らわしい文字（0とO、1とI）を除いた32種類から10文字。
+-- 32 の10乗＝約1,000兆通りなので、手当たり次第に試しても当たりません。
+-- ▼ なぜ DB で作るのか
+--   前は画面側で16進6文字（約1,600万通り）を作って渡していました。
+--   画面側で作ると、短いコードや決まったコードを送り込めてしまいます。
+--   1文字ずつ gen_random_uuid() の先頭の1バイト（0〜255）を32で割った余りで選びます。
+--   256 は 32 で割り切れるので、どの文字も同じ確率で出ます
+create function public.make_invite_code()
+returns text
+language sql
+volatile
+set search_path to 'public'
+as $$
+  select string_agg(
+    substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', get_byte(uuid_send(gen_random_uuid()), 0) % 32 + 1, 1),
+    ''
+  )
+  from generate_series(1, 10);
+$$;
+
 -- コミュニティを作って、自分を owner として入れます。
--- 名前が1〜40文字で、ゲストでないときだけ作ります。合わなければ何もせず null を返します
-create function public.create_community(community_name text, code text)
+-- 名前が1〜40文字で、ゲストでないときだけ作ります。合わなければ何もせず null を返します。
+-- 招待コードは、この中で make_invite_code が作ります
+create function public.create_community(community_name text)
 returns uuid
 language sql
 security definer
@@ -444,7 +465,7 @@ set search_path to 'public'
 as $$
   with created as (
     insert into communities (name, invite_code, created_by)
-    select trim(community_name), upper(trim(code)), auth.uid()
+    select trim(community_name), make_invite_code(), auth.uid()
     where auth.uid() is not null
       and not is_demo_guest()
       and char_length(trim(coalesce(community_name, ''))) between 1 and 40
@@ -1048,7 +1069,7 @@ create policy "recovery vetoes insert"
 
 -- 画面から呼ぶ関数と、許可の中で使う関数：ログインしている人だけ
 revoke execute on function
-  public.create_community(text, text),
+  public.create_community(text),
   public.join_community(text),
   public.rename_community(uuid, text),
   public.set_community_icon(uuid, text),
@@ -1060,7 +1081,7 @@ revoke execute on function
 from public, anon;
 
 grant execute on function
-  public.create_community(text, text),
+  public.create_community(text),
   public.join_community(text),
   public.rename_community(uuid, text),
   public.set_community_icon(uuid, text),
@@ -1070,6 +1091,10 @@ grant execute on function
   public.capsule_is_open(uuid),
   public.is_own_file(text)
 to authenticated, service_role;
+
+-- 招待コードを作る関数：画面からは直接呼ばせません（create_community の中で使います）
+revoke execute on function public.make_invite_code() from public, anon, authenticated;
+grant execute on function public.make_invite_code() to service_role;
 
 -- 思い出ログインの判定：サーバー（service_role）だけ
 revoke execute on function public.recovery_is_unlocked(uuid) from public, anon, authenticated;
