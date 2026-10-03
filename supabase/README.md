@@ -133,6 +133,8 @@ Authentication → Providers → Google
 | `NEXT_PUBLIC_SUPABASE_URL` | 両方 | 公開してよい |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 両方 | 公開してよい（RLS が守る） |
 | `SUPABASE_SERVICE_ROLE_KEY` | 両方 | **絶対に出さない**。RLS を無視できる |
+| `RESEND_API_KEY` | Vercel | メールを送るサービス（Resend）の鍵。思い出ログインの申請を本人にメールで知らせる。無ければメールは送らない（`lib/mail.ts`） |
+| `MAIL_FROM` | Vercel | メールの送り主。例：`ゆかり <noreply@あなたのドメイン>`。Resend で確認したドメインのアドレス |
 | `DEMO_COMMUNITY_ID` | 両方 | 「デモで入る」のゲストが入るコミュニティ。`44444444-4444-4444-8444-000000000001`。**発表が終わったら消す** |
 
 `NEXT_PUBLIC_` が付いているものはブラウザに配られます。
