@@ -74,7 +74,7 @@ export default async function ProfilePage() {
       />
 
       {/* ▼ 下半分：自分のご報告 */}
-      <h2 className="border-y border-stone-200 bg-white px-5 py-3 text-lg font-bold text-stone-800">
+      <h2 className="border-y border-stone-200 bg-white px-4 py-3 text-lg font-bold text-stone-800">
         ご報告
       </h2>
 

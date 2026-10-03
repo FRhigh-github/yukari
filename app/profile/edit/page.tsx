@@ -31,7 +31,7 @@ export default async function ProfileEditPage() {
 
   return (
     <main>
-      <div className="px-5 pt-3">
+      <div className="px-4 pt-3">
         <Link href="/profile" className="text-sm text-stone-500">
           ← 戻る
         </Link>

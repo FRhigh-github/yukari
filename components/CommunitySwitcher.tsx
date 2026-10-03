@@ -147,7 +147,7 @@ export default function CommunitySwitcher({
                   onClick={() =>
                     setFormMode(formMode === "create" ? null : "create")
                   }
-                  className="flex h-12 w-full cursor-pointer items-center px-5 text-sm text-stone-600"
+                  className="flex h-12 w-full cursor-pointer items-center px-4 text-sm text-stone-600"
                 >
                   ＋ コミュニティを新しく作る
                 </button>
@@ -161,7 +161,7 @@ export default function CommunitySwitcher({
                   onClick={() =>
                     setFormMode(formMode === "join" ? null : "join")
                   }
-                  className="flex h-12 w-full cursor-pointer items-center px-5 text-sm text-stone-600"
+                  className="flex h-12 w-full cursor-pointer items-center px-4 text-sm text-stone-600"
                 >
                   招待コードで参加する
                 </button>

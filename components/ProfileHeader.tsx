@@ -30,7 +30,7 @@ export default function ProfileHeader({
   const selectedMood = MOODS.find((item) => item.value === mood);
 
   return (
-    <section className="flex gap-4 bg-[#fdf6f0] p-5">
+    <section className="flex gap-4 bg-[#fdf6f0] px-4 py-5">
       <div className="relative shrink-0">
         {/* アイコンは背景画像で置きます（読み込みに失敗しても印が出ないため） */}
         <div

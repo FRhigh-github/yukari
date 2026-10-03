@@ -119,7 +119,7 @@ export default async function MemberProfilePage({
       {/* ▼ 「最後に話したのは何年前」。自分のプロフィールには出しません。
             カード・お祝い・チャットを送ると、DB が自動で記録します */}
       {isMe ? null : (
-        <p className="mx-5 mt-4 rounded-xl border border-kin/30 bg-white px-4 py-3 text-center text-sm text-stone-600">
+        <p className="mx-4 mt-4 rounded-xl border border-kin/30 bg-white px-4 py-3 text-center text-sm text-stone-600">
           {lastContactLabel === null ? (
             "まだやりとりはありません"
           ) : (
@@ -135,7 +135,7 @@ export default async function MemberProfilePage({
           ふだんは使わないものなので、目立たせすぎない場所に置きます。
           自分で自分のコードは出せない（DB が止める）ので、自分のプロフィールには出しません */}
       {isMe ? null : (
-        <div className="p-5">
+        <div className="px-4 py-5">
           <RecoveryCodeButton
             targetUserId={id}
             targetName={profile?.display_name ?? "この人"}
@@ -143,7 +143,7 @@ export default async function MemberProfilePage({
         </div>
       )}
 
-      <h2 className="border-y border-stone-200 bg-white px-5 py-3 text-lg font-bold text-stone-800">
+      <h2 className="border-y border-stone-200 bg-white px-4 py-3 text-lg font-bold text-stone-800">
         ご報告
       </h2>
 

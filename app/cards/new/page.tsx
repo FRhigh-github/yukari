@@ -18,7 +18,7 @@ export default async function NewCardPage({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 px-5 pt-3">
+      <div className="shrink-0 px-4 pt-3">
         <Link href="/cards" className="text-sm text-stone-500">
           ← 戻る
         </Link>

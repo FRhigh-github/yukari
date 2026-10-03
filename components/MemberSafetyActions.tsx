@@ -76,7 +76,7 @@ export default function MemberSafetyActions({
   };
 
   return (
-    <div className="space-y-3 px-5 pt-8">
+    <div className="space-y-3 px-4 pt-8">
       <div className="flex justify-center gap-6">
         <button
           type="button"

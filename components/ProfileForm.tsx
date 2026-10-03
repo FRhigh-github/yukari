@@ -257,7 +257,7 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-4 border-b border-stone-200 px-5 py-3">
+    <div className="flex items-center gap-4 border-b border-stone-200 px-4 py-3">
       <span className="w-20 shrink-0 text-sm text-stone-600">{label}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>

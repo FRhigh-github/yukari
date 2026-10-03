@@ -59,7 +59,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - **押せるものは 44×44px 以上**。見た目が小さくても、当たり判定は 44px 確保する。
   これを守るだけで「ちゃんとしたアプリ感」がかなり出る
-- 画面の左右の余白は **16px**（Tailwind の `px-4`）。今は `px-5`(20px) も混在
+- 画面の左右の余白は **16px**（Tailwind の `px-4`）。ボタンやカードの内側の余白は、この決まりとは別
 - 下タブの高さは **49px** が iOS の基準
 - カードの角丸は **10〜16px**（`rounded-xl` 〜 `rounded-2xl`）
 - 本文の文字は **17px** が iOS の標準。10px より小さくしない
