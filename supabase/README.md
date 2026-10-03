@@ -136,6 +136,7 @@ Authentication → Providers → Google
 | `NEXT_PUBLIC_SUPABASE_URL` | 両方 | 公開してよい |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 両方 | 公開してよい（RLS が守る） |
 | `SUPABASE_SERVICE_ROLE_KEY` | 両方 | **絶対に出さない**。RLS を無視できる |
+| `RECOVERY_SECRET` | 両方 | **出さない**。思い出ログインの引換券の署名に使う、32文字以上のでたらめな文字。無いと思い出ログインが動かない（`lib/recoveryTicket.ts`）。作り方：`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 | `RESEND_API_KEY` | Vercel | メールを送るサービス（Resend）の鍵。思い出ログインの申請を本人にメールで知らせる。無ければメールは送らない（`lib/mail.ts`） |
 | `MAIL_FROM` | Vercel | メールの送り主。例：`ゆかり <noreply@あなたのドメイン>`。Resend で確認したドメインのアドレス |
 | `DEMO_COMMUNITY_ID` | 両方 | 「デモで入る」のゲストが入るコミュニティ。`44444444-4444-4444-8444-000000000001`。**発表が終わったら消す** |
