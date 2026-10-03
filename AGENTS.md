@@ -28,7 +28,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | URL | 中身 |
 |---|---|
 | `/` | ホーム。メンバーのマルが並ぶ。まだ見ていない報告がある人は光る。右下にステータス（会いたい / 多忙）、1年以上やりとりが無い人は右上に「3年」の印 |
-| `/members/[id]` | その人のご報告（ホームから来たときは、いきなりストーリーで開く）。上スワイプで手書きのお祝い |
+| `/members/[id]` | その人のご報告を「ご報告のはがき」で見る（ホームから来たときは、いきなり1枚目から開く。`?c=` で見ていたコミュニティの分だけ）。上スワイプで手書きのお祝い |
 | `/members/[id]/profile` | その人のプロフィールと「最後にやりとりしたのは〜」。ホームでアイコンを長押しして開く |
 | `/post` | ご報告を書く。`?c=` で最初に選ぶコミュニティを渡す |
 | `/cards` | 背景をえらぶ（DBに聞かない。`CARD_KINDS` から出している） |
@@ -41,6 +41,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `/profile` `/profile/edit` | 自分のプロフィール |
 | `/signup` `/login` `/setup` `/start` | 登録 / ログイン / 名前と誕生日の入力 / 最初のコミュニティ選び |
 | `/recover` | 思い出ログイン（下に説明あり） |
+| `/forgot` `/reset-password` | パスワードを忘れた人がメールで再設定 / 新しいパスワードを決める（思い出ログインのあとにも来る） |
+| `/account/email` | メールアドレスを変える（プロフィールの編集から） |
 | `/communities/new` `/communities/join` | コミュニティを作る / 招待コードで参加 |
 | `/communities/[id]` | コミュニティの設定。ホームの切り替えの ⚙ から |
 
@@ -121,11 +123,18 @@ RLS の外にいる。`app/api/recovery/` が `SUPABASE_SERVICE_ROLE_KEY` を使
 `lib/supabase/admin.ts` は **`"use client"` のファイルから読み込まないこと。**
 読み込むと鍵がブラウザに配られ、誰でも DB を全部読み書きできる状態になる。
 
-## いま分かっている宿題
+## 知っておくこと
 
-- 通知の鐘（`NotificationBell`）はアプリの中の「お知らせ」一覧。スマホへのプッシュ通知は送っていない
+- 通知の鐘（`NotificationBell`）はアプリの中の「お知らせ」一覧
+- スマホへの通知（プッシュ通知）は、プロフィールの「スマホに通知を受け取る」から。
+  送るのは `lib/push.ts`、受け取るのは `public/sw.js`。ご報告・カード・お祝いは `/api/notify`、
+  手紙の開封は1日1回の定期実行（`/api/cron/daily`、`vercel.json` の crons）
+- 1日1回の定期実行は、Supabase が止まらないための問い合わせ・手紙の通知・容量の見張り・
+  エラーのまとめのメール（`error_reports`）もまとめてやる
+- 思いがけないエラーは `error_reports` に残る（サーバーは `instrumentation.ts`、画面は `app/error.tsx`）
+- ご報告・カード・手紙を消すときは、保管庫の写真も消すためにサーバーを通す（`/api/posts/delete`・`/api/items/delete`）
 - ダミーデータのアイコンとご報告の絵は public/demo/ に置いてある（外部のサービスは使っていない）
-- ログアウトは自分のプロフィール（`/profile`）のいちばん下。ログインしたまま `/login` を開くとホームへ戻る
+- ログアウトと退会は自分のプロフィール（`/profile`）のいちばん下。ログインしたまま `/login` を開くとホームへ戻る
 - `useEffect` の中で、描き直すたびに作り直される関数を呼ぶときは `useEffectEvent` で包む
   （日程調整・チャットの画面を参照。依存から外すと lint の警告になる）
 
