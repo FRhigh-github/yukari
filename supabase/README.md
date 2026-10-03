@@ -38,6 +38,7 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `2026-10-04_02_strong_invite_codes.sql` | |
 | `2026-10-04_03_random_avatar_names.sql` | |
 | `2026-10-04_04_allowed_avatar_urls.sql` | |
+| `2026-10-04_05_recovery_visible_to_all.sql` | |
 
 ## 新しく作り直す手順
 
@@ -72,7 +73,7 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `events` / `event_date_options` / `event_responses` | 手紙に付けた日程調整 | 手紙が開いたあと、そのコミュニティの人 |
 | `messages` | 日程調整のチャット | そのイベントが見える人 |
 | `interactions` | やりとりの記録（最後に話した日） | 自分が関わった分だけ。**書くのはトリガーだけ** |
-| `recovery_codes` / `recovery_requests` / `recovery_vetoes` | 思い出ログイン | 発行した本人 / そのコミュニティの人 |
+| `recovery_codes` / `recovery_requests` / `recovery_vetoes` | 思い出ログイン | 発行した本人 / 復旧しようとしている本人と、同じコミュニティにいる人 |
 
 `last_contacts` はビュー（見え方）で、相手ごとの「最後にやりとりした日時」を返します。
 `security_invoker = true` を付けているので、見ている人の権限で動き、自分の分しか返りません。

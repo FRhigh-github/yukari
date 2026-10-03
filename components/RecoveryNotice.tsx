@@ -56,12 +56,23 @@ export default function RecoveryNotice({ requests }: RecoveryNoticeProps) {
           key={request.id}
           className="rounded-xl bg-amber-50 p-3 text-xs text-stone-700"
         >
-          <p className="leading-relaxed">
-            <span className="font-bold">{request.targetName}</span> さんが
-            アプリに入れなくなり、3人の力で戻ろうとしています。
-            <br />
-            心当たりがなければ、止めてください。
-          </p>
+          {/* 自分への申請なら、言い方を変えます。
+              ログインできている本人にとっては、身に覚えのない申請＝乗っ取りのおそれだからです */}
+          {request.isMine ? (
+            <p className="leading-relaxed">
+              <span className="font-bold">あなたのアカウント</span>に、
+              3人の力で戻る申請が出ています。
+              <br />
+              心当たりがなければ、すぐに止めてください。
+            </p>
+          ) : (
+            <p className="leading-relaxed">
+              <span className="font-bold">{request.targetName}</span> さんが
+              アプリに入れなくなり、3人の力で戻ろうとしています。
+              <br />
+              心当たりがなければ、止めてください。
+            </p>
+          )}
 
           {confirmingId === request.id ? (
             <div className="mt-2 flex gap-2">
