@@ -26,6 +26,9 @@ type MemberPostsProps = {
   posts: StoryPost[];
   // 自分のご報告の一覧かどうか。自分のものだけ消せるようにします
   isMine: boolean;
+  // 自分が作成者（owner）のコミュニティの id。
+  // そのコミュニティのご報告は、他人のものでも消せます（報告を受けて、困る投稿を消すため）
+  ownedCommunityIds: string[];
   // 最初からストーリーで開いておくご報告の id（プロフィールの一覧から来たとき）。無ければ null
   openPostId: string | null;
   // 「戻る」を押したときの行き先。ホームから来たときは "/"
@@ -41,6 +44,7 @@ export default function MemberPosts({
   avatarUrl,
   posts,
   isMine,
+  ownedCommunityIds,
   openPostId,
   backHref,
   startInStory,
@@ -135,7 +139,7 @@ export default function MemberPosts({
                 onPointerDown={(event) => {
                   longPressedRef.current = false;
                   startRef.current = { x: event.clientX, y: event.clientY };
-                  if (!isMine) return;
+                  if (!isMine && !ownedCommunityIds.includes(post.communityId)) return;
                   timerRef.current = setTimeout(() => {
                     longPressedRef.current = true;
                     setMessage(null);

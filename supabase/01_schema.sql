@@ -309,6 +309,35 @@ alter table public.recovery_vetoes enable row level security;
 
 
 -- ------------------------------------------------------------
+--  報告とブロック
+--  reports … 「この人の振る舞いが困る」という報告。報告した人と、
+--             そのコミュニティの作成者（owner）だけが読めます。書くのは report_user だけです
+--  blocks  … 自分がブロックした人。ブロックした人のご報告・お祝い・カードは、自分には見えません。
+--             ブロックされた人は、ブロックした人にカードを送れません。
+--             ブロックしたことは、相手には分かりません（自分の分しか読めないため）
+-- ------------------------------------------------------------
+create table public.reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter uuid not null references public.profiles (id) on delete cascade,
+  reported_user uuid not null references public.profiles (id) on delete cascade,
+  -- どのコミュニティの作成者に知らせるか。二人が一緒にいるコミュニティごとに1行ずつ入ります
+  community_id uuid not null references public.communities (id) on delete cascade,
+  reason text not null check (char_length(trim(reason)) between 1 and 500),
+  created_at timestamptz not null default now(),
+  check (reporter <> reported_user)
+);
+alter table public.reports enable row level security;
+
+create table public.blocks (
+  blocker uuid not null references public.profiles (id) on delete cascade,
+  blocked uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker, blocked),
+  check (blocker <> blocked)
+);
+alter table public.blocks enable row level security;
+
+-- ------------------------------------------------------------
 --  回数制限のための記録（under_rate_limit で数えます）
 --  join_attempts     … 招待コードで参加しようとした記録（当たり外れに関係なく1回ずつ）
 --  recovery_attempts … 思い出ログインのコードを試した記録。まだログインしていない人なので、
@@ -367,6 +396,10 @@ create index post_reactions_from_user_created_at_idx on public.post_reactions (f
 create index messages_user_id_created_at_idx on public.messages (user_id, created_at desc);
 create index join_attempts_user_id_attempted_at_idx on public.join_attempts (user_id, attempted_at desc);
 create index recovery_attempts_ip_attempted_at_idx on public.recovery_attempts (ip, attempted_at desc);
+
+-- 作成者が、自分のコミュニティの報告を新しい順に見るため
+create index reports_community_id_created_at_idx on public.reports (community_id, created_at desc);
+create index reports_reporter_created_at_idx on public.reports (reporter, created_at desc);
 
 
 -- ============================================================
@@ -478,6 +511,37 @@ as $$
     or url ~ '^/demo/avatars/[a-z0-9-]+\.svg$';
 $$;
 
+-- 自分がそのコミュニティの作成者（owner）か
+create function public.is_owner(target_community uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+  select exists (
+    select 1 from memberships
+    where user_id = auth.uid()
+      and community_id = target_community
+      and role = 'owner'
+  );
+$$;
+
+-- blocker が blocked をブロックしているか。
+-- blocks は自分の分しか読めないので、「相手が自分をブロックしているか」を確かめるときに使います
+-- （カードを送るとき。中身は見せず、true / false だけを返します）
+create function public.has_blocked(blocker_id uuid, blocked_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+  select exists (
+    select 1 from blocks where blocker = blocker_id and blocked = blocked_id
+  );
+$$;
+
 -- 回数制限。この1時間に、自分が kind をした回数が max_count より少なければ true。
 --   許可（RLS）の with check に「and under_rate_limit('posts', 20)」のように足して使います。
 -- ▼ なぜ要るのか
@@ -511,6 +575,9 @@ as $$
       when 'messages' then (
         select count(*) from messages
         where user_id = auth.uid() and created_at > now() - interval '1 hour')
+      when 'reports' then (
+        select count(*) from reports
+        where reporter = auth.uid() and created_at > now() - interval '1 hour')
       when 'joins' then (
         select count(*) from join_attempts
         where user_id = auth.uid() and attempted_at > now() - interval '1 hour')
@@ -648,6 +715,48 @@ as $$
     returning 1
   )
   select exists (select 1 from changed);
+$$;
+
+-- 人を報告します。二人が一緒にいるコミュニティごとに1行ずつ入れ、
+-- それぞれの作成者（owner）が、コミュニティの設定の画面で読めるようにします。
+-- 入れた行の数を返します（一緒にいるコミュニティが無ければ 0）
+create function public.report_user(target_user uuid, reason text)
+returns integer
+language sql
+security definer
+set search_path to 'public'
+as $$
+  with inserted as (
+    insert into reports (reporter, reported_user, community_id, reason)
+    select auth.uid(), target_user, mine.community_id, trim(reason)
+    from memberships mine
+    join memberships theirs on theirs.community_id = mine.community_id
+    where mine.user_id = auth.uid()
+      and theirs.user_id = target_user
+      and target_user <> auth.uid()
+      and char_length(trim(coalesce(reason, ''))) between 1 and 500
+      and under_rate_limit('reports', 10)
+    returning 1
+  )
+  select count(*)::integer from inserted;
+$$;
+
+-- コミュニティから人を外します（作成者だけ。自分は外せません。自分で抜けるのは設定の「抜ける」から）
+create function public.remove_member(target_community uuid, target_user uuid)
+returns boolean
+language sql
+security definer
+set search_path to 'public'
+as $$
+  with removed as (
+    delete from memberships
+    where community_id = target_community
+      and user_id = target_user
+      and target_user <> auth.uid()
+      and is_owner(target_community)
+    returning 1
+  )
+  select exists (select 1 from removed);
 $$;
 
 -- ------------------------------------------------------------
@@ -875,10 +984,16 @@ create policy "memberships leave"
 -- ------------------------------------------------------------
 --  ご報告
 -- ------------------------------------------------------------
+-- 自分がブロックした人のご報告は、自分には返しません（blocks は自分の分しか読めません）
 create policy "posts for members"
   on public.posts for select
   to authenticated
-  using (is_member(community_id));
+  using (
+    is_member(community_id)
+    and not exists (
+      select 1 from blocks b where b.blocker = auth.uid() and b.blocked = posts.author_id
+    )
+  );
 
 -- 写真の場所は、自分のフォルダのものだけ（is_own_file を参照）
 create policy "posts insert"
@@ -894,10 +1009,11 @@ create policy "posts update own"
   using (author_id = auth.uid())
   with check (author_id = auth.uid() and is_member(community_id) and is_own_file(image_url));
 
+-- 消せる：書いた本人と、そのコミュニティの作成者（報告を受けて、困る投稿を消せるように）
 create policy "posts delete own"
   on public.posts for delete
   to authenticated
-  using (author_id = auth.uid());
+  using (author_id = auth.uid() or is_owner(community_id));
 
 -- ------------------------------------------------------------
 --  お祝い
@@ -905,7 +1021,12 @@ create policy "posts delete own"
 create policy "reactions for members"
   on public.post_reactions for select
   to authenticated
-  using (is_member(community_id));
+  using (
+    is_member(community_id)
+    and not exists (
+      select 1 from blocks b where b.blocker = auth.uid() and b.blocked = post_reactions.from_user
+    )
+  );
 
 -- お祝いを付ける投稿が、本当にそのコミュニティのものかも確かめます
 create policy "reactions insert"
@@ -938,10 +1059,19 @@ create policy "templates readable"
   using (true);
 
 -- 読める：送った人と、受け取った人だけ
+-- ブロックした人から届いたカードは、受け取った側には見えません
 create policy "cards visible to both"
   on public.card_sends for select
   to authenticated
-  using (from_user = auth.uid() or to_user = auth.uid());
+  using (
+    from_user = auth.uid()
+    or (
+      to_user = auth.uid()
+      and not exists (
+        select 1 from blocks b where b.blocker = auth.uid() and b.blocked = card_sends.from_user
+      )
+    )
+  );
 
 -- 送れる：自分が入っているコミュニティの、ほかのメンバーにだけ
 create policy "cards insert"
@@ -952,6 +1082,8 @@ create policy "cards insert"
     and is_member(community_id)
     and (drawing_url is null or is_own_file(drawing_url))
     and under_rate_limit('cards', 50)
+    -- 相手にブロックされていたら送れません
+    and not has_blocked(to_user, auth.uid())
     and exists (
       select 1 from memberships m
       where m.user_id = card_sends.to_user
@@ -1116,6 +1248,37 @@ create policy "interactions visible"
   using (user_a = auth.uid() or user_b = auth.uid());
 
 -- ------------------------------------------------------------
+--  報告とブロック
+-- ------------------------------------------------------------
+-- 報告：書くのは report_user だけ。読めるのは、報告した本人と、そのコミュニティの作成者
+create policy "reports visible"
+  on public.reports for select
+  to authenticated
+  using (reporter = auth.uid() or is_owner(community_id));
+
+-- 作成者は、読み終えた報告を消せます
+create policy "reports delete by owner"
+  on public.reports for delete
+  to authenticated
+  using (is_owner(community_id));
+
+-- ブロック：自分の分だけ、読む・する・やめる
+create policy "blocks own"
+  on public.blocks for select
+  to authenticated
+  using (blocker = auth.uid());
+
+create policy "blocks insert own"
+  on public.blocks for insert
+  to authenticated
+  with check (blocker = auth.uid());
+
+create policy "blocks delete own"
+  on public.blocks for delete
+  to authenticated
+  using (blocker = auth.uid());
+
+-- ------------------------------------------------------------
 --  思い出ログイン
 -- ------------------------------------------------------------
 -- 発行できる：同じコミュニティにいる、自分以外の人のぶんだけ
@@ -1193,7 +1356,11 @@ revoke execute on function
   public.capsule_is_visible(uuid),
   public.is_own_file(text),
   public.is_allowed_avatar(text),
-  public.under_rate_limit(text, integer)
+  public.under_rate_limit(text, integer),
+  public.is_owner(uuid),
+  public.has_blocked(uuid, uuid),
+  public.report_user(uuid, text),
+  public.remove_member(uuid, uuid)
 from public, anon;
 
 grant execute on function
@@ -1206,7 +1373,11 @@ grant execute on function
   public.capsule_is_visible(uuid),
   public.is_own_file(text),
   public.is_allowed_avatar(text),
-  public.under_rate_limit(text, integer)
+  public.under_rate_limit(text, integer),
+  public.is_owner(uuid),
+  public.has_blocked(uuid, uuid),
+  public.report_user(uuid, text),
+  public.remove_member(uuid, uuid)
 to authenticated, service_role;
 
 -- 招待コードを作る関数：画面からは直接呼ばせません（create_community の中で使います）

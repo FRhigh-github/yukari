@@ -9,6 +9,7 @@ import PostGrid from "@/components/PostGrid";
 import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
 import RecoveryCodeButton from "@/components/RecoveryCodeButton";
+import MemberSafetyActions from "@/components/MemberSafetyActions";
 import { getSignedUrls } from "@/lib/signedUrls";
 import { formatLastContact } from "@/lib/lastContact";
 
@@ -25,6 +26,7 @@ export default async function MemberProfilePage({
     { data: memberships },
     { data: posts },
     { data: lastContact },
+    { data: block },
     myId,
   ] =
     await Promise.all([
@@ -55,6 +57,13 @@ export default async function MemberProfilePage({
         .from("last_contacts")
         .select("last_at")
         .eq("partner", id)
+        .maybeSingle(),
+
+      // 自分がこの人をブロックしているか（blocks は自分の分しか返りません）
+      supabase
+        .from("blocks")
+        .select("blocked")
+        .eq("blocked", id)
         .maybeSingle(),
 
       getCurrentUserId(supabase),
@@ -150,6 +159,15 @@ export default async function MemberProfilePage({
           })) ?? []
         }
       />
+
+      {/* ▼ 報告・ブロック。いちばん下の、ふだんは目に入らない場所に置きます */}
+      {isMe ? null : (
+        <MemberSafetyActions
+          targetUserId={id}
+          targetName={profile?.display_name ?? "この人"}
+          isBlocked={block !== null}
+        />
+      )}
     </main>
   );
 }

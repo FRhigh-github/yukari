@@ -45,6 +45,7 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `2026-10-04_09_text_length_limits.sql` | |
 | `2026-10-04_10_birthday_without_year.sql` | |
 | `2026-10-04_11_remove_demo_guests.sql` | |
+| `2026-10-04_12_reports_and_blocks.sql` | |
 
 ## 新しく作り直す手順
 
@@ -79,6 +80,8 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `messages` | 日程調整のチャット | そのイベントが見える人 |
 | `interactions` | やりとりの記録（最後に話した日） | 自分が関わった分だけ。**書くのはトリガーだけ** |
 | `recovery_codes` / `recovery_requests` / `recovery_vetoes` | 思い出ログイン | 発行した本人 / 復旧しようとしている本人と、同じコミュニティにいる人 |
+| `reports` | メンバーについての報告 | 報告した本人と、そのコミュニティの作成者。**書くのは `report_user` だけ** |
+| `blocks` | 自分がブロックした人 | 自分の分だけ |
 
 `last_contacts` はビュー（見え方）で、相手ごとの「最後にやりとりした日時」を返します。
 `security_invoker = true` を付けているので、見ている人の権限で動き、自分の分しか返りません。

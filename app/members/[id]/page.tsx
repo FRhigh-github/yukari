@@ -26,7 +26,7 @@ export default async function MemberPage({
   // 1回目：この4つは、どれも id だけで取れます
   // single() = 1件だけ取ってくる（配列ではなく、そのものが返ります）
   // getCurrentUserId = 自分か確かめるため（自分のご報告だけ、長押しで消せるようにします）。通信なしで済みます
-  const [{ data: profile }, { data: posts }, { data: reactions }, myId] =
+  const [{ data: profile }, { data: posts }, { data: reactions }, myId, { data: owned }] =
     await Promise.all([
       supabase.from("profiles").select("display_name, avatar_url").eq("id", id).single(),
       // 列は使うものだけ並べます。
@@ -51,6 +51,8 @@ export default async function MemberPage({
         .eq("posts.author_id", id)
         .order("created_at", { ascending: false }),
       getCurrentUserId(supabase),
+      // 自分が作成者のコミュニティ。そのご報告は、作成者として消せます（MemberPosts）
+      supabase.from("memberships").select("community_id, user_id").eq("role", "owner"),
     ]);
 
   // posts に入っているのは「保管庫のどこに置いたか」という場所だけです。
@@ -97,6 +99,11 @@ export default async function MemberPage({
     <MemberPosts
       authorId={id}
       isMine={myId === id}
+      ownedCommunityIds={
+        owned
+          ?.filter((membership) => membership.user_id === myId)
+          .map((membership) => membership.community_id) ?? []
+      }
       openPostId={typeof openPostId === "string" ? openPostId : null}
       startInStory={view === "story"}
       // アプリの中の画面（"/" で始まり、"//" ではない）だけを受け付けます。
