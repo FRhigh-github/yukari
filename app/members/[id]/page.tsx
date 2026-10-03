@@ -2,6 +2,7 @@ import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import MemberPosts from "@/components/MemberPosts";
 import { getSignedUrls } from "@/lib/signedUrls";
 import type { Reaction } from "@/components/ReactionBoard";
+import { isUuid } from "@/lib/isUuid";
 
 // [id] という名前のフォルダにすると、URL の一部を受け取れます。
 // 例: /members/abc123 → id は "abc123"
@@ -13,7 +14,11 @@ export default async function MemberPage({
   // ?post=<ご報告の id> = プロフィールの一覧で押したご報告。そこからストーリーで開きます
   // ?back=<URL> = 「戻る」を押したときの行き先（コミュニティの設定から来たときなど）。無ければホーム
   // ?view=story = ホームから来たとき。一覧を挟まず、最新のご報告からストーリーで開きます
-  const { post: openPostId, back, view } = await searchParams;
+  // ?c=<コミュニティの id> = ホームで見ていたコミュニティ。そのコミュニティのご報告だけを出します。
+  //   「常にどれか1つのコミュニティを見ている」決まり（AGENTS.md）に合わせるためです。
+  //   無いとき（プロフィールの一覧から来たときなど）は、見られるご報告を全部出します
+  const { post: openPostId, back, view, c } = await searchParams;
+  const onlyCommunity = isUuid(c) ? c : null;
   const supabase = await createClient();
 
   // ▼ 待ち時間の話
@@ -33,12 +38,20 @@ export default async function MemberPage({
       // select("*") だと、誰かが列を足した瞬間に、
       // 知らないうちに取ってくる量が増えます。
       // limit は、報告が増えたときに一気に読み込まないための上限です。
-      supabase
-        .from("posts")
-        .select("id, title, body, image_url, created_at, community_id")
-        .eq("author_id", id)
-        .order("created_at", { ascending: false })
-        .limit(30),
+      onlyCommunity
+        ? supabase
+            .from("posts")
+            .select("id, title, body, image_url, created_at, community_id")
+            .eq("author_id", id)
+            .eq("community_id", onlyCommunity)
+            .order("created_at", { ascending: false })
+            .limit(30)
+        : supabase
+            .from("posts")
+            .select("id, title, body, image_url, created_at, community_id")
+            .eq("author_id", id)
+            .order("created_at", { ascending: false })
+            .limit(30),
 
       // ▼ 反応も、ここで一緒に取ります。
       //   前は「報告を取る → その id で反応を取る」と2段階でしたが、
@@ -118,7 +131,10 @@ export default async function MemberPage({
         !back.startsWith("//") &&
         !back.includes("\\")
           ? back
-          : "/"
+          : // ホームから来たときは、見ていたコミュニティのホームへ戻します
+            onlyCommunity
+            ? `/?c=${onlyCommunity}`
+            : "/"
       }
       authorName={profile?.display_name ?? "名無し"}
       avatarUrl={profile?.avatar_url ?? null}

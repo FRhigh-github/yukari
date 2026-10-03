@@ -99,11 +99,14 @@ function readLetterIds(): string[] {
 type MemberCirclesProps = {
   members: Member[];
   currentUserId: string;
+  // いま見ているコミュニティ。ご報告のページで、このコミュニティのご報告だけを出すために渡します
+  communityId: string | null;
 };
 
 export default function MemberCircles({
   members,
   currentUserId,
+  communityId,
 }: MemberCirclesProps) {
   const [openableCount, setOpenableCount] = useState<number>(0);
   const [letterId, setLetterId] = useState<string | null>(null);
@@ -383,7 +386,7 @@ export default function MemberCircles({
         {/* ▼ 自分（中心） */}
         {me ? (
           <Link
-            href={`/members/${currentUserId}`}
+            href={`/members/${currentUserId}${communityId ? `?c=${communityId}` : ""}`}
             aria-label="自分"
             // 長押ししたまま動かしたときに、リンクをつまんで運ぶ動きを始めないようにします
             draggable={false}
@@ -417,6 +420,7 @@ export default function MemberCircles({
             x={spots[index].x}
             y={spots[index].y}
             hideName
+            communityId={communityId}
           />
         ))}
       </div>

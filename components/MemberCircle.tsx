@@ -25,6 +25,8 @@ type MemberCircleProps = {
   // 名前を出さないとき true。
   // 水引の輪の中に置くと、名前が紐に重なって読めなくなるためです。
   hideName?: boolean;
+  // いま見ているコミュニティ。押したときに開くご報告を、このコミュニティのものだけにします
+  communityId: string | null;
 };
 
 export default function MemberCircle({
@@ -32,6 +34,7 @@ export default function MemberCircle({
   x,
   y,
   hideName,
+  communityId,
 }: MemberCircleProps) {
   // 数え終わるまでの時計。取り消すときに止めるので、持っておきます
   const timerRef = useRef<number | null>(null);
@@ -64,7 +67,7 @@ export default function MemberCircle({
     <>
       <Link
         // ?view=story = 一覧を挟まずに、いきなり全画面のストーリーで開きます
-        href={`/members/${member.id}?view=story`}
+        href={`/members/${member.id}?view=story${communityId ? `&c=${communityId}` : ""}`}
         // ▼ 光っている人（まだ見ていない新しいご報告がある人）だけ、ご報告の中身まで先に取っておきます。
         //   押される見込みが高いのはこの人たちなので、押した瞬間に開くようにします。
         //   前は全員ぶん中身まで取っていたので、ホームを開くたびに通信が30件ほど走り、

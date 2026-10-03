@@ -106,7 +106,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         // 余白（px / pb）は付けません。付けると、そこで模様が切れて見えるためです。
         // 下タブとボタンに重なるぶんは、MemberCircles の中で中心を上にずらして逃がしています。
         <div className="min-h-0 flex-1">
-          <MemberCircles members={members} currentUserId={user.id} />
+          <MemberCircles members={members} currentUserId={user.id} communityId={currentId} />
         </div>
       )}
 
