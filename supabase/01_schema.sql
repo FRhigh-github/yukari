@@ -415,18 +415,6 @@ as $$
   );
 $$;
 
--- 「デモで入る」で作られたゲストか（メールの最後が @demo.yukari.invalid）。
--- ゲストは、コミュニティを作る・参加する・抜ける・名前やアイコンを変える、ができません。
--- 審査員が同時に触っても、ほかの人の画面が変わらないようにするためです
-create function public.is_demo_guest()
-returns boolean
-language sql
-stable
-set search_path to 'public'
-as $$
-  select coalesce(auth.jwt() ->> 'email', '') like '%@demo.yukari.invalid';
-$$;
-
 -- 自分がその手紙を読めるか（イベントの許可で使います）。
 -- 「capsules readable」の許可と同じ条件です：書いた本人か、開封日を過ぎていて宛先が「全員」か「自分」。
 -- ▼ 前は「開封日が来ているか」だけを見ていました
@@ -564,7 +552,7 @@ as $$
 $$;
 
 -- コミュニティを作って、自分を owner として入れます。
--- 名前が1〜40文字で、ゲストでないときだけ作ります。合わなければ何もせず null を返します。
+-- 名前が1〜40文字のときだけ作ります。合わなければ何もせず null を返します。
 -- 招待コードは、この中で make_invite_code が作ります
 create function public.create_community(community_name text)
 returns uuid
@@ -576,7 +564,6 @@ as $$
     insert into communities (name, invite_code, created_by)
     select trim(community_name), make_invite_code(), auth.uid()
     where auth.uid() is not null
-      and not is_demo_guest()
       and char_length(trim(coalesce(community_name, ''))) between 1 and 40
     returning id
   ),
@@ -611,7 +598,6 @@ as $$
     select id from communities
     where invite_code = upper(trim(code))
       and auth.uid() is not null
-      and not is_demo_guest()
       and under_rate_limit('joins', 20)
   ),
   joined as (
@@ -635,7 +621,6 @@ as $$
     update communities set name = trim(new_name)
     where id = target_community
       and is_member(target_community)
-      and not is_demo_guest()
       and char_length(trim(coalesce(new_name, ''))) between 1 and 40
     returning 1
   )
@@ -655,7 +640,6 @@ as $$
     update communities set icon_url = url
     where id = target_community
       and is_member(target_community)
-      and not is_demo_guest()
       -- ~ は「この形に合っているか」を調べる記号（正規表現）。
       and url ~ (
         '^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/avatars/communities/'
@@ -876,7 +860,7 @@ create policy "communities for members"
 -- ------------------------------------------------------------
 --  参加
 --  読める：自分の参加と、自分がいるコミュニティの参加。
---  抜ける：自分の分だけ。ゲストは抜けられません（抜けると、どこにも戻れなくなるため）
+--  抜ける：自分の分だけ
 -- ------------------------------------------------------------
 create policy "memberships visible"
   on public.memberships for select
@@ -886,7 +870,7 @@ create policy "memberships visible"
 create policy "memberships leave"
   on public.memberships for delete
   to authenticated
-  using (user_id = auth.uid() and not is_demo_guest());
+  using (user_id = auth.uid());
 
 -- ------------------------------------------------------------
 --  ご報告
@@ -1206,7 +1190,6 @@ revoke execute on function
   public.set_community_icon(uuid, text),
   public.is_member(uuid),
   public.shares_community(uuid),
-  public.is_demo_guest(),
   public.capsule_is_visible(uuid),
   public.is_own_file(text),
   public.is_allowed_avatar(text),
@@ -1220,7 +1203,6 @@ grant execute on function
   public.set_community_icon(uuid, text),
   public.is_member(uuid),
   public.shares_community(uuid),
-  public.is_demo_guest(),
   public.capsule_is_visible(uuid),
   public.is_own_file(text),
   public.is_allowed_avatar(text),
@@ -1313,7 +1295,7 @@ create policy "avatar delete own"
   );
 
 -- コミュニティのアイコン：avatars/communities/<コミュニティの id>/<ランダムな id>.jpg。
--- そのコミュニティのメンバーだけ（ゲストは除く）。
+-- そのコミュニティのメンバーだけ。
 -- ▼ id の比べ方について
 --   ファイル名を uuid に変換して比べると、uuid でない名前のときにエラーで止まります。
 --   文字のまま比べれば、合わないだけで済みます。
@@ -1324,7 +1306,6 @@ create policy "community icon insert"
   with check (
     bucket_id = 'avatars'
     and name ~ '^communities/[0-9a-f-]{36}/[0-9a-f-]{36}\.jpg$'
-    and not public.is_demo_guest()
     and public.under_rate_limit('uploads', 100)
     and exists (
       select 1 from public.memberships m
@@ -1355,7 +1336,6 @@ create policy "community icon delete"
   using (
     bucket_id = 'avatars'
     and (storage.foldername(name))[1] = 'communities'
-    and not public.is_demo_guest()
     and exists (
       select 1 from public.memberships m
       where m.user_id = auth.uid()

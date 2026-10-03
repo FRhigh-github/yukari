@@ -23,15 +23,12 @@ type CommunityIconProps = {
   name: string;
   // まだ決めていなければ null
   iconUrl: string | null;
-  // false のときは、アイコンを見せるだけで変えられません（デモのゲスト）
-  canEdit: boolean;
 };
 
 export default function CommunityIcon({
   communityId,
   name,
   iconUrl,
-  canEdit,
 }: CommunityIconProps) {
   const router = useRouter();
 
@@ -155,28 +152,22 @@ export default function CommunityIcon({
       <div className="flex items-center gap-4">
         {/* label で包むと、中のどこを押しても写真を選べます。
             input 本体は hidden で隠します（見た目が端末ごとに違うため）。 */}
-        {/* デモのゲストは、みんなで見ているデモ用コミュニティの絵を変えられません
-            （DB 側でも止めています。supabase/01_schema.sql の is_demo_guest） */}
-        {canEdit ? (
-          <label className="relative shrink-0 cursor-pointer">
-            {square}
-            {/* カメラの印。これが無いと「押せる」と気づかれません */}
-            <CameraBadge />
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) handlePick(file);
-                // 同じ画像をもう一度選んでも反応するように、選んだ記録を消しておきます
-                event.target.value = "";
-              }}
-            />
-          </label>
-        ) : (
-          <div className="shrink-0">{square}</div>
-        )}
+        <label className="relative shrink-0 cursor-pointer">
+          {square}
+          {/* カメラの印。これが無いと「押せる」と気づかれません */}
+          <CameraBadge />
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) handlePick(file);
+              // 同じ画像をもう一度選んでも反応するように、選んだ記録を消しておきます
+              event.target.value = "";
+            }}
+          />
+        </label>
 
         {/* min-w-0 = 名前が長くても、この欄が押し広がらないようにする指定 */}
         <div className="min-w-0 flex-1">

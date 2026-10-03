@@ -28,8 +28,6 @@ export default async function LoginPage({
           ? ERROR_MESSAGES[error]
           : null
       }
-      // 発表用の「デモで入る」ボタン。DEMO_COMMUNITY_ID が設定されているときだけ出します（app/api/demo-login）
-      demoEnabled={Boolean(process.env.DEMO_COMMUNITY_ID)}
     />
   );
 }

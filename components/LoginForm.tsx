@@ -18,42 +18,15 @@ import KnotMark from "@/components/KnotMark";
 type LoginFormProps = {
   // Googleから戻ってきて失敗したときの理由。うまくいっていれば null。
   initialMessage: string | null;
-  // 発表用の「デモで入る」ボタンを出すか（環境変数 DEMO_COMMUNITY_ID があるときだけ true）
-  demoEnabled: boolean;
 };
 
-export default function LoginForm({ initialMessage, demoEnabled }: LoginFormProps) {
+export default function LoginForm({ initialMessage }: LoginFormProps) {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [message, setMessage] = useState<string | null>(initialMessage);
-
-  // ▼ 「デモで入る」。サーバーが、押した人専用の使い捨てアカウントを作って、
-  //   デモ用のコミュニティに入れた状態でログインさせてくれます（app/api/demo-login）。
-  //   発表で、登録の手間をとばしてすぐ中身を見せるためのものです
-  const handleDemo = async () => {
-    setMessage(null);
-    setIsSending(true);
-    // 通信が切れていると fetch そのものが失敗します（例外）。
-    // 受け止めないと、ボタンが押せないまま戻らなくなっていました
-    try {
-      const response = await fetch("/api/demo-login", { method: "POST" });
-      if (!response.ok) {
-        // サーバーが返した理由（「デモの準備ができていません」など）を、そのまま出します
-        const result = await response.json().catch(() => null);
-        setMessage(result?.error ?? "デモに入れませんでした");
-        setIsSending(false);
-        return;
-      }
-      router.push("/");
-      router.refresh();
-    } catch {
-      setMessage("つながりませんでした。電波の良いところで、もう一度お試しください");
-      setIsSending(false);
-    }
-  };
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -107,18 +80,6 @@ export default function LoginForm({ initialMessage, demoEnabled }: LoginFormProp
       </form>
 
       {message ? <p className="text-xs text-beni">{message}</p> : null}
-
-      {/* ▼ 発表用。押すだけで、投稿やメンバーがそろったデモ用アカウントに入れます */}
-      {demoEnabled ? (
-        <button
-          type="button"
-          onClick={handleDemo}
-          disabled={isSending}
-          className="h-14 w-full cursor-pointer rounded-full bg-white text-base font-bold text-beni ring-2 ring-beni disabled:opacity-40"
-        >
-          デモで入る
-        </button>
-      ) : null}
 
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-stone-200" />

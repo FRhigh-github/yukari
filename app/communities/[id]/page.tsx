@@ -3,7 +3,6 @@ import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import InviteCode from "@/components/InviteCode";
 import CommunitySettings from "@/components/CommunitySettings";
 import CommunityIcon from "@/components/CommunityIcon";
-import { isDemoGuest } from "@/lib/demoGuest";
 
 export default async function CommunityPage({
   params,
@@ -15,11 +14,6 @@ export default async function CommunityPage({
   // 本人確認。通信なしで済みます（lib/supabase/server.ts の getCurrentUserId）
   const userId = await getCurrentUserId(supabase);
   const user = userId === null ? null : { id: userId };
-
-  // デモのゲストには、アイコン・名前の変更と退出を出しません（lib/demoGuest.ts）。
-  // getClaims は通信なしで済むので、待ち時間は増えません
-  const { data: claims } = await supabase.auth.getClaims();
-  const isGuest = isDemoGuest(claims?.claims.email);
 
   // ▼ コミュニティとメンバーの一覧は、どちらも id だけで取れるので同時に出します。
   //   前は1つずつ待っていたので、通信2回ぶん待たされていました。
@@ -82,7 +76,6 @@ export default async function CommunityPage({
         communityId={community.id}
         name={community.name}
         iconUrl={community.icon_url}
-        canEdit={!isGuest}
       />
 
       <section>
@@ -132,7 +125,6 @@ export default async function CommunityPage({
         communityId={community.id}
         currentName={community.name}
         isOwner={community.created_by === user?.id}
-        isGuest={isGuest}
       />
     </main>
   );

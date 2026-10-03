@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getHomeData } from "@/lib/home";
-import { createClient } from "@/lib/supabase/server";
-import { isDemoGuest } from "@/lib/demoGuest";
 import CommunitySwitcher from "@/components/CommunitySwitcher";
 import MemberCircles from "@/components/MemberCircles";
 import RecoveryNotice from "@/components/RecoveryNotice";
@@ -56,11 +54,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   //   ログインが済んでから戻ってきたときに、初めて紐が流れます。
   if (user === null) redirect("/login");
 
-  // デモのゲストには、コミュニティの「作る」「参加する」を出しません（lib/demoGuest.ts）。
-  // getClaims は通信なしで済むので、待ち時間は増えません
-  const { data: claims } = await (await createClient()).auth.getClaims();
-  const isGuest = isDemoGuest(claims?.claims.email);
-
   return (
     // h-full = 親（layout の main）からもらった高さいっぱい。
     // 縦に伸ばさず、この中で収める形にします。
@@ -78,7 +71,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           selectedId={currentId}
           memberCount={members.length}
           todayCount={todayCount}
-          isGuest={isGuest}
         />
 
         {/* お知らせの鐘。押すと、新しいご報告の一覧が開きます（NotificationBell）。

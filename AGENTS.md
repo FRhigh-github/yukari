@@ -74,7 +74,8 @@ Supabase。**手順と決まりごとは `supabase/README.md` にまとめてあ
 supabase/00_reset.sql             まっさらにする（危険。全アカウントも消える）
 supabase/01_schema.sql            土台（テーブル・型・RLS・関数・トリガー・保管庫）
 supabase/02_seed.sql              ダミーの10人と中身。流し直すとダミーだけ入れ替わる
-supabase/03_clear_demo_guests.sql 「デモで入る」のゲストを消す（発表後）
+supabase/04_remove_dummy_data.sql 本番からダミーとゲストを片づける（公開前に1回）
+supabase/migrations/              本番に流す差分（下を参照）
 ```
 
 **許可を足すときは、ダッシュボードから足さずに SQL のファイルに書く。**
@@ -91,7 +92,6 @@ DB を変えるときは、`01_schema.sql`（今の正しい形）と `supabase/
 - `messages`（チャット）は **そのイベントが見える人しか読めない**
 - `recovery_codes` は **発行した本人しか読めない**
 - `interactions`（最後に話した日）は **画面からは書けない**。カード・お祝い・チャットを送ると、DB のトリガーが記録する
-- デモのゲスト（`@demo.yukari.invalid`）は、コミュニティの作成・参加・退出・名前やアイコンの変更ができない（`is_demo_guest`）
 
 テーブルを増やしたら、RLS の設定も必ず書くこと。
 書き忘れると、鍵を持っている人（＝アプリを開いた全員）が中身を全部読み書きできる。

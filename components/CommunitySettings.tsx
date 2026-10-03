@@ -9,15 +9,12 @@ type CommunitySettingsProps = {
   currentName: string;
   // 作成者かどうか。退出の確認に「あなたは作成者です」と添えるために使います
   isOwner: boolean;
-  // デモのゲストかどうか。ゲストには名前の変更と退出を出しません
-  isGuest: boolean;
 };
 
 export default function CommunitySettings({
   communityId,
   currentName,
   isOwner,
-  isGuest,
 }: CommunitySettingsProps) {
   const router = useRouter();
 
@@ -89,18 +86,6 @@ export default function CommunitySettings({
     router.push("/");
     router.refresh();
   };
-
-  // ▼ デモのゲストには、名前の変更も退出も出しません。
-  //   デモ用コミュニティは審査員みんなで見ているので、1人が変えると全員の画面が変わります。
-  //   退出すると、ゲストはほかのコミュニティに入れないので、どこにも戻れなくなります。
-  //   （DB 側でも止めています。supabase/01_schema.sql の is_demo_guest）
-  if (isGuest) {
-    return (
-      <p className="text-xs leading-relaxed text-stone-500">
-        デモ用のコミュニティなので、名前の変更と退出はできません。
-      </p>
-    );
-  }
 
   return (
     <div className="space-y-6">

@@ -12,18 +12,15 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isDemoGuest } from "@/lib/demoGuest";
 
 // ログインしていなくても開ける画面。
-// ログイン・登録・思い出ログイン（本人はまだログインできない）・デモと、その裏で動く処理だけです
+// ログイン・登録・思い出ログイン（本人はまだログインできない）と、その裏で動く処理だけです
 const PUBLIC_PATHS = [
   "/login",
   "/signup",
   "/recover",
   "/auth/callback",
   "/api/recovery",
-  // 発表用の「デモで入る」（DEMO_COMMUNITY_ID が無ければ、中で断ります）
-  "/api/demo-login",
 ];
 
 const isPublic = (path: string) =>
@@ -71,18 +68,6 @@ export async function proxy(request: NextRequest) {
   //   別のアカウントで入りたいときは、プロフィールの「ログアウト」から出てもらいます
   const path = request.nextUrl.pathname;
   if (isLoggedIn && (path === "/login" || path === "/signup")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
-
-  // ▼ デモのゲストは、ほかのコミュニティを作ったり、参加したりできません。
-  //   その画面を開こうとしたら、ホームへ戻します（DB 側でも止めています）
-  if (
-    isDemoGuest(data?.claims.email) &&
-    (path === "/communities/new" || path === "/communities/join")
-  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";

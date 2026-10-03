@@ -27,8 +27,6 @@ type CommunitySwitcherProps = {
   selectedId: string | null;
   memberCount: number;
   todayCount: number;
-  // デモのゲストかどうか。ゲストには「作る」「参加する」を出しません
-  isGuest: boolean;
 };
 
 export default function CommunitySwitcher({
@@ -36,7 +34,6 @@ export default function CommunitySwitcher({
   selectedId,
   memberCount,
   todayCount,
-  isGuest,
 }: CommunitySwitcherProps) {
   const [isOpen, setIsOpen] = useState(false);
   // 一覧の下で開いている入力欄。"create" = 作る、"join" = 招待コードで参加、null = 閉じている。
@@ -144,38 +141,36 @@ export default function CommunitySwitcher({
 
               {/* 作る・参加する への入口も、同じ場所に置きます。
                 切り替えのために開いたついでに操作できるほうが早いためです。 */}
-              {isGuest ? null : (
-                <div className="mt-2 border-t border-stone-100 pt-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormMode(formMode === "create" ? null : "create")
-                    }
-                    className="flex h-12 w-full cursor-pointer items-center px-5 text-sm text-stone-600"
-                  >
-                    ＋ コミュニティを新しく作る
-                  </button>
-                  {formMode === "create" ? (
-                    <div className="px-4 pb-3">
-                      <CommunityCreateForm inline />
-                    </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormMode(formMode === "join" ? null : "join")
-                    }
-                    className="flex h-12 w-full cursor-pointer items-center px-5 text-sm text-stone-600"
-                  >
-                    招待コードで参加する
-                  </button>
-                  {formMode === "join" ? (
-                    <div className="px-4 pb-3">
-                      <CommunityJoinForm />
-                    </div>
-                  ) : null}
-                </div>
-              )}
+              <div className="mt-2 border-t border-stone-100 pt-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormMode(formMode === "create" ? null : "create")
+                  }
+                  className="flex h-12 w-full cursor-pointer items-center px-5 text-sm text-stone-600"
+                >
+                  ＋ コミュニティを新しく作る
+                </button>
+                {formMode === "create" ? (
+                  <div className="px-4 pb-3">
+                    <CommunityCreateForm inline />
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormMode(formMode === "join" ? null : "join")
+                  }
+                  className="flex h-12 w-full cursor-pointer items-center px-5 text-sm text-stone-600"
+                >
+                  招待コードで参加する
+                </button>
+                {formMode === "join" ? (
+                  <div className="px-4 pb-3">
+                    <CommunityJoinForm />
+                  </div>
+                ) : null}
+              </div>
             </div>
           </>
         ) : null}
