@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { avatarPathFromUrl, newAvatarPath } from "@/lib/avatarFile";
 import ImageCropper from "@/components/ImageCropper";
 import CameraBadge from "@/components/CameraBadge";
 import { MOODS } from "@/lib/mood";
@@ -79,15 +80,12 @@ export default function ProfileForm({
       let uploadedUrl = avatarUrl;
 
       if (newAvatar !== null) {
-        // ファイル名は自分のidにします。作り直すたびに増えません。
-        const path = `${data.user.id}.jpg`;
+        // ファイル名は毎回ランダムな id にします（lib/avatarFile.ts）。
+        // 名前が毎回ちがうので、古い画像が表示され続けることもありません
+        const path = newAvatarPath(data.user.id);
         const upload = await supabase.storage
           .from("avatars")
-          .upload(path, newAvatar, {
-            contentType: "image/jpeg",
-            // upsert = 同じ名前があれば上書きする
-            upsert: true,
-          });
+          .upload(path, newAvatar, { contentType: "image/jpeg" });
 
         if (upload.error) throw new Error(upload.error.message);
 
@@ -95,8 +93,7 @@ export default function ProfileForm({
           .from("avatars")
           .getPublicUrl(path);
 
-        // ?t=... を付けて、古い画像が表示され続けるのを防ぎます
-        uploadedUrl = `${publicUrl.publicUrl}?t=${Date.now()}`;
+        uploadedUrl = publicUrl.publicUrl;
       }
 
       // ▼ 最後の .select() が大事です。
@@ -120,6 +117,14 @@ export default function ProfileForm({
         setMessage("保存できませんでした。もう一度お試しください");
         setIsSaving(false);
         return;
+      }
+
+      // ▼ アイコンを変えたら、前のファイルを消します。
+      //   残しておくと、前の写真の URL を知っている人に見られ続けるためです。
+      //   消せなくても保存はできているので、そのまま進みます
+      const oldPath = avatarPathFromUrl(avatarUrl);
+      if (newAvatar !== null && oldPath !== null) {
+        await supabase.storage.from("avatars").remove([oldPath]);
       }
 
       router.push("/profile");

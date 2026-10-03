@@ -522,7 +522,7 @@ as $$
 $$;
 
 -- アイコンを変えます（メンバーなら誰でも）。
--- 入れられるのは、このアプリの保管庫の「avatars/communities/<id>.jpg」の URL だけです。
+-- 入れられるのは、このアプリの保管庫の「avatars/communities/<id>/<ランダムな id>.jpg」の URL だけです。
 -- 何でも入れられると、よそのサイトの画像（見た人を記録する仕掛けなど）を出させられるためです
 create function public.set_community_icon(target_community uuid, url text)
 returns boolean
@@ -536,10 +536,9 @@ as $$
       and is_member(target_community)
       and not is_demo_guest()
       -- ~ は「この形に合っているか」を調べる記号（正規表現）。
-      -- 最後の ?t=数字 は、画像を差し替えたときに古い絵が出ないようにする目印です
       and url ~ (
         '^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/avatars/communities/'
-        || target_community::text || '\.jpg(\?t=[0-9]+)?$'
+        || target_community::text || '/[0-9a-f-]{36}\.jpg$'
       )
     returning 1
   )
@@ -1137,54 +1136,53 @@ end $$;
 --   storage.foldername(name)[1] = いちばん上のフォルダ名
 --   storage.filename(name)      = フォルダを除いたファイル名
 
--- プロフィールのアイコン：avatars/<自分の id>.jpg だけ。
--- 上書き（upsert）で上げているので、置く・上書き・読む の3つが要ります
+-- プロフィールのアイコン：avatars/<自分の id>/<ランダムな id>.jpg（lib/avatarFile.ts）。
+-- ▼ 名前にランダムな id を入れている理由
+--   avatars は公開の置き場所なので、URL さえ分かれば誰でも見られます。
+--   前は「<自分の id>.jpg」で、id を知っている人なら URL を作れてしまいました。
+-- 置く・読む・消す の3つです（上書きはしないので、書き換えの許可はありません）。
+-- 読む・消すは、前の形（<自分の id>.jpg）のファイルも片づけられるように、そちらも認めます
 create policy "avatar insert own"
   on storage.objects for insert
   to authenticated
-  with check (bucket_id = 'avatars' and name = auth.uid()::text || '.jpg');
-
-create policy "avatar update own"
-  on storage.objects for update
-  to authenticated
-  using (bucket_id = 'avatars' and name = auth.uid()::text || '.jpg')
-  with check (bucket_id = 'avatars' and name = auth.uid()::text || '.jpg');
+  with check (
+    bucket_id = 'avatars'
+    and name ~ ('^' || auth.uid()::text || '/[0-9a-f-]{36}\.jpg$')
+  );
 
 create policy "avatar read own"
   on storage.objects for select
   to authenticated
-  using (bucket_id = 'avatars' and name = auth.uid()::text || '.jpg');
+  using (
+    bucket_id = 'avatars'
+    and ((storage.foldername(name))[1] = auth.uid()::text or name = auth.uid()::text || '.jpg')
+  );
 
--- コミュニティのアイコン：avatars/communities/<コミュニティの id>.jpg。
+create policy "avatar delete own"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and ((storage.foldername(name))[1] = auth.uid()::text or name = auth.uid()::text || '.jpg')
+  );
+
+-- コミュニティのアイコン：avatars/communities/<コミュニティの id>/<ランダムな id>.jpg。
 -- そのコミュニティのメンバーだけ（ゲストは除く）。
 -- ▼ id の比べ方について
 --   ファイル名を uuid に変換して比べると、uuid でない名前のときにエラーで止まります。
---   文字のまま比べれば、合わないだけで済みます
+--   文字のまま比べれば、合わないだけで済みます。
+--   coalesce の2つめは、前の形（communities/<コミュニティの id>.jpg）を片づけるためです
 create policy "community icon insert"
   on storage.objects for insert
   to authenticated
   with check (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = 'communities'
+    and name ~ '^communities/[0-9a-f-]{36}/[0-9a-f-]{36}\.jpg$'
     and not public.is_demo_guest()
     and exists (
       select 1 from public.memberships m
       where m.user_id = auth.uid()
-        and m.community_id::text = replace(storage.filename(name), '.jpg', '')
-    )
-  );
-
-create policy "community icon update"
-  on storage.objects for update
-  to authenticated
-  using (
-    bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = 'communities'
-    and not public.is_demo_guest()
-    and exists (
-      select 1 from public.memberships m
-      where m.user_id = auth.uid()
-        and m.community_id::text = replace(storage.filename(name), '.jpg', '')
+        and m.community_id::text = (storage.foldername(name))[2]
     )
   );
 
@@ -1197,7 +1195,27 @@ create policy "community icon read"
     and exists (
       select 1 from public.memberships m
       where m.user_id = auth.uid()
-        and m.community_id::text = replace(storage.filename(name), '.jpg', '')
+        and m.community_id::text = coalesce(
+          (storage.foldername(name))[2],
+          replace(storage.filename(name), '.jpg', '')
+        )
+    )
+  );
+
+create policy "community icon delete"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = 'communities'
+    and not public.is_demo_guest()
+    and exists (
+      select 1 from public.memberships m
+      where m.user_id = auth.uid()
+        and m.community_id::text = coalesce(
+          (storage.foldername(name))[2],
+          replace(storage.filename(name), '.jpg', '')
+        )
     )
   );
 

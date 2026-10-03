@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { avatarPathFromUrl, newAvatarPath } from "@/lib/avatarFile";
 import ImageCropper from "@/components/ImageCropper";
 import CameraBadge from "@/components/CameraBadge";
 
@@ -83,17 +84,14 @@ export default function CommunityIcon({
       //   公開なので、URLをそのまま communities に入れておけます。
       //   非公開だと、コミュニティを出すたびに期限付きURLの発行が要ります。
       //
-      //   ファイル名はコミュニティのid。
-      //   変えるたびにファイルが増えていかないようにするためです。
-      const path = `communities/${communityId}.jpg`;
+      //   ファイル名は「communities/<コミュニティの id>/<ランダムな id>.jpg」（lib/avatarFile.ts）。
+      //   公開の置き場所なので、名前を当てられないようにしています。
+      //   前のファイルは、新しいアイコンに変えたあとで消します
+      const path = newAvatarPath(`communities/${communityId}`);
       const upload = await supabase.storage
         .from("avatars")
-        .upload(path, blob, {
-          // 切り取り画面が JPEG にして返すので、形式は決まっています
-          contentType: "image/jpeg",
-          // upsert = 同じ名前があれば上書きする
-          upsert: true,
-        });
+        // 切り取り画面が JPEG にして返すので、形式は決まっています
+        .upload(path, blob, { contentType: "image/jpeg" });
 
       if (upload.error) throw new Error(`画像: ${upload.error.message}`);
 
@@ -101,8 +99,8 @@ export default function CommunityIcon({
         .from("avatars")
         .getPublicUrl(path);
 
-      // ?t=... を付けて、古い絵が表示され続けるのを防ぎます
-      const savedUrl = `${publicUrl.publicUrl}?t=${Date.now()}`;
+      // 名前が毎回ちがうので、古い絵が表示され続けることはありません
+      const savedUrl = publicUrl.publicUrl;
 
       // ▼ 表を直接書き換えるのではなく、DB側の関数を呼びます。
       //   関数の中で「このコミュニティの人か」を確かめているので、
@@ -115,6 +113,12 @@ export default function CommunityIcon({
 
       if (error) throw new Error(error.message);
       if (changed !== true) throw new Error("このコミュニティのアイコンは変えられません");
+
+      // 前のアイコンのファイルを消します（URL を知っている人に見られ続けないように）
+      const oldPath = avatarPathFromUrl(iconUrl);
+      if (oldPath !== null) {
+        await supabase.storage.from("avatars").remove([oldPath]);
+      }
 
       setPicked(null);
       setMessage({ text: "保存しました", isError: false });

@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { newAvatarPath } from "@/lib/avatarFile";
 import { shrinkImage } from "@/lib/image";
 import CameraBadge from "@/components/CameraBadge";
 import BirthdayPicker from "@/components/BirthdayPicker";
@@ -79,10 +80,11 @@ export default function SetupForm({
       // アイコンを選んでいれば、公開の置き場所へ上げます。
       // 上げられなくても先へ進みます（あとからプロフィールで設定できます）。
       if (avatar !== null) {
-        const path = `${data.user.id}.jpg`;
+        // ファイル名は毎回ランダムな id にします（lib/avatarFile.ts）
+        const path = newAvatarPath(data.user.id);
         const upload = await supabase.storage
           .from("avatars")
-          .upload(path, avatar, { contentType: "image/jpeg", upsert: true });
+          .upload(path, avatar, { contentType: "image/jpeg" });
 
         if (upload.error === null) {
           const { data: publicUrl } = supabase.storage
