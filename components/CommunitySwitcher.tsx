@@ -98,7 +98,7 @@ export default function CommunitySwitcher({
               </span>
               <span className="shrink-0 text-xs text-kin">▼</span>
             </span>
-            <span className="block truncate text-xs text-stone-400">
+            <span className="block truncate text-xs text-stone-500">
               {memberCount}人
               {/* 今日の報告だけ金にして、目が行くようにします */}
               {todayCount > 0 ? (

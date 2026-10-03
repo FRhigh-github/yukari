@@ -85,7 +85,7 @@ export default function RecoveryCodeButton({
           {code}
         </p>
 
-        <p className="text-xs leading-relaxed text-stone-400">
+        <p className="text-xs leading-relaxed text-stone-500">
           24時間で使えなくなります。
           <br />
           このコードだけでは入れません。ほかに2人ぶん必要です。
@@ -105,12 +105,12 @@ export default function RecoveryCodeButton({
         {isSending ? "発行中..." : "復旧を手伝う（コードを発行）"}
       </button>
 
-      <p className="text-center text-xs text-stone-400">
+      <p className="text-center text-xs text-stone-500">
         {targetName} さんがアプリに入れなくなったときに使います
       </p>
 
       {message ? (
-        <p className="text-center text-xs text-red-600">{message}</p>
+        <p className="text-center text-xs text-beni">{message}</p>
       ) : null}
     </div>
   );

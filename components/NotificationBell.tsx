@@ -106,7 +106,7 @@ export default function NotificationBell({ news }: NotificationBellProps) {
                         >
                           {item.title}
                         </span>
-                        <span className="block text-xs text-stone-400">{item.timeLabel}</span>
+                        <span className="block text-xs text-stone-500">{item.timeLabel}</span>
                       </span>
                       {/* まだ見ていないものだけ、右に紅い点 */}
                       {item.isUnseen ? (

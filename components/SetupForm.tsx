@@ -164,7 +164,7 @@ export default function SetupForm({
       </label>
 
       {/* 本名をお願いする理由を添えます。理由なく求めると、入れてもらえません */}
-      <p className="-mt-2 text-xs text-stone-400">
+      <p className="-mt-2 text-xs text-stone-500">
         大切な人に見つけてもらうところなので、なるべく本名でお願いします
       </p>
 
@@ -183,7 +183,7 @@ export default function SetupForm({
         {isSending ? "保存中..." : "はじめる"}
       </button>
 
-      {message ? <p className="text-xs text-red-600">{message}</p> : null}
+      {message ? <p className="text-xs text-beni">{message}</p> : null}
     </form>
   );
 }

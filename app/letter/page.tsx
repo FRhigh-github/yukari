@@ -1431,7 +1431,7 @@ export default function LetterPage() {
                       // h-11 = 押せる範囲 44px。
                       // 下線は選んでいないときも透明で引いておき、切り替えても高さが変わらないようにします
                       className={`-mb-px h-11 flex-1 border-b-2 text-sm font-bold ${
-                        styleTab === tab ? "border-kin text-kin" : "border-transparent text-stone-400"
+                        styleTab === tab ? "border-kin text-kin" : "border-transparent text-stone-500"
                       }`}
                     >
                       {tab === "font" ? "書体" : "色"}
@@ -1767,7 +1767,7 @@ export default function LetterPage() {
                   {/* 期間のときだけ、終わりの日の欄を出します */}
                   {row.isRange && (
                     <>
-                      <span className="text-stone-400">〜</span>
+                      <span className="text-stone-500">〜</span>
                       <input
                         type="date"
                         value={row.end}
@@ -1785,7 +1785,7 @@ export default function LetterPage() {
                         setDraft({ ...draft, rows: draft.rows.filter((_, i) => i !== index) })
                       }
                       aria-label="この候補日を消す"
-                      className="flex h-11 w-11 shrink-0 items-center justify-center text-xl text-stone-400"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center text-xl text-stone-500"
                     >
                       ×
                     </button>
@@ -1801,7 +1801,7 @@ export default function LetterPage() {
                       className={`h-9 rounded-full px-3 text-sm ${
                         row.isRange === isRange
                           ? "bg-white font-bold text-kin ring-1 ring-kin"
-                          : "text-stone-400"
+                          : "text-stone-500"
                       }`}
                     >
                       {isRange ? "期間" : "1日"}

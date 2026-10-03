@@ -241,7 +241,7 @@ export default function ProfileForm({
         </button>
 
         {message ? (
-          <p className="text-center text-xs text-red-600">{message}</p>
+          <p className="text-center text-xs text-beni">{message}</p>
         ) : null}
       </div>
     </div>

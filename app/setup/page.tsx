@@ -42,7 +42,7 @@ export default async function SetupPage({
           「ログインしたつもりが、新しく作られていた」に気づいてもらうためです。
           前に使っていたアカウントがある人は、ここで引き返せます。 */}
       {isNew === "1" ? (
-        <div className="rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-stone-700">
+        <div className="rounded-xl bg-[#fdf6f0] p-3 text-xs leading-relaxed text-stone-700">
           このGoogleアカウントは、ゆかりでは初めてです。
           <br />
           <span className="font-bold">新しくアカウントを作りました。</span>

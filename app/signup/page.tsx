@@ -90,12 +90,12 @@ export default function SignupPage() {
         </button>
       </form>
 
-      {message ? <p className="text-xs text-red-600">{message}</p> : null}
+      {message ? <p className="text-xs text-beni">{message}</p> : null}
 
       {/* 線と「または」。左右の線は flex-1 で余白いっぱいに伸ばします */}
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-stone-200" />
-        <span className="text-xs text-stone-400">または</span>
+        <span className="text-xs text-stone-500">または</span>
         <span className="h-px flex-1 bg-stone-200" />
       </div>
 

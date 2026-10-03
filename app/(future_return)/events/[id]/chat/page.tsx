@@ -321,7 +321,7 @@ export default function EventChatPage() {
                 <span className="font-bold text-stone-700">{vote.date}</span>
                 <span className="text-beni">〇{vote.ok}</span>
                 <span className="text-kin">△{vote.maybe}</span>
-                <span className="text-stone-400">×{vote.ng}</span>
+                <span className="text-stone-500">×{vote.ng}</span>
               </span>
             ))}
           </div>
@@ -391,7 +391,7 @@ export default function EventChatPage() {
                     この発言を消す
                   </button>
                 ) : null}
-                <span className="mt-0.5 px-1 text-xs text-stone-400">
+                <span className="mt-0.5 px-1 text-xs text-stone-500">
                   {new Date(msg.created_at).toLocaleTimeString("ja-JP", {
                     hour: "2-digit",
                     minute: "2-digit",

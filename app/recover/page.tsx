@@ -199,7 +199,7 @@ export default function RecoverPage() {
         </form>
       )}
 
-      {message ? <p className="text-xs text-red-600">{message}</p> : null}
+      {message ? <p className="text-xs text-beni">{message}</p> : null}
 
       {/* 前に申請した人が、24時間後に戻ってくるための入口 */}
       {!waiting ? (

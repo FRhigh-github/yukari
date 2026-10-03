@@ -62,7 +62,8 @@ export default function DeleteItemButton({ kind, id, afterHref }: DeleteItemButt
         <button
           type="button"
           onClick={() => setIsConfirming(true)}
-          className="h-11 px-3 text-sm text-stone-400 underline"
+          // 暗い背景（カードの拡大）でも明るい背景（手紙）でも読めるよう、白い下地を敷きます
+          className="h-11 rounded-full bg-white/90 px-4 text-sm text-stone-600 underline"
         >
           {label}
         </button>

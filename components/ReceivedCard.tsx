@@ -65,7 +65,7 @@ export default function ReceivedCard({
         <p className="mt-2 truncate text-sm font-bold text-stone-800">
           {partnerName ?? "名無し"} <span className="font-normal text-kin">{suffix}</span>
         </p>
-        <p className="text-xs text-stone-400">
+        <p className="text-xs text-stone-500">
           {/* timeZone = サーバーで描いても日本の日付にするため（サーバーの時計は世界標準時） */}
           {new Date(sentAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
         </p>

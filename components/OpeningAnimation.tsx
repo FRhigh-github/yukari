@@ -579,7 +579,7 @@ export default function OpeningAnimation() {
       <p className="opening-caption absolute bottom-16 text-[11px] tracking-[0.22em] text-[#767a72]">
         糸がむすぶ、ゆかり。
       </p>
-      <p className="opening-caption absolute bottom-8 text-xs text-stone-400">
+      <p className="opening-caption absolute bottom-8 text-xs text-stone-500">
         {isDone ? "画面を押してはじめる" : "画面を押すと最後まで進みます"}
       </p>
     </div>

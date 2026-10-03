@@ -69,7 +69,7 @@ export function RemoveMemberButton({
       type="button"
       onClick={() => setIsConfirming(true)}
       aria-label={`${name}さんをコミュニティから外す`}
-      className="h-11 shrink-0 px-2 text-xs text-stone-400 underline"
+      className="h-11 shrink-0 px-2 text-xs text-stone-500 underline"
     >
       外す
     </button>
@@ -118,7 +118,7 @@ export function ReportList({
             <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-stone-600">
               {report.reason}
             </p>
-            <p className="mt-1 text-xs text-stone-400">
+            <p className="mt-1 text-xs text-stone-500">
               {report.reporterName}さんより・
               {new Date(report.createdAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
             </p>

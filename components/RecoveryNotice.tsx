@@ -54,7 +54,7 @@ export default function RecoveryNotice({ requests }: RecoveryNoticeProps) {
       {requests.map((request) => (
         <div
           key={request.id}
-          className="rounded-xl bg-amber-50 p-3 text-xs text-stone-700"
+          className="rounded-xl bg-[#fdf6f0] p-3 text-sm text-stone-700 ring-1 ring-beni/40"
         >
           {/* 自分への申請なら、言い方を変えます。
               ログインできている本人にとっては、身に覚えのない申請＝乗っ取りのおそれだからです */}
@@ -79,14 +79,14 @@ export default function RecoveryNotice({ requests }: RecoveryNoticeProps) {
               <button
                 type="button"
                 onClick={() => handleVeto(request.id)}
-                className="flex-1 cursor-pointer rounded-lg bg-red-600 py-2 text-[11px] font-bold text-white"
+                className="h-11 flex-1 cursor-pointer rounded-lg bg-beni text-sm font-bold text-white"
               >
                 止める
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmingId(null)}
-                className="flex-1 cursor-pointer rounded-lg border border-stone-300 py-2 text-[11px] text-stone-600"
+                className="h-11 flex-1 cursor-pointer rounded-lg border border-stone-300 bg-white text-sm text-stone-600"
               >
                 やめる
               </button>
@@ -95,14 +95,14 @@ export default function RecoveryNotice({ requests }: RecoveryNoticeProps) {
             <button
               type="button"
               onClick={() => setConfirmingId(request.id)}
-              className="mt-2 cursor-pointer text-[11px] text-red-600 underline"
+              className="mt-1 h-11 cursor-pointer text-sm text-beni underline"
             >
               心当たりがない（止める）
             </button>
           )}
 
           {message ? (
-            <p className="mt-1 text-[11px] text-red-600">{message}</p>
+            <p className="mt-1 text-sm text-beni">{message}</p>
           ) : null}
         </div>
       ))}

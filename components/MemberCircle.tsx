@@ -140,7 +140,7 @@ export default function MemberCircle({
                 全員に付けると印だらけになるので、ごぶさたの人だけが目に入るようにしています。
                 数えているのは DB です（カード・お祝い・チャットを送ると記録されます） */}
           {member.lastContactYears !== null && member.lastContactYears >= 1 ? (
-            <span className="absolute -right-2 -top-1 rounded-full bg-white px-1.5 text-[11px] font-bold leading-4 text-stone-500 shadow-sm ring-1 ring-kin/60">
+            <span className="absolute -right-2 -top-1 rounded-full bg-white px-1.5 text-xs font-bold leading-4 text-stone-600 shadow-sm ring-1 ring-kin/60">
               {member.lastContactYears}年
             </span>
           ) : null}
@@ -150,7 +150,7 @@ export default function MemberCircle({
         {hideName ? null : (
         <span
           className={`w-full truncate text-center text-xs leading-tight ${
-            member.hasNews ? "font-bold text-stone-700" : "text-stone-400"
+            member.hasNews ? "font-bold text-stone-700" : "text-stone-500"
           }`}
         >
           {member.displayName ?? "名無し"}

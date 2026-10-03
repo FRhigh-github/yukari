@@ -88,7 +88,7 @@ export default function LoginForm({ initialMessage }: LoginFormProps) {
 
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-stone-200" />
-        <span className="text-xs text-stone-400">または</span>
+        <span className="text-xs text-stone-500">または</span>
         <span className="h-px flex-1 bg-stone-200" />
       </div>
 

@@ -56,7 +56,7 @@ const ANSWER_MARK: Record<ResponseStatus, string> = { ok: "〇", maybe: "△", n
 const ANSWER_COLOR: Record<ResponseStatus, string> = {
   ok: "text-beni",
   maybe: "text-kin",
-  ng: "text-stone-400",
+  ng: "text-stone-500",
 };
 
 // "2030-04-01" を「4月1日(月)」の形にします。年が今年でなければ年も付けます
@@ -394,7 +394,7 @@ export default function EventDetailPage() {
                   <span className="flex items-center gap-2 text-base font-bold">
                     <span className="text-beni">〇{counts.ok}</span>
                     <span className="text-kin">△{counts.maybe}</span>
-                    <span className="text-stone-400">×{counts.ng}</span>
+                    <span className="text-stone-500">×{counts.ng}</span>
                   </span>
                 </div>
 
@@ -489,7 +489,7 @@ export default function EventDetailPage() {
                               : st === "maybe"
                                 ? "bg-kin text-white"
                                 : "bg-stone-500 text-white"
-                            : "bg-white text-stone-400 ring-1 ring-stone-200"
+                            : "bg-white text-stone-500 ring-1 ring-stone-200"
                         }`}
                       >
                         {ANSWER_MARK[st]}

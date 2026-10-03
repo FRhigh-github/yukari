@@ -107,7 +107,7 @@ export default async function ProfilePage() {
       </div>
 
       {/* アプリのバージョン。何の版を見ているか、発表や不具合の相談のときに分かるようにします */}
-      <p className="pt-6 text-center text-xs tracking-widest text-stone-400">
+      <p className="pt-6 text-center text-xs tracking-widest text-stone-500">
         ゆかり v{packageJson.version}
       </p>
     </main>

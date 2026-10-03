@@ -606,7 +606,7 @@ export default function CardComposer({ initialKind }: CardComposerProps) {
         {isPicking ? (
           <div className="space-y-2">
             {recipients === null ? (
-              <p className="py-3 text-center text-sm text-stone-400">…</p>
+              <p className="py-3 text-center text-sm text-stone-500">…</p>
             ) : (
               <select
                 value={target}
