@@ -428,6 +428,30 @@ as $$
   );
 $$;
 
+-- プロフィールのアイコンに入れてよい URL か。
+--   ・このアプリの保管庫の、自分のアイコン（avatars/<自分の id>/... と、前の形の <自分の id>.jpg）
+--   ・Google でログインした人の、Google のアイコン
+--   ・アプリの中に置いたダミーの絵（/demo/avatars/...）
+--   ・空（null）
+-- ▼ なぜ要るのか
+--   何でも入れられると、よそのサイトの画像（見た人を記録する仕掛けなど）を
+--   コミュニティの全員の画面に出させられるためです（コミュニティのアイコンと同じ考え方）。
+--   画面側でも、読み込める画像の置き場所を絞っています（next.config.ts の Content-Security-Policy）
+create function public.is_allowed_avatar(url text)
+returns boolean
+language sql
+stable
+set search_path to 'public'
+as $$
+  select url is null
+    or url ~ (
+      '^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/avatars/'
+      || auth.uid()::text || '(/[0-9a-f-]{36})?\.jpg(\?t=[0-9]+)?$'
+    )
+    or url ~ '^https://lh3\.googleusercontent\.com/[A-Za-z0-9/_=-]+$'
+    or url ~ '^/demo/avatars/[a-z0-9-]+\.svg$';
+$$;
+
 -- ------------------------------------------------------------
 --  画面から呼ぶ関数（supabase.rpc(...)）
 --  communities / memberships には、画面から直接足す許可を出していません。
@@ -730,16 +754,17 @@ create policy "profiles readable"
   to authenticated
   using (id = auth.uid() or shares_community(id));
 
+-- アイコンの URL は、決まった置き場所のものだけ（is_allowed_avatar を参照）
 create policy "profiles self insert"
   on public.profiles for insert
   to authenticated
-  with check (id = auth.uid());
+  with check (id = auth.uid() and is_allowed_avatar(avatar_url));
 
 create policy "profiles self update"
   on public.profiles for update
   to authenticated
   using (id = auth.uid())
-  with check (id = auth.uid());
+  with check (id = auth.uid() and is_allowed_avatar(avatar_url));
 
 -- ------------------------------------------------------------
 --  コミュニティ
@@ -1076,7 +1101,8 @@ revoke execute on function
   public.shares_community(uuid),
   public.is_demo_guest(),
   public.capsule_is_open(uuid),
-  public.is_own_file(text)
+  public.is_own_file(text),
+  public.is_allowed_avatar(text)
 from public, anon;
 
 grant execute on function
@@ -1088,7 +1114,8 @@ grant execute on function
   public.shares_community(uuid),
   public.is_demo_guest(),
   public.capsule_is_open(uuid),
-  public.is_own_file(text)
+  public.is_own_file(text),
+  public.is_allowed_avatar(text)
 to authenticated, service_role;
 
 -- 招待コードを作る関数：画面からは直接呼ばせません（create_community の中で使います）

@@ -82,6 +82,7 @@ drop function if exists
   public.create_community(text),
   public.handle_new_user(),
   public.is_demo_guest(),
+  public.is_allowed_avatar(text),
   public.is_member(uuid),
   public.is_own_file(text),
   public.join_community(text),

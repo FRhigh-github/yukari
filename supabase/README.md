@@ -37,6 +37,7 @@ DB を変えるときは、次の2か所に同じ変更を書きます。
 | `2026-10-04_01_own_file_paths.sql` | |
 | `2026-10-04_02_strong_invite_codes.sql` | |
 | `2026-10-04_03_random_avatar_names.sql` | |
+| `2026-10-04_04_allowed_avatar_urls.sql` | |
 
 ## 新しく作り直す手順
 
