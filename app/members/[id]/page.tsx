@@ -70,7 +70,7 @@ export default async function MemberPage({
   const drawingPaths = reactions?.map((reaction) => reaction.drawing_url) ?? [];
 
   // 2回目：この3つは、1回目の結果がそろえば同時に出せます
-  //   写真のURLは lib/signedUrls.ts で作ります。同じ写真には6日間同じURLを返すので、
+  //   写真のURLは lib/signedUrls.ts で作ります。同じ写真には20時間同じURLを返すので、
   //   2回目からはブラウザが前にダウンロードした写真をそのまま使えます。
   //   渡している場所は、どれも RLS を通して取ってきたものです（そこの約束を参照）
   const [findSignedImage, { data: reactionUsers }, findDrawingUrl] =
