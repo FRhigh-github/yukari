@@ -54,12 +54,8 @@ export default async function MemberPage({
     ]);
 
   // posts に入っているのは「保管庫のどこに置いたか」という場所だけです。
-  // 保管庫は非公開なので、見るには期限付きの URL を発行してもらいます（3600秒＝1時間）。
-  // http で始まるものはデバッグ用データの外部URLなので、発行の対象から外します。
-  const imagePaths =
-    posts
-      ?.filter((post) => post.image_url && !post.image_url.startsWith("http"))
-      .map((post) => post.image_url) ?? [];
+  // 保管庫は非公開なので、見るには期限付きの URL を発行してもらいます（lib/signedUrls.ts）
+  const imagePaths = posts?.map((post) => post.image_url) ?? [];
 
   // 描いた人の名前を引くために、profiles をまとめて取ります
   const reactionUserIds = Array.from(
@@ -73,7 +69,7 @@ export default async function MemberPage({
   //   写真のURLは lib/signedUrls.ts で作ります。同じ写真には20時間同じURLを返すので、
   //   2回目からはブラウザが前にダウンロードした写真をそのまま使えます。
   //   渡している場所は、どれも RLS を通して取ってきたものです（そこの約束を参照）
-  const [findSignedImage, { data: reactionUsers }, findDrawingUrl] =
+  const [findImageUrl, { data: reactionUsers }, findDrawingUrl] =
     await Promise.all([
       getSignedUrls("posts", imagePaths),
       supabase
@@ -82,14 +78,6 @@ export default async function MemberPage({
         .in("id", reactionUserIds),
       getSignedUrls("drawings", drawingPaths),
     ]);
-
-  // 置き場所から URL を探す。find() = 条件に合う最初の1件を返す
-  const findImageUrl = (path: string | null) => {
-    if (!path) return null;
-    // デバッグ用データは最初から URL なので、そのまま使います
-    if (path.startsWith("http")) return path;
-    return findSignedImage(path);
-  };
 
   // 報告1件ぶんの反応を、表示に使う形にして返します
   const getReactions = (postId: string): Reaction[] =>

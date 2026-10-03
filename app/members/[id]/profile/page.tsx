@@ -64,19 +64,10 @@ export default async function MemberProfilePage({
   const lastContactLabel = formatLastContact(lastContact?.last_at ?? null);
 
   // 写真の置き場所から、期限付きのURLを発行してもらいます
-  const imagePaths =
-    posts
-      ?.filter((post) => post.image_url && !post.image_url.startsWith("http"))
-      .map((post) => post.image_url) ?? [];
+  const imagePaths = posts?.map((post) => post.image_url) ?? [];
 
   // URL は lib/signedUrls.ts で作ります（同じ写真には同じURLを返すので、写真を使い回せます）
-  const findSignedImage = await getSignedUrls("posts", imagePaths);
-
-  const findImageUrl = (path: string | null) => {
-    if (!path) return null;
-    if (path.startsWith("http")) return path;
-    return findSignedImage(path);
-  };
+  const findImageUrl = await getSignedUrls("posts", imagePaths);
 
   // ▼ 一緒に持ってきた communities から、名前だけを取り出します。
   //

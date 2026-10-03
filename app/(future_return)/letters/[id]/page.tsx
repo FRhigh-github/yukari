@@ -32,9 +32,7 @@ export default async function LetterDetailPage({
   //   ・その手紙にイベント（日程調整）が付いているか。付いていないのにボタンを出すと、
   //     押しても「イベントが見つかりません」になってしまうため、先に確かめます
   //   ・書いた人の名前
-  const imagePaths = list
-    .map((letter) => letter.image_url)
-    .filter((path): path is string => path !== null && !path.startsWith("http"));
+  const imagePaths = list.map((letter) => letter.image_url);
 
   const [findImageUrl, { data: events }, { data: authors }] = await Promise.all([
     getSignedUrls("drawings", imagePaths),
@@ -55,9 +53,7 @@ export default async function LetterDetailPage({
         id: letter.id,
         body: letter.body,
         openAt: letter.open_at,
-        imageUrl: letter.image_url?.startsWith("http")
-          ? letter.image_url
-          : findImageUrl(letter.image_url),
+        imageUrl: findImageUrl(letter.image_url),
         eventId: events?.find((event) => event.capsule_id === letter.id)?.id ?? null,
         authorName:
           authors?.find((author) => author.id === letter.author_id)?.display_name ?? null,

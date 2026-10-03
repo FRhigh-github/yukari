@@ -50,21 +50,30 @@ const signOne = unstable_cache(
   { revalidate: REUSE_FOR },
 );
 
-// 保管庫の中ではない画像か。
-//   http で始まるもの = ダミーデータ用の外部の画像（アイコン・写真）
-//   / で始まるもの    = このアプリの public/ に置いた画像（ダミーのお祝いの絵など）
-// 保管庫の場所は「<id>/<ファイル名>」の形なので、どちらでも始まりません。
-// これらは期限付きURLを作らずに、そのまま表示します
-function isExternal(path: string) {
-  return path.startsWith("http") || path.startsWith("/");
+// このアプリの public/demo/ に置いた画像か（02_seed.sql のダミーのお祝いの絵など）。
+// 保管庫の場所は「<id>/<ファイル名>」の形なので、/ では始まりません。
+// これだけは期限付きURLを作らずに、そのまま表示します。
+// ▼ 前は http で始まるもの（よそのサイトの画像）も、そのまま表示していました
+//   今は DB が「自分のフォルダのファイル」しか入れさせない（01_schema.sql の is_own_file）ので、
+//   よその画像が入ることはありませんが、念のため、ここでも出さないようにしています
+function isAppAsset(path: string) {
+  return path.startsWith("/demo/");
 }
 
 // 場所の一覧を受け取り、「場所 → URL」を引ける関数を返します。
 // 使い方: const findUrl = await getSignedUrls("posts", paths);  findUrl(post.image_url)
-export async function getSignedUrls(bucket: string, paths: string[]) {
+// paths には null が混ざっていてもかまいません（写真の無いご報告など）。
+export async function getSignedUrls(bucket: string, paths: (string | null)[]) {
   // 同じ場所が何度も入っていても、作るのは1回ずつにします。
-  // 保管庫の外の画像は、URL を作る必要がないので外します
-  const unique = Array.from(new Set(paths.filter((path) => !isExternal(path))));
+  // アプリの中の画像と、保管庫の場所の形でないもの（http で始まるものなど）は外します
+  const unique = Array.from(
+    new Set(
+      paths.filter(
+        (path): path is string =>
+          path !== null && !isAppAsset(path) && !path.startsWith("http"),
+      ),
+    ),
+  );
 
   // 1枚ずつ同時に作ります。覚えているものは通信なしですぐ返ってきます
   const urls = await Promise.all(
@@ -73,8 +82,8 @@ export async function getSignedUrls(bucket: string, paths: string[]) {
 
   return (path: string | null) => {
     if (!path) return null;
-    // 前は外部の画像を渡すと null が返り、ダミーのお祝いが白い四角になっていました
-    if (isExternal(path)) return path;
+    // 前はアプリの中の画像を渡すと null が返り、ダミーのお祝いが白い四角になっていました
+    if (isAppAsset(path)) return path;
     const index = unique.indexOf(path);
     return index === -1 ? null : urls[index];
   };
