@@ -1,6 +1,7 @@
 // 1日1回、Vercel が自動で呼ぶ処理です（vercel.json の crons。毎朝9時）。GET /api/cron/daily
 //
 // ▼ やること
+//   ・DB に軽く問い合わせて、Supabase の無料プランが「使われていない」と止まらないようにする
 //   ・開封日が来た未来への手紙を、届いた人のスマホに知らせる
 //
 // ▼ 呼べるのは Vercel だけ
@@ -18,9 +19,18 @@ export async function GET(request: Request) {
   }
 
   const admin = createAdminClient();
+
+  // ▼ Supabase の無料プランは、しばらく誰も使わないとプロジェクトが止まります。
+  //   止まると、アプリを開いても何も出なくなります。
+  //   毎日1回 DB に問い合わせて「使われている」状態を保ちます（1件数えるだけの、軽い問い合わせ）
+  const { count: profiles, error: keepAliveError } = await admin
+    .from("profiles")
+    .select("id", { count: "exact", head: true });
+  if (keepAliveError) console.error("DB に問い合わせできませんでした", keepAliveError);
+
   const letters = await notifyOpenedLetters(admin);
 
-  return NextResponse.json({ ok: true, letters });
+  return NextResponse.json({ ok: true, profiles, letters });
 }
 
 // ▼ この1日のあいだに開封日が来た手紙を、届いた人に知らせます。
