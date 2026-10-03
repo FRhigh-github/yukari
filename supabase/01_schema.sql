@@ -741,6 +741,21 @@ as $$
   select count(*)::integer from inserted;
 $$;
 
+-- 招待コードを作り直します（作成者だけ）。新しいコードを返します。作成者でなければ null。
+-- 前のコードは使えなくなります。コードが知らない人に広まってしまったときのためです
+create function public.regenerate_invite_code(target_community uuid)
+returns text
+language sql
+security definer
+set search_path to 'public'
+as $$
+  update communities
+    set invite_code = make_invite_code()
+    where id = target_community
+      and is_owner(target_community)
+    returning invite_code;
+$$;
+
 -- コミュニティから人を外します（作成者だけ。自分は外せません。自分で抜けるのは設定の「抜ける」から）
 create function public.remove_member(target_community uuid, target_user uuid)
 returns boolean
@@ -1416,7 +1431,8 @@ revoke execute on function
   public.is_owner(uuid),
   public.has_blocked(uuid, uuid),
   public.report_user(uuid, text),
-  public.remove_member(uuid, uuid)
+  public.remove_member(uuid, uuid),
+  public.regenerate_invite_code(uuid)
 from public, anon;
 
 grant execute on function
@@ -1433,7 +1449,8 @@ grant execute on function
   public.is_owner(uuid),
   public.has_blocked(uuid, uuid),
   public.report_user(uuid, text),
-  public.remove_member(uuid, uuid)
+  public.remove_member(uuid, uuid),
+  public.regenerate_invite_code(uuid)
 to authenticated, service_role;
 
 -- 招待コードを作る関数：画面からは直接呼ばせません（create_community の中で使います）

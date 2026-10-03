@@ -104,7 +104,12 @@ export default async function CommunityPage({
 
       <section>
         <h2 className="mb-2 text-sm font-bold text-kin">招待コード</h2>
-        <InviteCode code={community.invite_code} communityName={community.name} />
+        <InviteCode
+          code={community.invite_code}
+          communityName={community.name}
+          communityId={community.id}
+          canRegenerate={amOwner}
+        />
       </section>
 
       <section>

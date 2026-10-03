@@ -105,7 +105,8 @@ drop function if exists
   public.is_owner(uuid),
   public.has_blocked(uuid, uuid),
   public.report_user(uuid, text),
-  public.remove_member(uuid, uuid)
+  public.remove_member(uuid, uuid),
+  public.regenerate_invite_code(uuid)
 cascade;
 
 -- ------------------------------------------------------------
