@@ -144,10 +144,12 @@ describe("SQL ファイル", () => {
   it("05_upgrade_2026-10.sql（migrations をまとめたもの）が前の形の DB に流せて、2回目は何も変えずに止まる", async () => {
     const { makeBeforeMigrationsDb } = await import("./harness");
     // migrations/ のどのファイルも、まとめた中に入っていること（足し忘れを防ぐため）
-    const combined = read("supabase/05_upgrade_2026-10.sql");
+    // 改行の形（Windows の \r\n と \n）の違いは無視して比べます
+    const lf = (text: string) => text.replace(/\r\n/g, "\n");
+    const combined = lf(read("supabase/05_upgrade_2026-10.sql"));
     const { readdirSync } = await import("node:fs");
     for (const file of readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql"))) {
-      expect(combined).toContain(read(`supabase/migrations/${file}`).trim());
+      expect(combined).toContain(lf(read(`supabase/migrations/${file}`)).trim());
     }
     const db = await makeBeforeMigrationsDb();
     await db.exec(combined);
