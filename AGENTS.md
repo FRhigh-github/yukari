@@ -144,5 +144,8 @@ RLS の外にいる。`app/api/recovery/` が `SUPABASE_SERVICE_ROLE_KEY` を使
 このリポジトリは、Web 開発を始めたばかりのメンバーが読む前提で書かれている。
 
 - **コメントは日本語で、「なぜ」を書く**。既存のファイルがその書き方になっている
+- 指の操作（なぞる・つまむ・スワイプ）は、pointer イベントを自分で数えずに `@use-gesture/react`（`useDrag` / `usePinch` / `useGesture`）を使う。
+  自分で数えると、途中で打ち切られた操作（pointercancel）を取りこぼして、画面が固まることがあった。
+  写真の切り取りは `react-easy-crop`
 - 一度に大きく変えない。1つの変更で1つのことだけ直す
 - DB の許可を変えたら、`tests/db/rls.test.ts` にテストを足して `npm test` で確かめる

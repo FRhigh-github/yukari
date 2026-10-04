@@ -14,6 +14,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useDrag } from "@use-gesture/react";
 import ReactionBoard, { type Reaction } from "@/components/ReactionBoard";
 import ReactionCardSheet from "@/components/ReactionCardSheet";
 import { SEEN_COOKIE, parseSeen } from "@/lib/seenPosts";
@@ -56,7 +57,8 @@ export default function StoryViewer({
   // いま何枚目か。0 がいちばん新しいご報告です
   const [index, setIndex] = useState(initialIndex);
   const [isWriting, setIsWriting] = useState(false);
-  const startRef = useRef<{ x: number; y: number } | null>(null);
+  // 押す・スワイプを受け取る面。押した所が左右どちら側かを測るのに使います
+  const surfaceRef = useRef<HTMLDivElement>(null);
 
   const post = posts[index];
 
@@ -81,33 +83,37 @@ export default function StoryViewer({
   const goOlder = () => setIndex(Math.min(posts.length - 1, index + 1));
   const goNewer = () => setIndex(Math.max(0, index - 1));
 
-  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    const start = startRef.current;
-    startRef.current = null;
-    if (start === null || post === undefined) return;
-    const dx = event.clientX - start.x;
-    const dy = event.clientY - start.y;
+  // ▼ 押す・スワイプは、@use-gesture/react というライブラリで受け取ります。
+  //   指が面の外へ出たときや、途中で打ち切られたとき（電話がかかってきた など）も、
+  //   ライブラリが「離した」として正しく知らせてくれます。
+  //   last = 指を離した瞬間 / movement = 触れた所から動いた量 / xy = いまの指の位置
+  //   tap = TAP より動かさずに離した
+  const bindSurface = useDrag(
+    ({ last, tap, movement: [dx, dy], xy: [x] }) => {
+      if (!last || post === undefined) return;
 
-    // 横へのスライド。縦より横に大きく動いたときだけ、横のスライドとみなします。
-    // 左へスライド（指を左へ）→ 古いほうへ。インスタと同じ向きです
-    if (Math.abs(dx) > SWIPE && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) goOlder();
-      else goNewer();
-      return;
-    }
-    // 上にスワイプ → 手書きカードを出します
-    if (dy < -SWIPE) {
-      setIsWriting(true);
-      return;
-    }
-    // ほとんど動いていなければ「押した」。左右どちらを押したかで進むか戻るか決めます
-    if (Math.abs(dx) < TAP && Math.abs(dy) < TAP) {
-      const rect = event.currentTarget.getBoundingClientRect();
-      const isRight = event.clientX - rect.left > rect.width / 2;
-      if (isRight) goOlder();
-      else goNewer();
-    }
-  };
+      // ほとんど動いていなければ「押した」。左右どちらを押したかで進むか戻るか決めます
+      if (tap) {
+        const rect = surfaceRef.current?.getBoundingClientRect();
+        if (rect === undefined) return;
+        const isRight = x - rect.left > rect.width / 2;
+        if (isRight) goOlder();
+        else goNewer();
+        return;
+      }
+
+      // 横へのスライド。縦より横に大きく動いたときだけ、横のスライドとみなします。
+      // 左へスライド（指を左へ）→ 古いほうへ。インスタと同じ向きです
+      if (Math.abs(dx) > SWIPE && Math.abs(dx) > Math.abs(dy)) {
+        if (dx < 0) goOlder();
+        else goNewer();
+        return;
+      }
+      // 上にスワイプ → 手書きカードを出します
+      if (dy < -SWIPE) setIsWriting(true);
+    },
+    { tapsThreshold: TAP },
+  );
 
   return (
     // absolute inset-0 = アプリの枠（スマホ幅の1枚）いっぱいに広げます
@@ -122,10 +128,8 @@ export default function StoryViewer({
           （操作はストーリーのときのままです） */}
       <div
         className="absolute inset-0 flex touch-none select-none items-stretch justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+10.5rem)] pt-[calc(env(safe-area-inset-top)+3.5rem)]"
-        onPointerDown={(event) => {
-          startRef.current = { x: event.clientX, y: event.clientY };
-        }}
-        onPointerUp={handlePointerUp}
+        ref={surfaceRef}
+        {...bindSurface()}
       >
         {post ? (
           // ▼ はがき。白い紙に金の細いふち、少しだけ影を落として、机に置いた紙のように見せます
