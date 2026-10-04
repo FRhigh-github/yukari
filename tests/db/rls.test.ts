@@ -141,6 +141,22 @@ describe.each(DB_KINDS)("%s", (_label, makeDb) => {
 });
 
 describe("SQL ファイル", () => {
+  it("05_upgrade_2026-10.sql（migrations をまとめたもの）が前の形の DB に流せて、2回目は何も変えずに止まる", async () => {
+    const { makeBeforeMigrationsDb } = await import("./harness");
+    // migrations/ のどのファイルも、まとめた中に入っていること（足し忘れを防ぐため）
+    const combined = read("supabase/05_upgrade_2026-10.sql");
+    const { readdirSync } = await import("node:fs");
+    for (const file of readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql"))) {
+      expect(combined).toContain(read(`supabase/migrations/${file}`).trim());
+    }
+    const db = await makeBeforeMigrationsDb();
+    await db.exec(combined);
+    // 最後の変更（容量を測る関数）まで入っていること
+    expect((await db.query(`select * from app_usage()`)).rows).toHaveLength(1);
+    // 2回目は「もうある」で止まり、begin〜commit で包んでいるので何も変わらない
+    await expect(db.exec(combined)).rejects.toThrow();
+  });
+
   it("02_seed.sql と 04_remove_dummy_data.sql が流せて、本物の人は残る", async () => {
     const { makeFreshDb } = await import("./harness");
     const db = await makeFreshDb();

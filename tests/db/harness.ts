@@ -69,6 +69,11 @@ export async function makeFreshDb() {
   return base(read("supabase/01_schema.sql"));
 }
 
+// migrations を流す前の、前の本番の形
+export async function makeBeforeMigrationsDb() {
+  return base(read("tests/fixtures/schema_before_migrations.sql"));
+}
+
 // 本番の形：前の 01_schema.sql に、migrations/ を名前の順に流したもの
 export async function makeMigratedDb() {
   const db = await base(read("tests/fixtures/schema_before_migrations.sql"));

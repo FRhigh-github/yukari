@@ -77,6 +77,7 @@ supabase/00_reset.sql             まっさらにする（危険。全アカウ�
 supabase/01_schema.sql            土台（テーブル・型・RLS・関数・トリガー・保管庫）
 supabase/02_seed.sql              ダミーの10人と中身。流し直すとダミーだけ入れ替わる
 supabase/04_remove_dummy_data.sql 本番からダミーとゲストを片づける（公開前に1回）
+supabase/05_upgrade_2026-10.sql  2026年10月の migrations を1つにまとめたもの（本番に1回だけ）
 supabase/migrations/              本番に流す差分（下を参照）
 ```
 
