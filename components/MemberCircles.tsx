@@ -7,7 +7,7 @@ import MemberCircle from "@/components/MemberCircle";
 import MoodIcon from "@/components/MoodIcon";
 import { MOODS, SHOW_MOOD_ON_HOME } from "@/lib/mood";
 import type { Member } from "@/lib/home";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 
 // 水引の色（globals.css と同じ）
 const BENI = "#b7282e";
@@ -104,11 +104,14 @@ function readLetterIds(): string[] {
 type MemberCirclesProps = {
   members: Member[];
   currentUserId: string;
+  // いま見ているコミュニティ。ご報告のページで、このコミュニティのご報告だけを出すために渡します
+  communityId: string | null;
 };
 
 export default function MemberCircles({
   members,
   currentUserId,
+  communityId,
 }: MemberCirclesProps) {
   const [openableCount, setOpenableCount] = useState<number>(0);
   const [letterId, setLetterId] = useState<string | null>(null);
@@ -116,8 +119,9 @@ export default function MemberCircles({
   useEffect(() => {
     async function checkLetter() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+      if (!myId) return;
 
       // 手紙が存在するか確認（飛行機マーク自体の表示判定用）
       const { data: allLetters, error } = await supabase
@@ -437,7 +441,7 @@ export default function MemberCircles({
         {/* ▼ 自分（中心） */}
         {me ? (
           <Link
-            href={`/members/${currentUserId}`}
+            href={`/members/${currentUserId}${communityId ? `?c=${communityId}` : ""}`}
             aria-label="自分"
             // 長押ししたまま動かしたときに、リンクをつまんで運ぶ動きを始めないようにします
             draggable={false}
@@ -471,6 +475,7 @@ export default function MemberCircles({
             x={spots[index].x}
             y={spots[index].y}
             hideName
+            communityId={communityId}
             isOpen={openMemberId === member.id}
             onClose={() => setOpenMemberId(null)}
           />

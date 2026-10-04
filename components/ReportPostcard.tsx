@@ -46,7 +46,8 @@ export default function ReportPostcard({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imageUrl}
-            alt=""
+            // 読み上げ機能のための説明
+            alt={`${title}の写真`}
             draggable={false}
             loading="lazy"
             className="aspect-[4/5] w-full rounded-sm object-cover"
@@ -75,7 +76,7 @@ export default function ReportPostcard({
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={imageUrl}
-          alt=""
+          alt={`${title}の写真`}
           draggable={false}
           fetchPriority="high"
           // flex-1 + min-h-0 = 文字を置いたあとの残りの高さを、写真が全部使います

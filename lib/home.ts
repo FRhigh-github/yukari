@@ -49,6 +49,8 @@ export type RecoveryRequest = {
   id: string;
   targetUser: string;
   targetName: string;
+  // 自分のアカウントへの申請か（自分がログインできているなら、乗っ取りのおそれがあります）
+  isMine: boolean;
 };
 
 // selectedId = URL の ?c= で指定されたコミュニティ。
@@ -146,11 +148,12 @@ export async function getHomeData(selectedId: string | null) {
         .order("created_at", { ascending: false })
         .limit(20),
 
-      // 待ち中の復旧申請。コミュニティ全員に見せて、誰でも止められるようにします
+      // 待ち中の復旧申請。誰でも止められるように、見えるものを全部取ります。
+      // 見えるのは「その人とどこかで同じコミュニティにいる」申請と、自分への申請です（DB の許可）。
+      // このうち、いま見ているコミュニティの人の分だけを、下で選んで出します
       supabase
         .from("recovery_requests")
         .select("id, target_user, requested_at")
-        .eq("community_id", currentId)
         .eq("status", "pending"),
 
       // 相手ごとの「最後にやりとりした日時」（supabase/01_schema.sql の last_contacts）。
@@ -221,15 +224,25 @@ export async function getHomeData(selectedId: string | null) {
   // 光る人を先に並べる
   members.sort((a, b) => (a.hasNews === b.hasNews ? 0 : a.hasNews ? -1 : 1));
 
-  // 申請には名前が入っていないので、メンバーの並びから引いて添えます
+  // ▼ 申請には名前が入っていないので、メンバーの並びから引いて添えます。
+  //   出すのは「いま見ているコミュニティの人」と「自分」への申請だけです。
+  //   ほかのコミュニティの人の申請まで出すと、知らない人の名前が並んでしまうためです
+  //   （その人と同じコミュニティに切り替えれば出ます）
   const recoveryRequests: RecoveryRequest[] =
-    recoveries?.map((recovery) => ({
-      id: recovery.id,
-      targetUser: recovery.target_user,
-      targetName:
-        members.find((member) => member.id === recovery.target_user)
-          ?.displayName ?? "どなたか",
-    })) ?? [];
+    recoveries
+      ?.filter(
+        (recovery) =>
+          recovery.target_user === user.id ||
+          members.some((member) => member.id === recovery.target_user),
+      )
+      .map((recovery) => ({
+        id: recovery.id,
+        targetUser: recovery.target_user,
+        targetName:
+          members.find((member) => member.id === recovery.target_user)
+            ?.displayName ?? "どなたか",
+        isMine: recovery.target_user === user.id,
+      })) ?? [];
 
   // ▼ 鐘の「お知らせ」。新しいご報告を、自分のものを除いて10件まで並べます。
   //   見たかどうかは、光る輪と同じく「その人のご報告をどこまで見たか」（lib/seenPosts.ts）で決めます

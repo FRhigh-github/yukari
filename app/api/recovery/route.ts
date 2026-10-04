@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { makeTicket } from "@/lib/recoveryTicket";
+import { sendMail } from "@/lib/mail";
 
 export async function POST(request: Request) {
   // 送られてきた中身が JSON として読めないときは、ここで断ります（読めないと処理ごと落ちるため）
@@ -37,6 +38,35 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
+
+  // ▼ 回数制限。同じアクセス元から、1時間に10回までしか試せません。
+  //   コードは6文字なので、制限が無いと手当たり次第に試されるおそれがあります。
+  //   まだログインしていない人なので、アクセス元（IP アドレス）で数えます。
+  //   x-forwarded-for は、Vercel が「元のアクセス元」を入れてくれる欄です（先頭が本人）
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown";
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const [{ count: recentTries }] = await Promise.all([
+    supabase
+      .from("recovery_attempts")
+      .select("*", { count: "exact", head: true })
+      .eq("ip", ip)
+      .gt("attempted_at", hourAgo),
+    supabase.from("recovery_attempts").insert({ ip }),
+    // 1日より前の記録は消します（表が大きくなり続けないように）
+    supabase
+      .from("recovery_attempts")
+      .delete()
+      .lt("attempted_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+  ]);
+  if ((recentTries ?? 0) >= 10) {
+    return NextResponse.json(
+      { error: "試した回数が多すぎます。1時間ほどおいてから、もう一度お試しください" },
+      { status: 429 },
+    );
+  }
 
   const { data: found } = await supabase
     .from("recovery_codes")
@@ -121,6 +151,27 @@ export async function POST(request: Request) {
       { error: "申請を立てられませんでした。時間をおいて試してください" },
       { status: 500 },
     );
+  }
+
+  // ▼ アカウントの本当の持ち主に、メールでも知らせます（lib/mail.ts）。
+  //   3人が組めば、他人のアカウントの申請を立てられてしまいます。
+  //   持ち主がまだメールを見られるなら、24時間のうちに気づいて止められるようにします。
+  //   本当に困っている人（メールを見られない人）には届きませんが、それで困ることはありません。
+  //   送れなくても申請は立っているので、待たずに先へ進みます（失敗しても止めません）
+  const { data: target } = await supabase.auth.admin.getUserById(targetUser);
+  if (target.user?.email) {
+    await sendMail({
+      to: target.user.email,
+      subject: "【ゆかり】あなたのアカウントに、復旧の申請が出ています",
+      text: [
+        "ゆかりで、あなたのアカウントに「思い出ログイン」（仲間3人のコードで戻る仕組み）の申請が出されました。",
+        "",
+        "心当たりがない場合は、24時間以内にアプリを開き、ホームの上に出ている知らせから「止める」を押してください。",
+        "誰も止めなければ、24時間後に申請した人がログインできるようになります。",
+        "",
+        "心当たりがある場合は、このメールは気にしなくて大丈夫です。",
+      ].join("\n"),
+    });
   }
 
   // 申請した本人にだけ、引換券を渡します（lib/recoveryTicket.ts）。

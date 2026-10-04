@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-
-// 招待コードを作ります。
-// crypto.randomUUID() は「-」入りの長い文字列なので、
-// 「-」を消して先頭6文字だけ取り、大文字にしています。
-const makeInviteCode = () =>
-  crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase();
+import { createClient, getMyId } from "@/lib/supabase/client";
 
 type CommunityCreateFormProps = {
   // true = ホームの切り替えの中で使う。作ったら、そのコミュニティのホームを出します。
@@ -29,8 +23,9 @@ export default function CommunityCreateForm({ inline = false }: CommunityCreateF
     setIsSending(true);
 
     const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
+    // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+    if (!myId) {
       router.push("/login");
       return;
     }
@@ -40,9 +35,10 @@ export default function CommunityCreateForm({ inline = false }: CommunityCreateF
     //   前は画面から memberships に直接書き込んでいましたが、
     //   それを許すと「招待コードなしで、どのコミュニティにも入れる」状態になるため、
     //   直接の書き込みは止めて、この関数と join_community（招待コード）だけにしました。
+    //   招待コードも DB の中で作ります（画面で作ると、当てやすい短いコードを送り込めるため）
     const { data: id, error: createError } = await supabase.rpc(
       "create_community",
-      { community_name: name, code: makeInviteCode() },
+      { community_name: name },
     );
 
     if (createError || typeof id !== "string") {

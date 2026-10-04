@@ -18,6 +18,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useDrag } from "@use-gesture/react";
 import { createClient } from "@/lib/supabase/client";
+import { requestNotify } from "@/lib/notify";
+import { removeOwnUpload } from "@/lib/removeOwnUpload";
 
 // これ以上指が上下に動いたら「スワイプした」とみなします（px）
 const SWIPE = 60;
@@ -158,13 +160,23 @@ export default function ReactionCardSheet({
         .upload(path, blob, { contentType: "image/png", cacheControl: "31536000" });
       if (upload.error !== null) throw new Error("画像の保存: " + upload.error.message);
 
+      // id はこちらで決めます。送ったあと、通知を頼むときに使うためです
+      const reactionId = crypto.randomUUID();
       const insert = await supabase.from("post_reactions").insert({
+        id: reactionId,
         post_id: postId,
         from_user: userId,
         community_id: communityId,
         drawing_url: path,
       });
-      if (insert.error !== null) throw new Error("保存に失敗: " + insert.error.message);
+      if (insert.error !== null) {
+        // 上げた手書きの絵だけが残らないよう、消してから知らせます（lib/removeOwnUpload.ts）
+        await removeOwnUpload("drawings", path);
+        throw new Error("保存に失敗: " + insert.error.message);
+      }
+
+      // ご報告を書いた人のスマホに知らせます（lib/notify.ts。待たずに頼むだけ）
+      requestNotify("reaction", reactionId);
 
       // カードを上へ飛ばしてから閉じます
       setIsFlying(true);

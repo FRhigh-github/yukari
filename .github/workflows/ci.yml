@@ -1,0 +1,40 @@
+# push や Pull Request のたびに、GitHub が自動で確かめる手順です（CI）。
+#   lint → 型チェック → テスト（DB の許可を含む）→ ビルド
+# どれかで失敗すると、GitHub の画面に赤い × が付きます。
+# 本物の Supabase にはつなぎません（テストは手元の Postgres = PGlite で動きます）。
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: lint
+        run: npm run lint
+
+      # PageProps などの型は Next.js が作るものです。ビルドの前なので、next typegen で先に作ってから確かめます
+      - name: 型チェック
+        run: npx next typegen && npx tsc --noEmit
+
+      - name: テスト
+        run: npm test
+
+      # ビルドには接続先の値が要りますが、ビルドの中では DB につながないので、ダミーの値で足ります
+      - name: ビルド
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: dummy

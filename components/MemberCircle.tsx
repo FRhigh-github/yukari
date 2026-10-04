@@ -23,6 +23,8 @@ type MemberCircleProps = {
   // 名前を出さないとき true。
   // 水引の輪の中に置くと、名前が紐に重なって読めなくなるためです。
   hideName?: boolean;
+  // いま見ているコミュニティ。押したときに開くご報告を、このコミュニティのものだけにします
+  communityId: string | null;
   // 長押しで小さなプロフィールを出しているとき true（MemberCircles が決めます）
   isOpen: boolean;
   onClose: () => void;
@@ -33,6 +35,7 @@ export default function MemberCircle({
   x,
   y,
   hideName,
+  communityId,
   isOpen,
   onClose,
 }: MemberCircleProps) {
@@ -42,7 +45,7 @@ export default function MemberCircle({
     <>
       <Link
         // ?view=story = 一覧を挟まずに、いきなり全画面のストーリーで開きます
-        href={`/members/${member.id}?view=story`}
+        href={`/members/${member.id}?view=story${communityId ? `&c=${communityId}` : ""}`}
         // ▼ 光っている人（まだ見ていない新しいご報告がある人）だけ、ご報告の中身まで先に取っておきます。
         //   押される見込みが高いのはこの人たちなので、押した瞬間に開くようにします。
         //   前は全員ぶん中身まで取っていたので、ホームを開くたびに通信が30件ほど走り、
@@ -104,7 +107,7 @@ export default function MemberCircle({
                 全員に付けると印だらけになるので、ごぶさたの人だけが目に入るようにしています。
                 数えているのは DB です（カード・お祝い・チャットを送ると記録されます） */}
           {member.lastContactYears !== null && member.lastContactYears >= 1 ? (
-            <span className="absolute -right-2 -top-1 rounded-full bg-white px-1.5 text-[11px] font-bold leading-4 text-stone-500 shadow-sm ring-1 ring-kin/60">
+            <span className="absolute -right-2 -top-1 rounded-full bg-white px-1.5 text-xs font-bold leading-4 text-stone-600 shadow-sm ring-1 ring-kin/60">
               {member.lastContactYears}年
             </span>
           ) : null}
@@ -114,7 +117,7 @@ export default function MemberCircle({
         {hideName ? null : (
         <span
           className={`w-full truncate text-center text-xs leading-tight ${
-            member.hasNews ? "font-bold text-stone-700" : "text-stone-400"
+            member.hasNews ? "font-bold text-stone-700" : "text-stone-500"
           }`}
         >
           {member.displayName ?? "名無し"}

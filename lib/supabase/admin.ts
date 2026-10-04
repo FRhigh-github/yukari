@@ -12,6 +12,9 @@
 //   読み込むと鍵がブラウザに配られ、誰でもDBを全部読み書きできる状態になります。
 //   （NEXT_PUBLIC_ を付けていないので、本来ブラウザ側では空になります）
 
+// server-only = このファイルを "use client" の側から読み込むと、ビルドの時点でエラーにする印です。
+// 鍵がブラウザに配られる事故を、うっかりでも起こせないようにします
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 export function createAdminClient() {

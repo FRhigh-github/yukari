@@ -11,6 +11,8 @@ import PostGrid from "@/components/PostGrid";
 import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
 import LogoutButton from "@/components/LogoutButton";
+import DeleteAccountButton from "@/components/DeleteAccountButton";
+import PushToggle from "@/components/PushToggle";
 import { getSignedUrls } from "@/lib/signedUrls";
 // バージョンの番号は package.json の1か所だけで管理します（CHANGELOG.md も合わせて書く）。
 // この画面はサーバーで作るので、package.json がブラウザに配られることはありません
@@ -55,19 +57,10 @@ export default async function ProfilePage() {
   ]);
 
   // 写真の置き場所から、期限付きのURLを発行してもらいます
-  const imagePaths =
-    posts
-      ?.filter((post) => post.image_url && !post.image_url.startsWith("http"))
-      .map((post) => post.image_url) ?? [];
+  const imagePaths = posts?.map((post) => post.image_url) ?? [];
 
   // URL は lib/signedUrls.ts で作ります（同じ写真には同じURLを返すので、写真を使い回せます）
-  const findSignedImage = await getSignedUrls("posts", imagePaths);
-
-  const findImageUrl = (path: string | null) => {
-    if (!path) return null;
-    if (path.startsWith("http")) return path;
-    return findSignedImage(path);
-  };
+  const findImageUrl = await getSignedUrls("posts", imagePaths);
 
   return (
     <main className="pb-24">
@@ -81,7 +74,7 @@ export default async function ProfilePage() {
       />
 
       {/* ▼ 下半分：自分のご報告 */}
-      <h2 className="border-y border-stone-200 bg-white px-5 py-3 text-lg font-bold text-stone-800">
+      <h2 className="border-y border-stone-200 bg-white px-4 py-3 text-lg font-bold text-stone-800">
         ご報告
       </h2>
 
@@ -98,13 +91,23 @@ export default async function ProfilePage() {
         }
       />
 
+      {/* スマホに通知を受け取る（受け取れない端末では出ません） */}
+      <div className="px-4 pt-10">
+        <PushToggle />
+      </div>
+
       {/* ログアウト。いちばん下の、押し間違えにくい場所に置きます */}
       <div className="px-4 pt-10">
         <LogoutButton />
       </div>
 
+      {/* 退会。ログアウトよりさらに下の、目立たない場所に置きます（押し間違いを防ぐため） */}
+      <div className="px-4 pt-6">
+        <DeleteAccountButton />
+      </div>
+
       {/* アプリのバージョン。何の版を見ているか、発表や不具合の相談のときに分かるようにします */}
-      <p className="pt-6 text-center text-xs tracking-widest text-stone-400">
+      <p className="pt-6 text-center text-xs tracking-widest text-stone-500">
         ゆかり v{packageJson.version}
       </p>
     </main>

@@ -41,7 +41,7 @@ export default function PasswordField({
         // 目で見て分かるように、状態を文字でも伝えます
         aria-label={isVisible ? "パスワードを隠す" : "パスワードを表示"}
         // h-11 w-11 = 44px。押せる範囲を iOS の基準に合わせています
-        className="-mr-2 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center text-stone-400"
+        className="-mr-2 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center text-stone-500"
       >
         <svg
           viewBox="0 0 24 24"

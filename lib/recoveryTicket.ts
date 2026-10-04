@@ -15,15 +15,20 @@
 //
 //   DB に何かを保存する必要がないので、表を増やさずに済みます。
 
+// server-only = "use client" の側から読み込むと、ビルドの時点でエラーにする印です（署名の鍵を使うため）
+import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-// 署名に使う鍵。
-// RECOVERY_SECRET があればそれを使い、無ければ service_role の鍵で代用します。
+// 署名に使う鍵。環境変数 RECOVERY_SECRET（32文字以上のでたらめな文字）を使います。
 // HMAC は「鍵から署名を作る」一方通行の計算なので、引換券から鍵が漏れることはありません。
+// ▼ 前は、RECOVERY_SECRET が無いと service_role の鍵で代用していました
+//   1つの鍵を2つの役目に使うと、片方の都合で鍵を替えたときに、もう片方まで巻き込まれます。
+//   この鍵だけの役目にして、無ければ動かないようにしました（設定し忘れに気づけるように）
 function getSecret() {
-  const secret =
-    process.env.RECOVERY_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!secret) throw new Error("署名の鍵が設定されていません");
+  const secret = process.env.RECOVERY_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error("RECOVERY_SECRET（32文字以上）が設定されていません");
+  }
   return secret;
 }
 

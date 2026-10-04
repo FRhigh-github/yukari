@@ -58,6 +58,13 @@ drop table if exists
   public.events,
   public.time_capsules,
   public.interactions,
+  public.reports,
+  public.error_reports,
+  public.push_subscriptions,
+  public.push_log,
+  public.blocks,
+  public.join_attempts,
+  public.recovery_attempts,
   public.card_sends,
   public.card_templates,
   public.post_reactions,
@@ -76,13 +83,21 @@ cascade;
 --  4. 関数（古い版で作ったものも含めて、全部の名前を並べています）
 -- ------------------------------------------------------------
 drop function if exists
+  public.app_usage(),
+  public.are_web_links(text[]),
   public.capsule_is_open(uuid),
+  public.capsule_is_visible(uuid),
   public.check_recovery_threshold(),
   public.create_community(text, text),
+  public.create_community(text),
   public.handle_new_user(),
+  public.handle_member_left(),
   public.is_demo_guest(),
+  public.is_allowed_avatar(text),
   public.is_member(uuid),
+  public.is_own_file(text),
   public.join_community(text),
+  public.make_invite_code(),
   public.record_card_interaction(),
   public.record_message_interaction(),
   public.record_reaction_interaction(),
@@ -90,7 +105,13 @@ drop function if exists
   public.reject_recovery_request(),
   public.rename_community(uuid, text),
   public.set_community_icon(uuid, text),
-  public.shares_community(uuid)
+  public.shares_community(uuid),
+  public.under_rate_limit(text, integer),
+  public.is_owner(uuid),
+  public.has_blocked(uuid, uuid),
+  public.report_user(uuid, text),
+  public.remove_member(uuid, uuid),
+  public.regenerate_invite_code(uuid)
 cascade;
 
 -- ------------------------------------------------------------

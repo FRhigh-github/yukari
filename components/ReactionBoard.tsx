@@ -57,6 +57,9 @@ export default function ReactionBoard({ reactions }: ReactionBoardProps) {
             }}
           >
             <div
+              // 読み上げ機能に「誰からのお祝いの絵か」を伝えます（背景画像は読み上げられないため）
+              role="img"
+              aria-label={`${reaction.authorName ?? "名無し"}さんからの手書きのお祝い`}
               className="h-14 w-14 bg-white bg-contain bg-center bg-no-repeat"
               style={
                 reaction.imageUrl
@@ -92,7 +95,7 @@ export default function ReactionBoard({ reactions }: ReactionBoardProps) {
           onClick={() => setIsOpen(false)}
           className="absolute inset-0 z-50 overflow-y-auto overscroll-contain bg-[#faf9f6]/90 backdrop-blur-md"
         >
-          <div className="px-5 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-[calc(env(safe-area-inset-top)+1.5rem)]">
+          <div className="px-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-[calc(env(safe-area-inset-top)+1.5rem)]">
             {/* 上に、水引の色の細い線と、お祝いの数 */}
             <div className="mb-6 flex items-center gap-3">
               <span className="h-px flex-1 bg-kin/50" />
@@ -111,6 +114,8 @@ export default function ReactionBoard({ reactions }: ReactionBoardProps) {
                   }}
                 >
                   <div
+                    role="img"
+                    aria-label={`${reaction.authorName ?? "名無し"}さんからの手書きのお祝い`}
                     className="aspect-square w-full bg-white bg-contain bg-center bg-no-repeat"
                     style={
                       reaction.imageUrl

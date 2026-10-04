@@ -91,6 +91,8 @@ export default async function CardInboxPage({
             return (
               <li key={card.id}>
                 <ReceivedCard
+                  // 送ったカードだけ、消せるようにします
+                  deletableId={isSent ? card.id : undefined}
                   imageUrl={findDrawingUrl(card.drawing_url)}
                   partnerName={
                     senders?.find(

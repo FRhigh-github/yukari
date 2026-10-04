@@ -2,22 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 
 type CommunitySettingsProps = {
   communityId: string;
   currentName: string;
   // 作成者かどうか。退出の確認に「あなたは作成者です」と添えるために使います
   isOwner: boolean;
-  // デモのゲストかどうか。ゲストには名前の変更と退出を出しません
-  isGuest: boolean;
 };
 
 export default function CommunitySettings({
   communityId,
   currentName,
   isOwner,
-  isGuest,
 }: CommunitySettingsProps) {
   const router = useRouter();
 
@@ -62,8 +59,9 @@ export default function CommunitySettings({
     setIsSaving(true);
 
     const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
+    // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+    if (!myId) {
       router.push("/login");
       return;
     }
@@ -74,7 +72,7 @@ export default function CommunitySettings({
       .from("memberships")
       .delete()
       .eq("community_id", communityId)
-      .eq("user_id", data.user.id)
+      .eq("user_id", myId)
       .select("user_id");
 
     if (error || deleted?.length === 0) {
@@ -89,18 +87,6 @@ export default function CommunitySettings({
     router.push("/");
     router.refresh();
   };
-
-  // ▼ デモのゲストには、名前の変更も退出も出しません。
-  //   デモ用コミュニティは審査員みんなで見ているので、1人が変えると全員の画面が変わります。
-  //   退出すると、ゲストはほかのコミュニティに入れないので、どこにも戻れなくなります。
-  //   （DB 側でも止めています。supabase/01_schema.sql の is_demo_guest）
-  if (isGuest) {
-    return (
-      <p className="text-xs leading-relaxed text-stone-500">
-        デモ用のコミュニティなので、名前の変更と退出はできません。
-      </p>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -130,7 +116,8 @@ export default function CommunitySettings({
           <div className="space-y-2">
             <p className="text-xs text-stone-600">
               このコミュニティから退出します。よろしいですか？
-              {isOwner ? "（あなたは作成者です）" : ""}
+              {/* 作成者が抜けると、いちばん前から入っている人に作成者が引き継がれます（DB の handle_member_left） */}
+              {isOwner ? "（作成者は、いちばん前から入っている人に引き継がれます）" : ""}
             </p>
             <div className="flex gap-2">
               <button

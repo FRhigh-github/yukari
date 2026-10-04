@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
 import type { Community } from "@/components/CommunitySwitcher";
 import ReportPostcard from "@/components/ReportPostcard";
+import { requestNotify } from "@/lib/notify";
+import { removeOwnUpload } from "@/lib/removeOwnUpload";
 
 type PostFormProps = {
   communities: Community[];
@@ -91,7 +93,10 @@ export default function PostForm({ communities, initialCommunityId }: PostFormPr
 
       if (upload.error) throw new Error(upload.error.message);
 
+      // id はこちらで決めます。書いたあと、通知を頼むときに使うためです
+      const postId = crypto.randomUUID();
       const { error: insertError } = await supabase.from("posts").insert({
+        id: postId,
         title: title.trim(),
         body,
         image_url: upload.data.path,
@@ -99,7 +104,14 @@ export default function PostForm({ communities, initialCommunityId }: PostFormPr
         community_id: communityId,
       });
 
-      if (insertError) throw new Error(insertError.message);
+      if (insertError) {
+        // 上げた写真だけが残らないよう、消してから知らせます（lib/removeOwnUpload.ts）
+        await removeOwnUpload("posts", upload.data.path);
+        throw new Error(insertError.message);
+      }
+
+      // コミュニティのみんなのスマホに知らせます（lib/notify.ts。待たずに頼むだけ）
+      requestNotify("post", postId);
 
       // 投稿したコミュニティのホームへ戻ります（?c= が無いと、一番上のコミュニティが出るため）。
       // refresh() が無いと、ホームに戻っても さっきの投稿が出ないことがあります
@@ -217,6 +229,8 @@ export default function PostForm({ communities, initialCommunityId }: PostFormPr
         />
 
         <textarea
+          // 本文は2,000文字まで（DB の上限と同じ。supabase/01_schema.sql の posts）
+          maxLength={2000}
           placeholder="本文を入力"
           value={body}
           onChange={(event) => setBody(event.target.value)}

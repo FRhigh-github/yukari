@@ -16,8 +16,17 @@ export default function LogoutButton() {
 
   const handleLogout = async () => {
     setIsSending(true);
+    // ▼ この端末で通知を受け取っていたら、宛先を消します。
+    //   1台のスマホを次の人に渡したとき、前の人あての通知が出ないようにするためです
+    const supabase = createClient();
+    const registration = await navigator.serviceWorker?.getRegistration();
+    const subscription = await registration?.pushManager?.getSubscription();
+    if (subscription) {
+      await supabase.from("push_subscriptions").delete().eq("endpoint", subscription.endpoint);
+      await subscription.unsubscribe();
+    }
     // signOut = ブラウザに保存したログインの証明書（Cookie）を消す命令
-    await createClient().auth.signOut();
+    await supabase.auth.signOut();
     // Link ではなく、ブラウザごと読み込み直してログイン画面へ行きます。
     // 前の人の画面の記憶（先読みした中身）を残さないためです
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- わざと読み込み直すため

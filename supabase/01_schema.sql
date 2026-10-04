@@ -53,6 +53,19 @@ create type public.member_role as enum ('owner', 'member');
 create type public.recovery_status as enum ('pending', 'approved', 'rejected', 'expired');
 
 
+-- 手紙に付けるリンクの一覧が、ふつうの web のリンクだけか（time_capsules の check で使います）。
+-- javascript: のような、押すとプログラムが動くものを入れさせないためです
+create function public.are_web_links(links text[])
+returns boolean
+language sql
+immutable
+set search_path to 'public'
+as $$
+  -- 長さは char_length で見ます（Postgres の正規表現は、{1,500} のような255より大きい回数を書けないため）
+  select coalesce(bool_and(link ~ '^https?://[^[:space:]]+$' and char_length(link) <= 500), true)
+  from unnest(links) as link;
+$$;
+
 -- ============================================================
 --  2. テーブル
 --     作ったらすぐに RLS を入れます。
@@ -68,7 +81,9 @@ create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null default '名前未設定'
     check (char_length(trim(display_name)) between 1 and 40),
-  birthday date,
+  -- 誕生日。使うのは月と日だけなので、年はいつも2000年にします（components/BirthdayPicker.tsx）。
+  -- 生まれ年は人に知られたくない情報なので、DB にも本当の年を持たないようにしています
+  birthday date check (extract(year from birthday) = 2000),
   avatar_url text,
   -- 今の気持ち。want_to_meet = 会いたい！ / busy = 多忙です / null = なし
   mood text check (mood in ('want_to_meet', 'busy')),
@@ -111,7 +126,8 @@ create table public.posts (
   author_id uuid not null references public.profiles (id) on delete cascade,
   community_id uuid not null references public.communities (id) on delete cascade,
   title text not null check (char_length(trim(title)) between 1 and 100),
-  body text,
+  -- 本文は2,000文字まで（はがき1枚に収まる長さ。画面の入力欄も同じ上限です）
+  body text check (char_length(body) <= 2000),
   -- 保管庫（posts バケット）の場所。http で始まるものと / で始まるものは、
   -- ダミーデータ用の画像のURLとして、そのまま表示します（lib/signedUrls.ts）
   image_url text not null,
@@ -160,8 +176,9 @@ create table public.card_sends (
   community_id uuid not null references public.communities (id) on delete cascade,
   -- 保管庫（cards バケット）の場所。カードを1枚の絵にしたもの
   drawing_url text,
-  -- カードに置いた文字や写真の並び（作り直すときのための記録）
-  drawing_data jsonb,
+  -- カードに置いた文字や写真の並び（作り直すときのための記録）。
+  -- 写真の中身は外して入れるので、ふつうは数KBです。100KB までにします
+  drawing_data jsonb check (pg_column_size(drawing_data) <= 102400),
   sent_at timestamptz not null default now(),
   check (from_user <> to_user)
 );
@@ -178,9 +195,13 @@ create table public.time_capsules (
   author_id uuid not null references public.profiles (id) on delete cascade,
   -- 宛先。null = コミュニティ全員へ
   to_user uuid references public.profiles (id) on delete cascade,
-  body text,
+  -- 手紙に書いた文字（紙の上の文字をつなげたもの）。10,000文字まで
+  body text check (char_length(body) <= 10000),
   -- 保管庫（drawings バケット）の場所。手紙の紙を1枚の絵にしたもの
   image_url text,
+  -- 紙に置いたリンク。紙は1枚の絵になって押せないので、受け取った人が開けるよう別に持ちます。
+  -- 10個まで。http / https で始まるものだけ（are_web_links）
+  links text[] check (cardinality(links) <= 10 and are_web_links(links)),
   sealed_at timestamptz not null default now(),
   open_at timestamptz not null,
   check (open_at > sealed_at)
@@ -228,7 +249,8 @@ create table public.event_responses (
   option_id uuid not null references public.event_date_options (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,
   answer public.attendance,
-  comment text not null default '',
+  -- ひとこと。200文字まで（画面の入力欄も同じ上限です）
+  comment text not null default '' check (char_length(comment) <= 200),
   responded_at timestamptz not null default now(),
   primary key (option_id, user_id)
 );
@@ -302,6 +324,99 @@ create table public.recovery_vetoes (
 alter table public.recovery_vetoes enable row level security;
 
 
+-- ------------------------------------------------------------
+--  報告とブロック
+--  reports … 「この人の振る舞いが困る」という報告。報告した人と、
+--             そのコミュニティの作成者（owner）だけが読めます。書くのは report_user だけです
+--  blocks  … 自分がブロックした人。ブロックした人のご報告・お祝い・カードは、自分には見えません。
+--             ブロックされた人は、ブロックした人にカードを送れません。
+--             ブロックしたことは、相手には分かりません（自分の分しか読めないため）
+-- ------------------------------------------------------------
+create table public.reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter uuid not null references public.profiles (id) on delete cascade,
+  reported_user uuid not null references public.profiles (id) on delete cascade,
+  -- どのコミュニティの作成者に知らせるか。二人が一緒にいるコミュニティごとに1行ずつ入ります
+  community_id uuid not null references public.communities (id) on delete cascade,
+  reason text not null check (char_length(trim(reason)) between 1 and 500),
+  created_at timestamptz not null default now(),
+  check (reporter <> reported_user)
+);
+alter table public.reports enable row level security;
+
+create table public.blocks (
+  blocker uuid not null references public.profiles (id) on delete cascade,
+  blocked uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker, blocked),
+  check (blocker <> blocked)
+);
+alter table public.blocks enable row level security;
+
+-- ------------------------------------------------------------
+--  スマホへの通知（プッシュ通知）
+--  push_subscriptions … 通知を受け取る端末の宛先。1台につき1行。本人だけが読める・足せる・消せる
+--  push_log           … もう通知を送ったもの（同じご報告やカードで、二度送らないため）。
+--                       サーバー（service_role）だけが書きます
+-- ------------------------------------------------------------
+create table public.push_subscriptions (
+  -- ブラウザが決める、その端末の宛先 URL
+  endpoint text primary key,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  -- 中身を暗号化するための鍵（ブラウザがくれます）
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+alter table public.push_subscriptions enable row level security;
+
+create table public.push_log (
+  -- 'post' / 'card' / 'reaction' / 'letter'
+  kind text not null,
+  ref_id uuid not null,
+  sent_at timestamptz not null default now(),
+  primary key (kind, ref_id)
+);
+alter table public.push_log enable row level security;
+
+-- ------------------------------------------------------------
+--  エラーの記録（lib/reportError.ts）
+--  サーバーや画面で思いがけないエラーが起きたときに、1行ずつ残します。
+--  1日1回の処理（app/api/cron/daily）が、新しいものがあれば運営者にメールで知らせます。
+--  サーバー（service_role）だけが読み書きします。許可を1つも出していないので、画面からは見えません
+-- ------------------------------------------------------------
+create table public.error_reports (
+  id uuid primary key default gen_random_uuid(),
+  -- どこで起きたか：'server' / 'client' / 'cron' / 'usage'（容量の見張り）
+  source text not null,
+  message text not null check (char_length(message) <= 2000),
+  -- 起きた画面の URL など
+  path text check (char_length(path) <= 500),
+  detail jsonb check (pg_column_size(detail) <= 20000),
+  created_at timestamptz not null default now()
+);
+alter table public.error_reports enable row level security;
+
+-- ------------------------------------------------------------
+--  回数制限のための記録（under_rate_limit で数えます）
+--  join_attempts     … 招待コードで参加しようとした記録（当たり外れに関係なく1回ずつ）
+--  recovery_attempts … 思い出ログインのコードを試した記録。まだログインしていない人なので、
+--                      アクセス元（IP アドレス）で数えます。サーバー（service_role）だけが書きます
+--  どちらも許可を1つも出していないので、画面からは読めません・書けません
+-- ------------------------------------------------------------
+create table public.join_attempts (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  attempted_at timestamptz not null default now()
+);
+alter table public.join_attempts enable row level security;
+
+create table public.recovery_attempts (
+  ip text not null,
+  attempted_at timestamptz not null default now()
+);
+alter table public.recovery_attempts enable row level security;
+
+
 -- ============================================================
 --  3. 索引（探すときの目次）
 --     よく使う「絞り込み + 並べ替え」の組み合わせに付けます。
@@ -335,6 +450,22 @@ create index interactions_user_b_occurred_at_idx on public.interactions (user_b,
 
 create index recovery_codes_target_user_idx on public.recovery_codes (target_user);
 create index recovery_requests_community_id_status_idx on public.recovery_requests (community_id, status);
+
+-- 回数制限（under_rate_limit）で「この人の、この1時間の分」を数えるため
+create index post_reactions_from_user_created_at_idx on public.post_reactions (from_user, created_at desc);
+create index messages_user_id_created_at_idx on public.messages (user_id, created_at desc);
+create index join_attempts_user_id_attempted_at_idx on public.join_attempts (user_id, attempted_at desc);
+create index recovery_attempts_ip_attempted_at_idx on public.recovery_attempts (ip, attempted_at desc);
+
+-- エラーを新しい順に見るため
+create index error_reports_created_at_idx on public.error_reports (created_at desc);
+
+-- 通知を送るとき、その人の端末をまとめて引くため
+create index push_subscriptions_user_id_idx on public.push_subscriptions (user_id);
+
+-- 作成者が、自分のコミュニティの報告を新しい順に見るため
+create index reports_community_id_created_at_idx on public.reports (community_id, created_at desc);
+create index reports_reporter_created_at_idx on public.reports (reporter, created_at desc);
 
 
 -- ============================================================
@@ -383,20 +514,11 @@ as $$
   );
 $$;
 
--- 「デモで入る」で作られたゲストか（メールの最後が @demo.yukari.invalid）。
--- ゲストは、コミュニティを作る・参加する・抜ける・名前やアイコンを変える、ができません。
--- 審査員が同時に触っても、ほかの人の画面が変わらないようにするためです
-create function public.is_demo_guest()
-returns boolean
-language sql
-stable
-set search_path to 'public'
-as $$
-  select coalesce(auth.jwt() ->> 'email', '') like '%@demo.yukari.invalid';
-$$;
-
--- 手紙の開封日が来ているか（イベントの許可で使います）
-create function public.capsule_is_open(target_capsule uuid)
+-- 自分がその手紙を読めるか（イベントの許可で使います）。
+-- 「capsules readable」の許可と同じ条件です：書いた本人か、開封日を過ぎていて宛先が「全員」か「自分」。
+-- ▼ 前は「開封日が来ているか」だけを見ていました
+--   宛先が特定の人の手紙でも、付いている日程調整とチャットは、コミュニティの全員に見えていました
+create function public.capsule_is_visible(target_capsule uuid)
 returns boolean
 language sql
 stable
@@ -406,8 +528,134 @@ as $$
   select exists (
     select 1 from time_capsules
     where id = target_capsule
-      and open_at <= now()
+      and (
+        author_id = auth.uid()
+        or (open_at <= now() and (to_user is null or to_user = auth.uid()))
+      )
   );
+$$;
+
+-- 保管庫の場所が「自分のフォルダの、アプリが作った名前のファイル」か。
+--   形は「<自分の id>/<ランダムな id>.jpg（または .png）」だけを認めます。
+-- ▼ なぜ要るのか
+--   写真を見せるときは、サーバーが service_role の鍵（RLS を通らない鍵）で期限付きURLを作ります
+--   （lib/signedUrls.ts）。ここで確かめないと、自分の投稿に「他人の写真の場所」を書くだけで、
+--   サーバーがその写真のURLを作ってくれてしまいます
+create function public.is_own_file(path text)
+returns boolean
+language sql
+stable
+set search_path to 'public'
+as $$
+  select coalesce(
+    path ~ ('^' || auth.uid()::text || '/[0-9a-f-]{36}\.(jpg|png)$'),
+    false
+  );
+$$;
+
+-- プロフィールのアイコンに入れてよい URL か。
+--   ・このアプリの保管庫の、自分のアイコン（avatars/<自分の id>/... と、前の形の <自分の id>.jpg）
+--   ・Google でログインした人の、Google のアイコン
+--   ・アプリの中に置いたダミーの絵（/demo/avatars/...）
+--   ・空（null）
+-- ▼ なぜ要るのか
+--   何でも入れられると、よそのサイトの画像（見た人を記録する仕掛けなど）を
+--   コミュニティの全員の画面に出させられるためです（コミュニティのアイコンと同じ考え方）。
+--   画面側でも、読み込める画像の置き場所を絞っています（next.config.ts の Content-Security-Policy）
+create function public.is_allowed_avatar(url text)
+returns boolean
+language sql
+stable
+set search_path to 'public'
+as $$
+  select url is null
+    or url ~ (
+      '^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/avatars/'
+      || auth.uid()::text || '(/[0-9a-f-]{36})?\.jpg(\?t=[0-9]+)?$'
+    )
+    or url ~ '^https://lh3\.googleusercontent\.com/[A-Za-z0-9/_=-]+$'
+    or url ~ '^/demo/avatars/[a-z0-9-]+\.svg$';
+$$;
+
+-- 自分がそのコミュニティの作成者（owner）か
+create function public.is_owner(target_community uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+  select exists (
+    select 1 from memberships
+    where user_id = auth.uid()
+      and community_id = target_community
+      and role = 'owner'
+  );
+$$;
+
+-- blocker が blocked をブロックしているか。
+-- blocks は自分の分しか読めないので、「相手が自分をブロックしているか」を確かめるときに使います
+-- （カードを送るとき。中身は見せず、true / false だけを返します）
+create function public.has_blocked(blocker_id uuid, blocked_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+  select exists (
+    select 1 from blocks where blocker = blocker_id and blocked = blocked_id
+  );
+$$;
+
+-- 回数制限。この1時間に、自分が kind をした回数が max_count より少なければ true。
+--   許可（RLS）の with check に「and under_rate_limit('posts', 20)」のように足して使います。
+-- ▼ なぜ要るのか
+--   回数の制限が無いと、プログラムで何万回も投稿・アップロードしたり、
+--   招待コードを手当たり次第に試したりできてしまいます（保管庫がいっぱいになる・よそのコミュニティに入られる）。
+--   ふつうに使う人が困らない回数にしています。
+-- ▼ security definer にしている理由
+--   数えるときに、その表の許可（RLS）に止められないようにするためです
+--   （たとえば、抜けたコミュニティに投稿した分も数えます）。数えるのは自分の分だけです
+create function public.under_rate_limit(kind text, max_count integer)
+returns boolean
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+  select (
+    case kind
+      when 'posts' then (
+        select count(*) from posts
+        where author_id = auth.uid() and created_at > now() - interval '1 hour')
+      when 'reactions' then (
+        select count(*) from post_reactions
+        where from_user = auth.uid() and created_at > now() - interval '1 hour')
+      when 'cards' then (
+        select count(*) from card_sends
+        where from_user = auth.uid() and sent_at > now() - interval '1 hour')
+      when 'capsules' then (
+        select count(*) from time_capsules
+        where author_id = auth.uid() and sealed_at > now() - interval '1 hour')
+      when 'messages' then (
+        select count(*) from messages
+        where user_id = auth.uid() and created_at > now() - interval '1 hour')
+      when 'reports' then (
+        select count(*) from reports
+        where reporter = auth.uid() and created_at > now() - interval '1 hour')
+      when 'joins' then (
+        select count(*) from join_attempts
+        where user_id = auth.uid() and attempted_at > now() - interval '1 hour')
+      -- 保管庫に置いたファイル（自分のフォルダの分。アイコンも含みます）
+      when 'uploads' then (
+        select count(*) from storage.objects o
+        where (storage.foldername(o.name))[1] = auth.uid()::text
+          and o.created_at > now() - interval '1 hour')
+      -- 知らない種類は、止めておきます（書き間違いで制限が効かなくならないように）
+      else max_count
+    end
+  ) < max_count;
 $$;
 
 -- ------------------------------------------------------------
@@ -416,9 +664,30 @@ $$;
 --  足すのは、この関数を通したときだけです（条件をまとめて確かめられるため）
 -- ------------------------------------------------------------
 
+-- 招待コードを作ります。紛らわしい文字（0とO、1とI）を除いた32種類から10文字。
+-- 32 の10乗＝約1,000兆通りなので、手当たり次第に試しても当たりません。
+-- ▼ なぜ DB で作るのか
+--   前は画面側で16進6文字（約1,600万通り）を作って渡していました。
+--   画面側で作ると、短いコードや決まったコードを送り込めてしまいます。
+--   1文字ずつ gen_random_uuid() の先頭の1バイト（0〜255）を32で割った余りで選びます。
+--   256 は 32 で割り切れるので、どの文字も同じ確率で出ます
+create function public.make_invite_code()
+returns text
+language sql
+volatile
+set search_path to 'public'
+as $$
+  select string_agg(
+    substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', get_byte(uuid_send(gen_random_uuid()), 0) % 32 + 1, 1),
+    ''
+  )
+  from generate_series(1, 10);
+$$;
+
 -- コミュニティを作って、自分を owner として入れます。
--- 名前が1〜40文字で、ゲストでないときだけ作ります。合わなければ何もせず null を返します
-create function public.create_community(community_name text, code text)
+-- 名前が1〜40文字のときだけ作ります。合わなければ何もせず null を返します。
+-- 招待コードは、この中で make_invite_code が作ります
+create function public.create_community(community_name text)
 returns uuid
 language sql
 security definer
@@ -426,9 +695,8 @@ set search_path to 'public'
 as $$
   with created as (
     insert into communities (name, invite_code, created_by)
-    select trim(community_name), upper(trim(code)), auth.uid()
+    select trim(community_name), make_invite_code(), auth.uid()
     where auth.uid() is not null
-      and not is_demo_guest()
       and char_length(trim(coalesce(community_name, ''))) between 1 and 40
     returning id
   ),
@@ -441,18 +709,29 @@ as $$
 $$;
 
 -- 招待コードで参加します。見つかればそのコミュニティの id、見つからなければ null。
--- もう入っているときも、そのコミュニティの id を返します
+-- もう入っているときも、そのコミュニティの id を返します。
+-- ▼ 1時間に20回まで
+--   試すたびに join_attempts に1行残し、この1時間に20回試していたら、合っていても入れません。
+--   手当たり次第にコードを試して、よそのコミュニティに入るのを防ぐためです。
+--   1日より前の記録は、ついでに消します（表が大きくなり続けないように）
 create function public.join_community(code text)
 returns uuid
 language sql
 security definer
 set search_path to 'public'
 as $$
-  with target as (
+  with attempt as (
+    insert into join_attempts (user_id)
+    select auth.uid() where auth.uid() is not null
+  ),
+  cleanup as (
+    delete from join_attempts where attempted_at < now() - interval '1 day'
+  ),
+  target as (
     select id from communities
     where invite_code = upper(trim(code))
       and auth.uid() is not null
-      and not is_demo_guest()
+      and under_rate_limit('joins', 20)
   ),
   joined as (
     insert into memberships (user_id, community_id)
@@ -475,7 +754,6 @@ as $$
     update communities set name = trim(new_name)
     where id = target_community
       and is_member(target_community)
-      and not is_demo_guest()
       and char_length(trim(coalesce(new_name, ''))) between 1 and 40
     returning 1
   )
@@ -483,7 +761,7 @@ as $$
 $$;
 
 -- アイコンを変えます（メンバーなら誰でも）。
--- 入れられるのは、このアプリの保管庫の「avatars/communities/<id>.jpg」の URL だけです。
+-- 入れられるのは、このアプリの保管庫の「avatars/communities/<id>/<ランダムな id>.jpg」の URL だけです。
 -- 何でも入れられると、よそのサイトの画像（見た人を記録する仕掛けなど）を出させられるためです
 create function public.set_community_icon(target_community uuid, url text)
 returns boolean
@@ -495,16 +773,86 @@ as $$
     update communities set icon_url = url
     where id = target_community
       and is_member(target_community)
-      and not is_demo_guest()
       -- ~ は「この形に合っているか」を調べる記号（正規表現）。
-      -- 最後の ?t=数字 は、画像を差し替えたときに古い絵が出ないようにする目印です
       and url ~ (
         '^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/avatars/communities/'
-        || target_community::text || '\.jpg(\?t=[0-9]+)?$'
+        || target_community::text || '/[0-9a-f-]{36}\.jpg$'
       )
     returning 1
   )
   select exists (select 1 from changed);
+$$;
+
+-- 人を報告します。二人が一緒にいるコミュニティごとに1行ずつ入れ、
+-- それぞれの作成者（owner）が、コミュニティの設定の画面で読めるようにします。
+-- 入れた行の数を返します（一緒にいるコミュニティが無ければ 0）
+create function public.report_user(target_user uuid, reason text)
+returns integer
+language sql
+security definer
+set search_path to 'public'
+as $$
+  with inserted as (
+    insert into reports (reporter, reported_user, community_id, reason)
+    select auth.uid(), target_user, mine.community_id, trim(reason)
+    from memberships mine
+    join memberships theirs on theirs.community_id = mine.community_id
+    where mine.user_id = auth.uid()
+      and theirs.user_id = target_user
+      and target_user <> auth.uid()
+      and char_length(trim(coalesce(reason, ''))) between 1 and 500
+      and under_rate_limit('reports', 10)
+    returning 1
+  )
+  select count(*)::integer from inserted;
+$$;
+
+-- 招待コードを作り直します（作成者だけ）。新しいコードを返します。作成者でなければ null。
+-- 前のコードは使えなくなります。コードが知らない人に広まってしまったときのためです
+create function public.regenerate_invite_code(target_community uuid)
+returns text
+language sql
+security definer
+set search_path to 'public'
+as $$
+  update communities
+    set invite_code = make_invite_code()
+    where id = target_community
+      and is_owner(target_community)
+    returning invite_code;
+$$;
+
+-- コミュニティから人を外します（作成者だけ。自分は外せません。自分で抜けるのは設定の「抜ける」から）
+create function public.remove_member(target_community uuid, target_user uuid)
+returns boolean
+language sql
+security definer
+set search_path to 'public'
+as $$
+  with removed as (
+    delete from memberships
+    where community_id = target_community
+      and user_id = target_user
+      and target_user <> auth.uid()
+      and is_owner(target_community)
+    returning 1
+  )
+  select exists (select 1 from removed);
+$$;
+
+-- DB と保管庫が、いまどれだけ使われているか（バイト）。
+-- 1日1回の処理（app/api/cron/daily）が、無料プランの上限に近づいていないかを見るのに使います。
+-- サーバー（service_role）だけが呼べます
+create function public.app_usage()
+returns table (db_bytes bigint, storage_bytes bigint)
+language sql
+stable
+security definer
+set search_path to 'public'
+as $$
+  select
+    pg_database_size(current_database()),
+    coalesce((select sum((o.metadata ->> 'size')::bigint) from storage.objects o), 0)::bigint;
 $$;
 
 -- ------------------------------------------------------------
@@ -556,6 +904,40 @@ begin
     new.raw_user_meta_data ->> 'avatar_url'
   );
   return new;
+end;
+$$;
+
+-- 誰かがコミュニティを抜けたとき（自分で抜けた・外された・退会した）の後片づけです。
+--   ・作成者（owner）がいなくなったら、いちばん前から入っている人を作成者にします
+--     （作成者がいないと、メンバーを外す・報告を読む人がいなくなるため）
+--   ・最後の1人が抜けたら、コミュニティを消します（誰も見られないものが残り続けないように）
+-- if を使わずに、where の条件に合ったときだけ書き換える形にしています（このファイルの先頭を参照）
+create function public.handle_member_left()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $$
+begin
+  update memberships
+    set role = 'owner'
+    where community_id = old.community_id
+      and user_id = (
+        select m.user_id from memberships m
+        where m.community_id = old.community_id
+        order by m.joined_at, m.user_id
+        limit 1
+      )
+      and not exists (
+        select 1 from memberships m
+        where m.community_id = old.community_id and m.role = 'owner'
+      );
+
+  delete from communities c
+    where c.id = old.community_id
+      and not exists (select 1 from memberships m where m.community_id = old.community_id);
+
+  return old;
 end;
 $$;
 
@@ -634,6 +1016,10 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+create trigger on_member_left
+  after delete on public.memberships
+  for each row execute function public.handle_member_left();
+
 create trigger on_recovery_veto
   after insert on public.recovery_vetoes
   for each row execute function public.reject_recovery_request();
@@ -692,16 +1078,17 @@ create policy "profiles readable"
   to authenticated
   using (id = auth.uid() or shares_community(id));
 
+-- アイコンの URL は、決まった置き場所のものだけ（is_allowed_avatar を参照）
 create policy "profiles self insert"
   on public.profiles for insert
   to authenticated
-  with check (id = auth.uid());
+  with check (id = auth.uid() and is_allowed_avatar(avatar_url));
 
 create policy "profiles self update"
   on public.profiles for update
   to authenticated
   using (id = auth.uid())
-  with check (id = auth.uid());
+  with check (id = auth.uid() and is_allowed_avatar(avatar_url));
 
 -- ------------------------------------------------------------
 --  コミュニティ
@@ -716,7 +1103,7 @@ create policy "communities for members"
 -- ------------------------------------------------------------
 --  参加
 --  読める：自分の参加と、自分がいるコミュニティの参加。
---  抜ける：自分の分だけ。ゲストは抜けられません（抜けると、どこにも戻れなくなるため）
+--  抜ける：自分の分だけ
 -- ------------------------------------------------------------
 create policy "memberships visible"
   on public.memberships for select
@@ -726,20 +1113,27 @@ create policy "memberships visible"
 create policy "memberships leave"
   on public.memberships for delete
   to authenticated
-  using (user_id = auth.uid() and not is_demo_guest());
+  using (user_id = auth.uid());
 
 -- ------------------------------------------------------------
 --  ご報告
 -- ------------------------------------------------------------
+-- 自分がブロックした人のご報告は、自分には返しません（blocks は自分の分しか読めません）
 create policy "posts for members"
   on public.posts for select
   to authenticated
-  using (is_member(community_id));
+  using (
+    is_member(community_id)
+    and not exists (
+      select 1 from blocks b where b.blocker = auth.uid() and b.blocked = posts.author_id
+    )
+  );
 
+-- 写真の場所は、自分のフォルダのものだけ（is_own_file を参照）
 create policy "posts insert"
   on public.posts for insert
   to authenticated
-  with check (author_id = auth.uid() and is_member(community_id));
+  with check (author_id = auth.uid() and is_member(community_id) and is_own_file(image_url) and under_rate_limit('posts', 20));
 
 -- 書き換えたあとも「自分の投稿で、自分が入っているコミュニティ」でなければいけません
 -- （入っていないコミュニティへ投稿を移せないようにするため）
@@ -747,12 +1141,13 @@ create policy "posts update own"
   on public.posts for update
   to authenticated
   using (author_id = auth.uid())
-  with check (author_id = auth.uid() and is_member(community_id));
+  with check (author_id = auth.uid() and is_member(community_id) and is_own_file(image_url));
 
+-- 消せる：書いた本人と、そのコミュニティの作成者（報告を受けて、困る投稿を消せるように）
 create policy "posts delete own"
   on public.posts for delete
   to authenticated
-  using (author_id = auth.uid());
+  using (author_id = auth.uid() or is_owner(community_id));
 
 -- ------------------------------------------------------------
 --  お祝い
@@ -760,7 +1155,12 @@ create policy "posts delete own"
 create policy "reactions for members"
   on public.post_reactions for select
   to authenticated
-  using (is_member(community_id));
+  using (
+    is_member(community_id)
+    and not exists (
+      select 1 from blocks b where b.blocker = auth.uid() and b.blocked = post_reactions.from_user
+    )
+  );
 
 -- お祝いを付ける投稿が、本当にそのコミュニティのものかも確かめます
 create policy "reactions insert"
@@ -769,6 +1169,8 @@ create policy "reactions insert"
   with check (
     from_user = auth.uid()
     and is_member(community_id)
+    and is_own_file(drawing_url)
+    and under_rate_limit('reactions', 100)
     and exists (
       select 1 from posts p
       where p.id = post_reactions.post_id
@@ -791,10 +1193,19 @@ create policy "templates readable"
   using (true);
 
 -- 読める：送った人と、受け取った人だけ
+-- ブロックした人から届いたカードは、受け取った側には見えません
 create policy "cards visible to both"
   on public.card_sends for select
   to authenticated
-  using (from_user = auth.uid() or to_user = auth.uid());
+  using (
+    from_user = auth.uid()
+    or (
+      to_user = auth.uid()
+      and not exists (
+        select 1 from blocks b where b.blocker = auth.uid() and b.blocked = card_sends.from_user
+      )
+    )
+  );
 
 -- 送れる：自分が入っているコミュニティの、ほかのメンバーにだけ
 create policy "cards insert"
@@ -803,12 +1214,22 @@ create policy "cards insert"
   with check (
     from_user = auth.uid()
     and is_member(community_id)
+    and (drawing_url is null or is_own_file(drawing_url))
+    and under_rate_limit('cards', 50)
+    -- 相手にブロックされていたら送れません
+    and not has_blocked(to_user, auth.uid())
     and exists (
       select 1 from memberships m
       where m.user_id = card_sends.to_user
         and m.community_id = card_sends.community_id
     )
   );
+
+-- 消せる：送った人だけ（送り間違えたときに取り消せるように）
+create policy "cards delete by sender"
+  on public.card_sends for delete
+  to authenticated
+  using (from_user = auth.uid());
 
 -- ------------------------------------------------------------
 --  未来への手紙
@@ -830,18 +1251,29 @@ create policy "capsules readable"
 create policy "capsules insert"
   on public.time_capsules for insert
   to authenticated
-  with check (author_id = auth.uid() and is_member(community_id));
+  with check (
+    author_id = auth.uid()
+    and is_member(community_id)
+    and (image_url is null or is_own_file(image_url))
+    and under_rate_limit('capsules', 20)
+  );
+
+-- 消せる：書いた本人だけ（付いている日程調整・チャットも連鎖で消えます）
+create policy "capsules delete own"
+  on public.time_capsules for delete
+  to authenticated
+  using (author_id = auth.uid());
 
 -- ------------------------------------------------------------
 --  イベント
---  読める：同じコミュニティの人で、手紙が開いたあと。作った人はいつでも
+--  読める：同じコミュニティの人で、その手紙を読める人（開封日を過ぎていて、宛先が全員か自分）。作った人はいつでも
 -- ------------------------------------------------------------
 create policy "events readable"
   on public.events for select
   to authenticated
   using (
     is_member(community_id)
-    and (capsule_is_open(capsule_id) or created_by = auth.uid())
+    and (capsule_is_visible(capsule_id) or created_by = auth.uid())
   );
 
 -- 作れる：自分が書いた手紙に、その手紙と同じコミュニティで
@@ -948,8 +1380,15 @@ create policy "messages insert own"
   to authenticated
   with check (
     user_id = auth.uid()
+    and under_rate_limit('messages', 300)
     and exists (select 1 from events e where e.id = messages.event_id)
   );
+
+-- 消せる：自分の発言だけ
+create policy "messages delete own"
+  on public.messages for delete
+  to authenticated
+  using (user_id = auth.uid());
 
 -- ------------------------------------------------------------
 --  やりとりの記録
@@ -959,6 +1398,61 @@ create policy "interactions visible"
   on public.interactions for select
   to authenticated
   using (user_a = auth.uid() or user_b = auth.uid());
+
+-- ------------------------------------------------------------
+--  スマホへの通知の宛先：自分の端末の分だけ
+-- ------------------------------------------------------------
+create policy "push subscriptions own"
+  on public.push_subscriptions for select
+  to authenticated
+  using (user_id = auth.uid());
+
+create policy "push subscriptions insert own"
+  on public.push_subscriptions for insert
+  to authenticated
+  with check (user_id = auth.uid());
+
+create policy "push subscriptions update own"
+  on public.push_subscriptions for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+create policy "push subscriptions delete own"
+  on public.push_subscriptions for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+-- ------------------------------------------------------------
+--  報告とブロック
+-- ------------------------------------------------------------
+-- 報告：書くのは report_user だけ。読めるのは、報告した本人と、そのコミュニティの作成者
+create policy "reports visible"
+  on public.reports for select
+  to authenticated
+  using (reporter = auth.uid() or is_owner(community_id));
+
+-- 作成者は、読み終えた報告を消せます
+create policy "reports delete by owner"
+  on public.reports for delete
+  to authenticated
+  using (is_owner(community_id));
+
+-- ブロック：自分の分だけ、読む・する・やめる
+create policy "blocks own"
+  on public.blocks for select
+  to authenticated
+  using (blocker = auth.uid());
+
+create policy "blocks insert own"
+  on public.blocks for insert
+  to authenticated
+  with check (blocker = auth.uid());
+
+create policy "blocks delete own"
+  on public.blocks for delete
+  to authenticated
+  using (blocker = auth.uid());
 
 -- ------------------------------------------------------------
 --  思い出ログイン
@@ -983,22 +1477,29 @@ create policy "recovery codes delete own"
   to authenticated
   using (issued_by = auth.uid());
 
--- 申請は、そのコミュニティの人に見えます（誰でも止められるように）。
--- 書くのはサーバー（service_role）だけです
-create policy "recovery requests for members"
+-- 申請は、復旧しようとしている人と、どこか1つでも同じコミュニティにいる人に見えます
+-- （誰でも止められるように）。書くのはサーバー（service_role）だけです。
+-- ▼ 前は「申請を立てたコミュニティ」の人にしか見えませんでした
+--   2つ以上のコミュニティに入っている人の場合、そのうち1つの人にしか知らせが出ず、
+--   ほかのコミュニティの人は、乗っ取りに気づいても止められませんでした。
+-- ▼ 本人（target_user）にも見せます
+--   本当の持ち主がまだログインできているなら、それは乗っ取りです。本人がいちばん早く気づけます
+create policy "recovery requests visible"
   on public.recovery_requests for select
   to authenticated
-  using (is_member(community_id));
+  using (
+    target_user = auth.uid()
+    or is_member(community_id)
+    or shares_community(target_user)
+  );
 
-create policy "recovery vetoes for members"
+-- 止めた記録は、その申請が見える人に見えます。
+-- exists の中の recovery_requests にも上の許可が効くので、見えない申請の分は見えません
+create policy "recovery vetoes visible"
   on public.recovery_vetoes for select
   to authenticated
   using (
-    exists (
-      select 1 from recovery_requests r
-      where r.id = recovery_vetoes.request_id
-        and is_member(r.community_id)
-    )
+    exists (select 1 from recovery_requests r where r.id = recovery_vetoes.request_id)
   );
 
 create policy "recovery vetoes insert"
@@ -1010,7 +1511,6 @@ create policy "recovery vetoes insert"
       select 1 from recovery_requests r
       where r.id = recovery_vetoes.request_id
         and r.status = 'pending'
-        and is_member(r.community_id)
     )
   );
 
@@ -1023,26 +1523,48 @@ create policy "recovery vetoes insert"
 
 -- 画面から呼ぶ関数と、許可の中で使う関数：ログインしている人だけ
 revoke execute on function
-  public.create_community(text, text),
+  public.create_community(text),
   public.join_community(text),
   public.rename_community(uuid, text),
   public.set_community_icon(uuid, text),
   public.is_member(uuid),
   public.shares_community(uuid),
-  public.is_demo_guest(),
-  public.capsule_is_open(uuid)
+  public.capsule_is_visible(uuid),
+  public.is_own_file(text),
+  public.is_allowed_avatar(text),
+  public.under_rate_limit(text, integer),
+  public.is_owner(uuid),
+  public.has_blocked(uuid, uuid),
+  public.report_user(uuid, text),
+  public.remove_member(uuid, uuid),
+  public.regenerate_invite_code(uuid)
 from public, anon;
 
 grant execute on function
-  public.create_community(text, text),
+  public.create_community(text),
   public.join_community(text),
   public.rename_community(uuid, text),
   public.set_community_icon(uuid, text),
   public.is_member(uuid),
   public.shares_community(uuid),
-  public.is_demo_guest(),
-  public.capsule_is_open(uuid)
+  public.capsule_is_visible(uuid),
+  public.is_own_file(text),
+  public.is_allowed_avatar(text),
+  public.under_rate_limit(text, integer),
+  public.is_owner(uuid),
+  public.has_blocked(uuid, uuid),
+  public.report_user(uuid, text),
+  public.remove_member(uuid, uuid),
+  public.regenerate_invite_code(uuid)
 to authenticated, service_role;
+
+-- 使用量：サーバー（service_role）だけ
+revoke execute on function public.app_usage() from public, anon, authenticated;
+grant execute on function public.app_usage() to service_role;
+
+-- 招待コードを作る関数：画面からは直接呼ばせません（create_community の中で使います）
+revoke execute on function public.make_invite_code() from public, anon, authenticated;
+grant execute on function public.make_invite_code() to service_role;
 
 -- 思い出ログインの判定：サーバー（service_role）だけ
 revoke execute on function public.recovery_is_unlocked(uuid) from public, anon, authenticated;
@@ -1067,15 +1589,24 @@ grant execute on function public.recovery_is_unlocked(uuid) to service_role;
 --   そのときは、流したあとに「NOTICE: バケットを…」と出るので、README.md の手順で
 --   ダッシュボードから作ってください（すでにあるなら、何もしなくて大丈夫です）。
 --   exception = begin〜end の間で起きたエラーを受け止める書き方です
+--
+-- ▼ 大きさと種類の上限（file_size_limit / allowed_mime_types）
+--   アプリが置くのは、縮めた JPEG（写真・カード・アイコン）と PNG（手書き・手紙の紙）だけです。
+--   上限が無いと、自分のフォルダになら巨大なファイルや、HTML・SVG のような
+--   「開くとプログラムが動くかもしれないファイル」も置けてしまいます。
+--   ふだんの大きさ：写真 0.2MB ほど / 手紙の紙 1〜2MB ほど。余裕を持たせています
 do $$
 begin
-  insert into storage.buckets (id, name, public)
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
   values
-    ('avatars', 'avatars', true),
-    ('posts', 'posts', false),
-    ('drawings', 'drawings', false),
-    ('cards', 'cards', false)
-  on conflict (id) do update set public = excluded.public;
+    ('avatars', 'avatars', true, 1048576, array['image/jpeg']),
+    ('posts', 'posts', false, 2097152, array['image/jpeg']),
+    ('drawings', 'drawings', false, 5242880, array['image/png']),
+    ('cards', 'cards', false, 2097152, array['image/jpeg'])
+  on conflict (id) do update set
+    public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
 exception
   when insufficient_privilege then
     raise notice 'バケットを SQL から作る権限がありませんでした。supabase/README.md の「保管庫」を見て、ダッシュボードで作ってください';
@@ -1085,54 +1616,54 @@ end $$;
 --   storage.foldername(name)[1] = いちばん上のフォルダ名
 --   storage.filename(name)      = フォルダを除いたファイル名
 
--- プロフィールのアイコン：avatars/<自分の id>.jpg だけ。
--- 上書き（upsert）で上げているので、置く・上書き・読む の3つが要ります
+-- プロフィールのアイコン：avatars/<自分の id>/<ランダムな id>.jpg（lib/avatarFile.ts）。
+-- ▼ 名前にランダムな id を入れている理由
+--   avatars は公開の置き場所なので、URL さえ分かれば誰でも見られます。
+--   前は「<自分の id>.jpg」で、id を知っている人なら URL を作れてしまいました。
+-- 置く・読む・消す の3つです（上書きはしないので、書き換えの許可はありません）。
+-- 読む・消すは、前の形（<自分の id>.jpg）のファイルも片づけられるように、そちらも認めます
 create policy "avatar insert own"
   on storage.objects for insert
   to authenticated
-  with check (bucket_id = 'avatars' and name = auth.uid()::text || '.jpg');
-
-create policy "avatar update own"
-  on storage.objects for update
-  to authenticated
-  using (bucket_id = 'avatars' and name = auth.uid()::text || '.jpg')
-  with check (bucket_id = 'avatars' and name = auth.uid()::text || '.jpg');
+  with check (
+    bucket_id = 'avatars'
+    and under_rate_limit('uploads', 100)
+    and name ~ ('^' || auth.uid()::text || '/[0-9a-f-]{36}\.jpg$')
+  );
 
 create policy "avatar read own"
   on storage.objects for select
   to authenticated
-  using (bucket_id = 'avatars' and name = auth.uid()::text || '.jpg');
+  using (
+    bucket_id = 'avatars'
+    and ((storage.foldername(name))[1] = auth.uid()::text or name = auth.uid()::text || '.jpg')
+  );
 
--- コミュニティのアイコン：avatars/communities/<コミュニティの id>.jpg。
--- そのコミュニティのメンバーだけ（ゲストは除く）。
+create policy "avatar delete own"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and ((storage.foldername(name))[1] = auth.uid()::text or name = auth.uid()::text || '.jpg')
+  );
+
+-- コミュニティのアイコン：avatars/communities/<コミュニティの id>/<ランダムな id>.jpg。
+-- そのコミュニティのメンバーだけ。
 -- ▼ id の比べ方について
 --   ファイル名を uuid に変換して比べると、uuid でない名前のときにエラーで止まります。
---   文字のまま比べれば、合わないだけで済みます
+--   文字のまま比べれば、合わないだけで済みます。
+--   coalesce の2つめは、前の形（communities/<コミュニティの id>.jpg）を片づけるためです
 create policy "community icon insert"
   on storage.objects for insert
   to authenticated
   with check (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = 'communities'
-    and not public.is_demo_guest()
+    and name ~ '^communities/[0-9a-f-]{36}/[0-9a-f-]{36}\.jpg$'
+    and public.under_rate_limit('uploads', 100)
     and exists (
       select 1 from public.memberships m
       where m.user_id = auth.uid()
-        and m.community_id::text = replace(storage.filename(name), '.jpg', '')
-    )
-  );
-
-create policy "community icon update"
-  on storage.objects for update
-  to authenticated
-  using (
-    bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = 'communities'
-    and not public.is_demo_guest()
-    and exists (
-      select 1 from public.memberships m
-      where m.user_id = auth.uid()
-        and m.community_id::text = replace(storage.filename(name), '.jpg', '')
+        and m.community_id::text = (storage.foldername(name))[2]
     )
   );
 
@@ -1145,11 +1676,30 @@ create policy "community icon read"
     and exists (
       select 1 from public.memberships m
       where m.user_id = auth.uid()
-        and m.community_id::text = replace(storage.filename(name), '.jpg', '')
+        and m.community_id::text = coalesce(
+          (storage.foldername(name))[2],
+          replace(storage.filename(name), '.jpg', '')
+        )
     )
   );
 
--- 写真・お祝い・手紙・カード：「<自分の id>/<ファイル名>」に置く、自分が置いたものを読む、だけ。
+create policy "community icon delete"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = 'communities'
+    and exists (
+      select 1 from public.memberships m
+      where m.user_id = auth.uid()
+        and m.community_id::text = coalesce(
+          (storage.foldername(name))[2],
+          replace(storage.filename(name), '.jpg', '')
+        )
+    )
+  );
+
+-- 写真・お祝い・手紙・カード：「<自分の id>/<ファイル名>」に置く、自分が置いたものを読む・消す、だけ。
 -- 他人のものを読む・上書きする・消すは、誰にも許しません
 -- （見せるときは、サーバーが RLS を通して取った場所にだけ期限付きURLを作ります）
 create policy "photos upload own folder"
@@ -1158,10 +1708,21 @@ create policy "photos upload own folder"
   with check (
     bucket_id in ('posts', 'drawings', 'cards')
     and (storage.foldername(name))[1] = auth.uid()::text
+    and public.under_rate_limit('uploads', 100)
   );
 
 create policy "photos read own folder"
   on storage.objects for select
+  to authenticated
+  using (
+    bucket_id in ('posts', 'drawings', 'cards')
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- 消す：自分のフォルダのものだけ。
+-- 写真を上げたあとに DB への書き込みが失敗したとき、上げた写真を残さないように、画面から消します
+create policy "photos delete own folder"
+  on storage.objects for delete
   to authenticated
   using (
     bucket_id in ('posts', 'drawings', 'cards')

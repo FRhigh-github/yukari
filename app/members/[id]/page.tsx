@@ -2,6 +2,7 @@ import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import MemberPosts from "@/components/MemberPosts";
 import { getSignedUrls } from "@/lib/signedUrls";
 import type { Reaction } from "@/components/ReactionBoard";
+import { isUuid } from "@/lib/isUuid";
 
 // [id] という名前のフォルダにすると、URL の一部を受け取れます。
 // 例: /members/abc123 → id は "abc123"
@@ -13,7 +14,11 @@ export default async function MemberPage({
   // ?post=<ご報告の id> = プロフィールの一覧で押したご報告。そこからストーリーで開きます
   // ?back=<URL> = 「戻る」を押したときの行き先（コミュニティの設定から来たときなど）。無ければホーム
   // ?view=story = ホームから来たとき。一覧を挟まず、最新のご報告からストーリーで開きます
-  const { post: openPostId, back, view } = await searchParams;
+  // ?c=<コミュニティの id> = ホームで見ていたコミュニティ。そのコミュニティのご報告だけを出します。
+  //   「常にどれか1つのコミュニティを見ている」決まり（AGENTS.md）に合わせるためです。
+  //   無いとき（プロフィールの一覧から来たときなど）は、見られるご報告を全部出します
+  const { post: openPostId, back, view, c } = await searchParams;
+  const onlyCommunity = isUuid(c) ? c : null;
   const supabase = await createClient();
 
   // ▼ 待ち時間の話
@@ -26,19 +31,27 @@ export default async function MemberPage({
   // 1回目：この4つは、どれも id だけで取れます
   // single() = 1件だけ取ってくる（配列ではなく、そのものが返ります）
   // getCurrentUserId = 自分か確かめるため（自分のご報告だけ、長押しで消せるようにします）。通信なしで済みます
-  const [{ data: profile }, { data: posts }, { data: reactions }, myId] =
+  const [{ data: profile }, { data: posts }, { data: reactions }, myId, { data: owned }] =
     await Promise.all([
       supabase.from("profiles").select("display_name, avatar_url").eq("id", id).single(),
       // 列は使うものだけ並べます。
       // select("*") だと、誰かが列を足した瞬間に、
       // 知らないうちに取ってくる量が増えます。
       // limit は、報告が増えたときに一気に読み込まないための上限です。
-      supabase
-        .from("posts")
-        .select("id, title, body, image_url, created_at, community_id")
-        .eq("author_id", id)
-        .order("created_at", { ascending: false })
-        .limit(30),
+      onlyCommunity
+        ? supabase
+            .from("posts")
+            .select("id, title, body, image_url, created_at, community_id")
+            .eq("author_id", id)
+            .eq("community_id", onlyCommunity)
+            .order("created_at", { ascending: false })
+            .limit(30)
+        : supabase
+            .from("posts")
+            .select("id, title, body, image_url, created_at, community_id")
+            .eq("author_id", id)
+            .order("created_at", { ascending: false })
+            .limit(30),
 
       // ▼ 反応も、ここで一緒に取ります。
       //   前は「報告を取る → その id で反応を取る」と2段階でしたが、
@@ -49,17 +62,18 @@ export default async function MemberPage({
         .from("post_reactions")
         .select("id, post_id, from_user, drawing_url, posts!inner(author_id)")
         .eq("posts.author_id", id)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        // ご報告は30件までしか出さないので、お祝いも新しい順に上限を付けます。
+        // 上限が無いと、お祝いが何千件にもなったときに、全部を運んでくることになります
+        .limit(300),
       getCurrentUserId(supabase),
+      // 自分が作成者のコミュニティ。そのご報告は、作成者として消せます（MemberPosts）
+      supabase.from("memberships").select("community_id, user_id").eq("role", "owner"),
     ]);
 
   // posts に入っているのは「保管庫のどこに置いたか」という場所だけです。
-  // 保管庫は非公開なので、見るには期限付きの URL を発行してもらいます（3600秒＝1時間）。
-  // http で始まるものはデバッグ用データの外部URLなので、発行の対象から外します。
-  const imagePaths =
-    posts
-      ?.filter((post) => post.image_url && !post.image_url.startsWith("http"))
-      .map((post) => post.image_url) ?? [];
+  // 保管庫は非公開なので、見るには期限付きの URL を発行してもらいます（lib/signedUrls.ts）
+  const imagePaths = posts?.map((post) => post.image_url) ?? [];
 
   // 描いた人の名前を引くために、profiles をまとめて取ります
   const reactionUserIds = Array.from(
@@ -70,10 +84,10 @@ export default async function MemberPage({
   const drawingPaths = reactions?.map((reaction) => reaction.drawing_url) ?? [];
 
   // 2回目：この3つは、1回目の結果がそろえば同時に出せます
-  //   写真のURLは lib/signedUrls.ts で作ります。同じ写真には6日間同じURLを返すので、
+  //   写真のURLは lib/signedUrls.ts で作ります。同じ写真には20時間同じURLを返すので、
   //   2回目からはブラウザが前にダウンロードした写真をそのまま使えます。
   //   渡している場所は、どれも RLS を通して取ってきたものです（そこの約束を参照）
-  const [findSignedImage, { data: reactionUsers }, findDrawingUrl] =
+  const [findImageUrl, { data: reactionUsers }, findDrawingUrl] =
     await Promise.all([
       getSignedUrls("posts", imagePaths),
       supabase
@@ -82,14 +96,6 @@ export default async function MemberPage({
         .in("id", reactionUserIds),
       getSignedUrls("drawings", drawingPaths),
     ]);
-
-  // 置き場所から URL を探す。find() = 条件に合う最初の1件を返す
-  const findImageUrl = (path: string | null) => {
-    if (!path) return null;
-    // デバッグ用データは最初から URL なので、そのまま使います
-    if (path.startsWith("http")) return path;
-    return findSignedImage(path);
-  };
 
   // 報告1件ぶんの反応を、表示に使う形にして返します
   const getReactions = (postId: string): Reaction[] =>
@@ -109,6 +115,11 @@ export default async function MemberPage({
     <MemberPosts
       authorId={id}
       isMine={myId === id}
+      ownedCommunityIds={
+        owned
+          ?.filter((membership) => membership.user_id === myId)
+          .map((membership) => membership.community_id) ?? []
+      }
       openPostId={typeof openPostId === "string" ? openPostId : null}
       startInStory={view === "story"}
       // アプリの中の画面（"/" で始まり、"//" ではない）だけを受け付けます。
@@ -120,7 +131,10 @@ export default async function MemberPage({
         !back.startsWith("//") &&
         !back.includes("\\")
           ? back
-          : "/"
+          : // ホームから来たときは、見ていたコミュニティのホームへ戻します
+            onlyCommunity
+            ? `/?c=${onlyCommunity}`
+            : "/"
       }
       authorName={profile?.display_name ?? "名無し"}
       avatarUrl={profile?.avatar_url ?? null}

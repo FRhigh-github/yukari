@@ -9,6 +9,10 @@ export async function GET(request: Request) {
   // searchParams = ?以降の部分 / origin = http://localhost:3000 の部分
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  // ▼ ログインのあとに開く画面。パスワードの再設定（/forgot）のときだけ /reset-password が付いてきます。
+  //   決まった行き先しか受け付けません。何でも受け付けると、
+  //   ?next=https://よそのサイト のリンクで、ログインのあとによそへ飛ばされてしまうためです
+  const next = searchParams.get('next') === '/reset-password' ? '/reset-password' : null
 
   // 交換に失敗したときの理由を、あとで画面に出すために控えておきます
   let exchangeError: string | null = null
@@ -19,6 +23,10 @@ export async function GET(request: Request) {
     // code を渡して、ログイン情報（セッション）に交換してもらう。
     // 成功すると、Cookieにログイン状態が保存される。
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (!error && next !== null) {
+      return NextResponse.redirect(`${origin}${next}`)
+    }
 
     if (!error) {
       // ▼ 初めての人か、すでに使っている人かで行き先を変えます。
@@ -58,14 +66,19 @@ export async function GET(request: Request) {
   //
   //   Google 側で断られた場合、?error=... と ?error_description=... が付いてきます。
   //   何も出さずにログイン画面へ戻すと「押したのに戻された」としか分からないので、
-  //   理由をそのまま持って帰って、画面に出します。
-  const reason =
-    searchParams.get('error_description') ??
-    searchParams.get('error') ??
-    exchangeError ??
-    'Googleから返事がありませんでした'
+  //   ログイン画面に「何が起きたか」の合図だけを渡します。
+  //
+  //   理由の文そのものは渡しません。
+  //   前は文をそのまま ?error= に入れて画面に出していたので、
+  //   誰かが ?error=好きな文 のリンクを作ると、アプリの画面に偽の案内を出せてしまいました。
+  //   合図は決まった2つだけで、出す文はログイン画面（app/login/page.tsx）が決めます
+  const cancelled = searchParams.get('error') === 'access_denied'
+  console.error(
+    'Google ログインに失敗しました',
+    searchParams.get('error_description') ?? searchParams.get('error') ?? exchangeError,
+  )
 
   return NextResponse.redirect(
-    `${origin}/login?error=${encodeURIComponent(reason)}`,
+    `${origin}/login?error=${cancelled ? 'google_cancelled' : 'google_failed'}`,
   )
 }

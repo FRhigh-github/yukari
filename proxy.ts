@@ -12,18 +12,19 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isDemoGuest } from "@/lib/demoGuest";
 
 // ログインしていなくても開ける画面。
-// ログイン・登録・思い出ログイン（本人はまだログインできない）・デモと、その裏で動く処理だけです
+// ログイン・登録・思い出ログイン（本人はまだログインできない）と、その裏で動く処理だけです
 const PUBLIC_PATHS = [
   "/login",
   "/signup",
+  // パスワードを忘れた人が、再設定のメールを受け取る画面
+  "/forgot",
   "/recover",
   "/auth/callback",
   "/api/recovery",
-  // 発表用の「デモで入る」（DEMO_COMMUNITY_ID が無ければ、中で断ります）
-  "/api/demo-login",
+  // 1日1回、Vercel が自動で呼ぶ処理。中で CRON_SECRET を確かめます（app/api/cron/daily）
+  "/api/cron",
 ];
 
 const isPublic = (path: string) =>
@@ -71,18 +72,6 @@ export async function proxy(request: NextRequest) {
   //   別のアカウントで入りたいときは、プロフィールの「ログアウト」から出てもらいます
   const path = request.nextUrl.pathname;
   if (isLoggedIn && (path === "/login" || path === "/signup")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
-
-  // ▼ デモのゲストは、ほかのコミュニティを作ったり、参加したりできません。
-  //   その画面を開こうとしたら、ホームへ戻します（DB 側でも止めています）
-  if (
-    isDemoGuest(data?.claims.email) &&
-    (path === "/communities/new" || path === "/communities/join")
-  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";

@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { avatarPathFromUrl, newAvatarPath } from "@/lib/avatarFile";
 import ImageCropper from "@/components/ImageCropper";
 import CameraBadge from "@/components/CameraBadge";
 
@@ -22,15 +23,12 @@ type CommunityIconProps = {
   name: string;
   // まだ決めていなければ null
   iconUrl: string | null;
-  // false のときは、アイコンを見せるだけで変えられません（デモのゲスト）
-  canEdit: boolean;
 };
 
 export default function CommunityIcon({
   communityId,
   name,
   iconUrl,
-  canEdit,
 }: CommunityIconProps) {
   const router = useRouter();
 
@@ -83,17 +81,14 @@ export default function CommunityIcon({
       //   公開なので、URLをそのまま communities に入れておけます。
       //   非公開だと、コミュニティを出すたびに期限付きURLの発行が要ります。
       //
-      //   ファイル名はコミュニティのid。
-      //   変えるたびにファイルが増えていかないようにするためです。
-      const path = `communities/${communityId}.jpg`;
+      //   ファイル名は「communities/<コミュニティの id>/<ランダムな id>.jpg」（lib/avatarFile.ts）。
+      //   公開の置き場所なので、名前を当てられないようにしています。
+      //   前のファイルは、新しいアイコンに変えたあとで消します
+      const path = newAvatarPath(`communities/${communityId}`);
       const upload = await supabase.storage
         .from("avatars")
-        .upload(path, blob, {
-          // 切り取り画面が JPEG にして返すので、形式は決まっています
-          contentType: "image/jpeg",
-          // upsert = 同じ名前があれば上書きする
-          upsert: true,
-        });
+        // 切り取り画面が JPEG にして返すので、形式は決まっています
+        .upload(path, blob, { contentType: "image/jpeg" });
 
       if (upload.error) throw new Error(`画像: ${upload.error.message}`);
 
@@ -101,8 +96,8 @@ export default function CommunityIcon({
         .from("avatars")
         .getPublicUrl(path);
 
-      // ?t=... を付けて、古い絵が表示され続けるのを防ぎます
-      const savedUrl = `${publicUrl.publicUrl}?t=${Date.now()}`;
+      // 名前が毎回ちがうので、古い絵が表示され続けることはありません
+      const savedUrl = publicUrl.publicUrl;
 
       // ▼ 表を直接書き換えるのではなく、DB側の関数を呼びます。
       //   関数の中で「このコミュニティの人か」を確かめているので、
@@ -116,14 +111,22 @@ export default function CommunityIcon({
       if (error) throw new Error(error.message);
       if (changed !== true) throw new Error("このコミュニティのアイコンは変えられません");
 
+      // 前のアイコンのファイルを消します（URL を知っている人に見られ続けないように）
+      const oldPath = avatarPathFromUrl(iconUrl);
+      if (oldPath !== null) {
+        await supabase.storage.from("avatars").remove([oldPath]);
+      }
+
       setPicked(null);
       setMessage({ text: "保存しました", isError: false });
       // 画面を取り直して、上のバーなどにも新しい絵を出します
       router.refresh();
     } catch (error) {
-      // 何で止まったかが分かるように、エラーの中身も出します
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      // （DB のエラー文には、表の名前など中の作りが書かれているため）
+      console.error("コミュニティのアイコンを保存できませんでした", error);
       setMessage({
-        text: `保存できませんでした（${error instanceof Error ? error.message : "原因不明"}）`,
+        text: "保存できませんでした。電波の良いところで、もう一度お試しください",
         isError: true,
       });
     } finally {
@@ -149,28 +152,22 @@ export default function CommunityIcon({
       <div className="flex items-center gap-4">
         {/* label で包むと、中のどこを押しても写真を選べます。
             input 本体は hidden で隠します（見た目が端末ごとに違うため）。 */}
-        {/* デモのゲストは、みんなで見ているデモ用コミュニティの絵を変えられません
-            （DB 側でも止めています。supabase/01_schema.sql の is_demo_guest） */}
-        {canEdit ? (
-          <label className="relative shrink-0 cursor-pointer">
-            {square}
-            {/* カメラの印。これが無いと「押せる」と気づかれません */}
-            <CameraBadge />
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) handlePick(file);
-                // 同じ画像をもう一度選んでも反応するように、選んだ記録を消しておきます
-                event.target.value = "";
-              }}
-            />
-          </label>
-        ) : (
-          <div className="shrink-0">{square}</div>
-        )}
+        <label className="relative shrink-0 cursor-pointer">
+          {square}
+          {/* カメラの印。これが無いと「押せる」と気づかれません */}
+          <CameraBadge />
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) handlePick(file);
+              // 同じ画像をもう一度選んでも反応するように、選んだ記録を消しておきます
+              event.target.value = "";
+            }}
+          />
+        </label>
 
         {/* min-w-0 = 名前が長くても、この欄が押し広がらないようにする指定 */}
         <div className="min-w-0 flex-1">

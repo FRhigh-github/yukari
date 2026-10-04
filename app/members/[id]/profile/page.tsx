@@ -9,6 +9,7 @@ import PostGrid from "@/components/PostGrid";
 import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import ProfileHeader from "@/components/ProfileHeader";
 import RecoveryCodeButton from "@/components/RecoveryCodeButton";
+import MemberSafetyActions from "@/components/MemberSafetyActions";
 import { getSignedUrls } from "@/lib/signedUrls";
 import { formatLastContact } from "@/lib/lastContact";
 
@@ -25,6 +26,7 @@ export default async function MemberProfilePage({
     { data: memberships },
     { data: posts },
     { data: lastContact },
+    { data: block },
     myId,
   ] =
     await Promise.all([
@@ -57,6 +59,13 @@ export default async function MemberProfilePage({
         .eq("partner", id)
         .maybeSingle(),
 
+      // 自分がこの人をブロックしているか（blocks は自分の分しか返りません）
+      supabase
+        .from("blocks")
+        .select("blocked")
+        .eq("blocked", id)
+        .maybeSingle(),
+
       getCurrentUserId(supabase),
     ]);
 
@@ -64,19 +73,10 @@ export default async function MemberProfilePage({
   const lastContactLabel = formatLastContact(lastContact?.last_at ?? null);
 
   // 写真の置き場所から、期限付きのURLを発行してもらいます
-  const imagePaths =
-    posts
-      ?.filter((post) => post.image_url && !post.image_url.startsWith("http"))
-      .map((post) => post.image_url) ?? [];
+  const imagePaths = posts?.map((post) => post.image_url) ?? [];
 
   // URL は lib/signedUrls.ts で作ります（同じ写真には同じURLを返すので、写真を使い回せます）
-  const findSignedImage = await getSignedUrls("posts", imagePaths);
-
-  const findImageUrl = (path: string | null) => {
-    if (!path) return null;
-    if (path.startsWith("http")) return path;
-    return findSignedImage(path);
-  };
+  const findImageUrl = await getSignedUrls("posts", imagePaths);
 
   // ▼ 一緒に持ってきた communities から、名前だけを取り出します。
   //
@@ -119,7 +119,7 @@ export default async function MemberProfilePage({
       {/* ▼ 「最後に話したのは何年前」。自分のプロフィールには出しません。
             カード・お祝い・チャットを送ると、DB が自動で記録します */}
       {isMe ? null : (
-        <p className="mx-5 mt-4 rounded-xl border border-kin/30 bg-white px-4 py-3 text-center text-sm text-stone-600">
+        <p className="mx-4 mt-4 rounded-xl border border-kin/30 bg-white px-4 py-3 text-center text-sm text-stone-600">
           {lastContactLabel === null ? (
             "まだやりとりはありません"
           ) : (
@@ -135,7 +135,7 @@ export default async function MemberProfilePage({
           ふだんは使わないものなので、目立たせすぎない場所に置きます。
           自分で自分のコードは出せない（DB が止める）ので、自分のプロフィールには出しません */}
       {isMe ? null : (
-        <div className="p-5">
+        <div className="px-4 py-5">
           <RecoveryCodeButton
             targetUserId={id}
             targetName={profile?.display_name ?? "この人"}
@@ -143,7 +143,7 @@ export default async function MemberProfilePage({
         </div>
       )}
 
-      <h2 className="border-y border-stone-200 bg-white px-5 py-3 text-lg font-bold text-stone-800">
+      <h2 className="border-y border-stone-200 bg-white px-4 py-3 text-lg font-bold text-stone-800">
         ご報告
       </h2>
 
@@ -159,6 +159,15 @@ export default async function MemberProfilePage({
           })) ?? []
         }
       />
+
+      {/* ▼ 報告・ブロック。いちばん下の、ふだんは目に入らない場所に置きます */}
+      {isMe ? null : (
+        <MemberSafetyActions
+          targetUserId={id}
+          targetName={profile?.display_name ?? "この人"}
+          isBlocked={block !== null}
+        />
+      )}
     </main>
   );
 }

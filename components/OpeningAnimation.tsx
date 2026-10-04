@@ -9,6 +9,11 @@
 //   ・一度見たら、そのセッションでは出さない
 //   ・画面を押したら飛ばせる
 //   ・終わったら、すっと消えてアプリが出てくる
+//
+// ▼ 重さについて（2026年10月に測りました）
+//   この部品を含むファイルは、圧縮して約11KB です。スマホの回線でも一瞬で読み込めます。
+//   あとから読み込む形（next/dynamic）にもできますが、そうすると最初の一瞬だけ
+//   ホームが見えてからアニメーションが始まってしまうので、最初から読み込む形にしています
 
 "use client";
 
@@ -574,7 +579,7 @@ export default function OpeningAnimation() {
       <p className="opening-caption absolute bottom-16 text-[11px] tracking-[0.22em] text-[#767a72]">
         糸がむすぶ、ゆかり。
       </p>
-      <p className="opening-caption absolute bottom-8 text-xs text-stone-400">
+      <p className="opening-caption absolute bottom-8 text-xs text-stone-500">
         {isDone ? "画面を押してはじめる" : "画面を押すと最後まで進みます"}
       </p>
     </div>

@@ -4,7 +4,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
+import { avatarPathFromUrl, newAvatarPath } from "@/lib/avatarFile";
 import ImageCropper from "@/components/ImageCropper";
 import CameraBadge from "@/components/CameraBadge";
 import { MOODS } from "@/lib/mood";
@@ -67,8 +68,9 @@ export default function ProfileForm({
 
     try {
       const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
+      // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+      if (!myId) {
         router.push("/login");
         return;
       }
@@ -79,15 +81,12 @@ export default function ProfileForm({
       let uploadedUrl = avatarUrl;
 
       if (newAvatar !== null) {
-        // ファイル名は自分のidにします。作り直すたびに増えません。
-        const path = `${data.user.id}.jpg`;
+        // ファイル名は毎回ランダムな id にします（lib/avatarFile.ts）。
+        // 名前が毎回ちがうので、古い画像が表示され続けることもありません
+        const path = newAvatarPath(myId);
         const upload = await supabase.storage
           .from("avatars")
-          .upload(path, newAvatar, {
-            contentType: "image/jpeg",
-            // upsert = 同じ名前があれば上書きする
-            upsert: true,
-          });
+          .upload(path, newAvatar, { contentType: "image/jpeg" });
 
         if (upload.error) throw new Error(upload.error.message);
 
@@ -95,8 +94,7 @@ export default function ProfileForm({
           .from("avatars")
           .getPublicUrl(path);
 
-        // ?t=... を付けて、古い画像が表示され続けるのを防ぎます
-        uploadedUrl = `${publicUrl.publicUrl}?t=${Date.now()}`;
+        uploadedUrl = publicUrl.publicUrl;
       }
 
       // ▼ 最後の .select() が大事です。
@@ -111,7 +109,7 @@ export default function ProfileForm({
           birthday: date === "" ? null : date,
           mood: selectedMood,
         })
-        .eq("id", data.user.id)
+        .eq("id", myId)
         .select("id");
 
       if (error) throw new Error(error.message);
@@ -120,6 +118,14 @@ export default function ProfileForm({
         setMessage("保存できませんでした。もう一度お試しください");
         setIsSaving(false);
         return;
+      }
+
+      // ▼ アイコンを変えたら、前のファイルを消します。
+      //   残しておくと、前の写真の URL を知っている人に見られ続けるためです。
+      //   消せなくても保存はできているので、そのまま進みます
+      const oldPath = avatarPathFromUrl(avatarUrl);
+      if (newAvatar !== null && oldPath !== null) {
+        await supabase.storage.from("avatars").remove([oldPath]);
       }
 
       router.push("/profile");
@@ -133,7 +139,8 @@ export default function ProfileForm({
   };
 
   return (
-    <div className="pb-24">
+    // 下の余白は、続けて並ぶ「メールアドレス・パスワードを変える」（app/profile/edit/page.tsx）の側で取ります
+    <div className="pb-6">
       {/* ▼ アイコン */}
       <section className="flex flex-col items-center gap-2 bg-[#fdf6f0] py-6">
         {/* label で囲むと、写真の丸そのものを押して選べます。
@@ -235,7 +242,7 @@ export default function ProfileForm({
         </button>
 
         {message ? (
-          <p className="text-center text-xs text-red-600">{message}</p>
+          <p className="text-center text-xs text-beni">{message}</p>
         ) : null}
       </div>
     </div>
@@ -251,7 +258,7 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-4 border-b border-stone-200 px-5 py-3">
+    <div className="flex items-center gap-4 border-b border-stone-200 px-4 py-3">
       <span className="w-20 shrink-0 text-sm text-stone-600">{label}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>

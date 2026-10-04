@@ -10,7 +10,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
 
 // 口頭で伝える前提なので、紛らわしい文字は外します。
 // 0とO、1とI、そして小文字は使いません。
@@ -42,8 +42,9 @@ export default function RecoveryCodeButton({
 
     try {
       const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) return;
+      // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+      if (!myId) return;
 
       // 前に発行したぶんを消してから入れ直します。
       // 1人1つの縛りがあるので、消さずに入れるとぶつかります。
@@ -51,25 +52,24 @@ export default function RecoveryCodeButton({
         .from("recovery_codes")
         .delete()
         .eq("target_user", targetUserId)
-        .eq("issued_by", data.user.id);
+        .eq("issued_by", myId);
 
       const newCode = makeCode();
 
       const { error } = await supabase.from("recovery_codes").insert({
         code: newCode,
         target_user: targetUserId,
-        issued_by: data.user.id,
+        issued_by: myId,
       });
 
       if (error) throw new Error(error.message);
 
       setCode(newCode);
     } catch (issueError) {
-      setMessage(
-        issueError instanceof Error
-          ? issueError.message
-          : "コードを発行できませんでした",
-      );
+      // 原因は開発者向けに残し、画面には分かりやすい言葉だけを出します
+      // （DB のエラー文には、表の名前など中の作りが書かれているため）
+      console.error("復旧のコードを発行できませんでした", issueError);
+      setMessage("コードを発行できませんでした。もう一度お試しください");
     }
 
     setIsSending(false);
@@ -86,7 +86,7 @@ export default function RecoveryCodeButton({
           {code}
         </p>
 
-        <p className="text-xs leading-relaxed text-stone-400">
+        <p className="text-xs leading-relaxed text-stone-500">
           24時間で使えなくなります。
           <br />
           このコードだけでは入れません。ほかに2人ぶん必要です。
@@ -106,12 +106,12 @@ export default function RecoveryCodeButton({
         {isSending ? "発行中..." : "復旧を手伝う（コードを発行）"}
       </button>
 
-      <p className="text-center text-xs text-stone-400">
+      <p className="text-center text-xs text-stone-500">
         {targetName} さんがアプリに入れなくなったときに使います
       </p>
 
       {message ? (
-        <p className="text-center text-xs text-red-600">{message}</p>
+        <p className="text-center text-xs text-beni">{message}</p>
       ) : null}
     </div>
   );

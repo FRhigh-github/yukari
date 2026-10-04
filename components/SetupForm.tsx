@@ -7,7 +7,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getMyId } from "@/lib/supabase/client";
+import { newAvatarPath } from "@/lib/avatarFile";
 import { shrinkImage } from "@/lib/image";
 import CameraBadge from "@/components/CameraBadge";
 import BirthdayPicker from "@/components/BirthdayPicker";
@@ -68,8 +69,9 @@ export default function SetupForm({
 
     try {
       const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
+      // 本人確認（通信なしで済みます。lib/supabase/client.ts の getMyId）
+      const myId = await getMyId(supabase);
+      if (!myId) {
         router.push("/login");
         return;
       }
@@ -79,10 +81,11 @@ export default function SetupForm({
       // アイコンを選んでいれば、公開の置き場所へ上げます。
       // 上げられなくても先へ進みます（あとからプロフィールで設定できます）。
       if (avatar !== null) {
-        const path = `${data.user.id}.jpg`;
+        // ファイル名は毎回ランダムな id にします（lib/avatarFile.ts）
+        const path = newAvatarPath(myId);
         const upload = await supabase.storage
           .from("avatars")
-          .upload(path, avatar, { contentType: "image/jpeg", upsert: true });
+          .upload(path, avatar, { contentType: "image/jpeg" });
 
         if (upload.error === null) {
           const { data: publicUrl } = supabase.storage
@@ -101,7 +104,7 @@ export default function SetupForm({
           birthday: birthday === "" ? null : birthday,
           avatar_url: avatarUrl,
         })
-        .eq("id", data.user.id);
+        .eq("id", myId);
 
       if (error) throw new Error(error.message);
 
@@ -162,7 +165,7 @@ export default function SetupForm({
       </label>
 
       {/* 本名をお願いする理由を添えます。理由なく求めると、入れてもらえません */}
-      <p className="-mt-2 text-xs text-stone-400">
+      <p className="-mt-2 text-xs text-stone-500">
         大切な人に見つけてもらうところなので、なるべく本名でお願いします
       </p>
 
@@ -181,7 +184,7 @@ export default function SetupForm({
         {isSending ? "保存中..." : "はじめる"}
       </button>
 
-      {message ? <p className="text-xs text-red-600">{message}</p> : null}
+      {message ? <p className="text-xs text-beni">{message}</p> : null}
     </form>
   );
 }

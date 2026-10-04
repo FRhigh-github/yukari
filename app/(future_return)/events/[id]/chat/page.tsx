@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useState, useRef, Fragment } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isUuid } from "@/lib/isUuid";
 
 type Message = {
   id: string;
@@ -32,6 +33,8 @@ export default function EventChatPage() {
   const [votes, setVotes] = useState<{ id: string; date: string; ok: number; maybe: number; ng: number }[]>([]);
   // 送れなかったときの知らせ。前はブラウザの alert でしたが、画面の中に出します
   const [errorText, setErrorText] = useState<string | null>(null);
+  // 消すかどうかを確かめている、自分の発言の id（自分のふきだしを押すと出ます）
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentUserIdRef = useRef<string | null>(null);
 
@@ -49,46 +52,42 @@ export default function EventChatPage() {
     return data?.display_name || "メンバー";
   };
 
-  // メッセージ取得用関数
-  const fetchMessages = async (myId: string | null) => {
-    if (!rawId) return;
-
-    const { data: msgData, error } = await supabase
+  // ▼ 発言の取得。
+  //   profiles(display_name) で、話した人の名前も一緒にもらいます（前は名前のためにもう1回取っていました）。
+  //   多くなりすぎないよう、新しいものから200件までにして、画面では古い順に並べ直します
+  const MESSAGE_LIMIT = 200;
+  const loadMessages = (myId: string | null) =>
+    supabase
       .from("messages")
-      .select("*")
+      .select("id, event_id, user_id, content, created_at, profiles(display_name)")
       .eq("event_id", rawId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("メッセージ取得エラー:", error.message);
-      return;
-    }
-
-    if (msgData && msgData.length > 0) {
-      const userIds = Array.from(new Set(msgData.map((m: Message) => m.user_id)));
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("id, display_name")
-        .in("id", userIds);
-
-      const profileMap = new Map<string, string>(
-        (profilesData || []).map((p) => [p.id, p.display_name || "メンバー"])
-      );
-
-      const formatted = msgData.map((m: Message) => ({
-        ...m,
-        user_name: m.user_id === myId ? "自分" : profileMap.get(m.user_id) || "メンバー",
-      }));
-
-      setMessages(formatted);
-    } else {
-      setMessages([]);
-    }
-  };
+      .order("created_at", { ascending: false })
+      .limit(MESSAGE_LIMIT)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("メッセージ取得エラー:", error.message);
+          return;
+        }
+        const formatted = (data ?? [])
+          .map((m) => ({
+            id: m.id,
+            event_id: m.event_id,
+            user_id: m.user_id,
+            content: m.content,
+            created_at: m.created_at,
+            user_name:
+              m.user_id === myId
+                ? "自分"
+                : (m.profiles as unknown as { display_name: string | null } | null)?.display_name ||
+                  "メンバー",
+          }))
+          .reverse();
+        setMessages(formatted);
+      });
 
   // ▼ useEffectEvent について（React 19.2 の機能）
   //   下の useEffect は「rawId が変わったときだけ」動かしたい処理です。
-  //   ところが中で使う fetchMessages などは、描き直すたびに作り直されるので、
+  //   ところが中で使う loadMessages などは、描き直すたびに作り直されるので、
   //   そのまま useEffect の依存に入れると、描き直すたびに読み直し・購読し直しになってしまいます。
   //   useEffectEvent で包んだ関数は依存に入れなくてよく、呼んだ時点の最新の中身で動きます。
 
@@ -114,19 +113,36 @@ export default function EventChatPage() {
 
   // 初期データ（ユーザー・イベント情報・過去ログ）の取得
   const initChat = useEffectEvent(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const myId = user?.id || null;
+    if (!isUuid(rawId)) return;
+
+    // ▼ 待ち時間を減らすため、お互いを必要としないものは同時に取ります。
+    //   前は「本人確認 → イベント名 → 候補日 → 出欠 → 発言 → 名前」と6回続けて通信していました。
+    //   本人確認（getClaims）は通信なしで済みます
+    const { data: claims } = await supabase.auth.getClaims();
+    const myId = claims?.claims.sub ?? null;
     setCurrentUserId(myId);
     currentUserIdRef.current = myId;
 
-    const { data: eventData } = await supabase
-      .from("events")
-      // events の名前の列は name だけです（title という列は無く、前は読むのに失敗して「チャット」のままでした）
-      .select("name")
-      .eq("id", rawId)
-      .maybeSingle();
+    const [{ data: eventData }, { data: options }, { data: responses }] = await Promise.all([
+      supabase
+        .from("events")
+        // events の名前の列は name だけです（title という列は無く、前は読むのに失敗して「チャット」のままでした）
+        .select("name")
+        .eq("id", rawId)
+        .maybeSingle(),
+      supabase
+        .from("event_date_options")
+        .select("id, event_date")
+        .eq("event_id", rawId)
+        .order("event_date", { ascending: true }),
+      // このイベントの候補日への答え（event_date_options!inner で、このイベントの分に絞ります）
+      supabase
+        .from("event_responses")
+        .select("option_id, user_id, answer, event_date_options!inner(event_id)")
+        .eq("event_date_options.event_id", rawId),
+      // 発言は、答えを確かめているあいだに取り始めておきます
+      loadMessages(myId),
+    ]);
 
     if (eventData) {
       setEventTitle(eventData.name || "チャット");
@@ -135,18 +151,7 @@ export default function EventChatPage() {
     // ▼ まだ日程の出欠に答えていない人は、先に答えてもらいます。
     //   候補日があって、自分の回答が1つも無いときだけ、答える画面へ移します（?answer=1）
     //   ついでに、候補日ごとの〇△×の数を数えて、チャットの上に出します
-    const { data: options } = await supabase
-      .from("event_date_options")
-      .select("id, event_date")
-      .eq("event_id", rawId)
-      .order("event_date", { ascending: true });
-    const optionIds = options?.map((option) => option.id) ?? [];
-    if (optionIds.length > 0) {
-      const { data: responses } = await supabase
-        .from("event_responses")
-        .select("option_id, user_id, answer")
-        .in("option_id", optionIds);
-
+    if ((options ?? []).length > 0) {
       if (myId && !responses?.some((response) => response.user_id === myId)) {
         // from も一緒に渡して、答え終わって戻ってきたときにも、戻る先が変わらないようにします
         router.replace(`/events/${rawId}?answer=1${fromChats ? "&from=chats" : ""}`);
@@ -171,12 +176,13 @@ export default function EventChatPage() {
       );
     }
 
-    await fetchMessages(myId);
     setLoading(false);
   });
 
   useEffect(() => {
-    if (!rawId) return;
+    // id の形でなければ、問い合わせも購読もしません（lib/isUuid.ts）。
+    // リアルタイムの絞り込み（filter）の文字にも埋め込むためです
+    if (!isUuid(rawId)) return;
 
     // supabase の窓口は、ブラウザでは1つを使い回す作りなので、ここで呼んでも上の supabase と同じものです。
     // （上の supabase をそのまま使うと、useEffect の依存に入れる必要が出てくるため、ここで受け取り直しています）
@@ -195,6 +201,16 @@ export default function EventChatPage() {
         },
         (payload) => {
           handleNewMessage(payload.new as Message);
+        }
+      )
+      // ▼ 誰かが発言を消したら、こちらの画面からも消します。
+      //   消えた行は id しか届かないので（中身は届きません）、絞り込みは付けずに id で探します
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "messages" },
+        (payload) => {
+          const removedId = (payload.old as { id?: string }).id;
+          setMessages((prev) => prev.filter((message) => message.id !== removedId));
         }
       )
       .subscribe();
@@ -217,16 +233,29 @@ export default function EventChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // 自分の発言を消します（DB の許可で、自分のもの以外は消えません）
+  const handleDeleteMessage = async (messageId: string) => {
+    const { data, error } = await supabase
+      .from("messages")
+      .delete()
+      .eq("id", messageId)
+      .select("id");
+    if (error || data?.length !== 1) {
+      setErrorText("消せませんでした。もう一度お試しください");
+      return;
+    }
+    setConfirmingId(null);
+    setMessages((prev) => prev.filter((message) => message.id !== messageId));
+  };
+
   // メッセージ送信処理
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || !rawId) return;
+    if (!inputText.trim() || !isUuid(rawId)) return;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const senderId = user?.id || currentUserId;
+    // getClaims = 本人確認。通信なしで済むので、送るまでの待ちが減ります
+    const { data: claims } = await supabase.auth.getClaims();
+    const senderId = claims?.claims.sub || currentUserId;
 
     if (!senderId) {
       setErrorText("ログインしてから、もう一度試してください");
@@ -292,7 +321,7 @@ export default function EventChatPage() {
                 <span className="font-bold text-stone-700">{vote.date}</span>
                 <span className="text-beni">〇{vote.ok}</span>
                 <span className="text-kin">△{vote.maybe}</span>
-                <span className="text-stone-400">×{vote.ng}</span>
+                <span className="text-stone-500">×{vote.ng}</span>
               </span>
             ))}
           </div>
@@ -341,17 +370,28 @@ export default function EventChatPage() {
                 {!isMe && (
                   <span className="mb-1 ml-1 text-sm text-kin">{msg.user_name || "メンバー"}</span>
                 )}
-                {/* 自分のふきだしは紅、ほかの人は白に金のふち */}
+                {/* 自分のふきだしは紅、ほかの人は白に金のふち。
+                    自分のふきだしを押すと、下に「消す」が出ます */}
                 <div
+                  onClick={isMe ? () => setConfirmingId(confirmingId === msg.id ? null : msg.id) : undefined}
                   className={`max-w-[78%] break-words rounded-2xl px-4 py-2 text-base ${
                     isMe
-                      ? "rounded-br-sm bg-beni text-white"
+                      ? "cursor-pointer rounded-br-sm bg-beni text-white"
                       : "rounded-bl-sm bg-white text-stone-800 ring-1 ring-kin/30"
                   }`}
                 >
                   {msg.content}
                 </div>
-                <span className="mt-0.5 px-1 text-xs text-stone-400">
+                {isMe && confirmingId === msg.id ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMessage(msg.id)}
+                    className="h-11 px-2 text-sm text-beni underline"
+                  >
+                    この発言を消す
+                  </button>
+                ) : null}
+                <span className="mt-0.5 px-1 text-xs text-stone-500">
                   {new Date(msg.created_at).toLocaleTimeString("ja-JP", {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -374,6 +414,8 @@ export default function EventChatPage() {
         <input
           type="text"
           value={inputText}
+          // 1回に送れるのは1,000文字まで（DB の上限と同じ。supabase/01_schema.sql の messages）
+          maxLength={1000}
           onChange={(e) => setInputText(e.target.value)}
           placeholder="メッセージ"
           className="h-11 min-w-0 flex-1 rounded-full bg-[#faf9f6] px-4 text-base ring-1 ring-kin/30 focus:outline-none focus:ring-kin"

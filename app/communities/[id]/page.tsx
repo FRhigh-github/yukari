@@ -2,8 +2,8 @@ import Link from "next/link";
 import { createClient, getCurrentUserId } from "@/lib/supabase/server";
 import InviteCode from "@/components/InviteCode";
 import CommunitySettings from "@/components/CommunitySettings";
+import { RemoveMemberButton, ReportList, type ReportItem } from "@/components/OwnerTools";
 import CommunityIcon from "@/components/CommunityIcon";
-import { isDemoGuest } from "@/lib/demoGuest";
 
 export default async function CommunityPage({
   params,
@@ -15,11 +15,6 @@ export default async function CommunityPage({
   // 本人確認。通信なしで済みます（lib/supabase/server.ts の getCurrentUserId）
   const userId = await getCurrentUserId(supabase);
   const user = userId === null ? null : { id: userId };
-
-  // デモのゲストには、アイコン・名前の変更と退出を出しません（lib/demoGuest.ts）。
-  // getClaims は通信なしで済むので、待ち時間は増えません
-  const { data: claims } = await supabase.auth.getClaims();
-  const isGuest = isDemoGuest(claims?.claims.email);
 
   // ▼ コミュニティとメンバーの一覧は、どちらも id だけで取れるので同時に出します。
   //   前は1つずつ待っていたので、通信2回ぶん待たされていました。
@@ -62,6 +57,29 @@ export default async function CommunityPage({
   const isOwner = (userId: string) =>
     memberships?.find((membership) => membership.user_id === userId)?.role ===
     "owner";
+  const amOwner = user !== null && isOwner(user.id);
+
+  // ▼ 作成者には、メンバーから届いた報告を見せます（読めるのは作成者だけ。DB の許可）
+  const { data: reportRows } = amOwner
+    ? await supabase
+        .from("reports")
+        .select("id, reporter, reported_user, reason, created_at")
+        .eq("community_id", community.id)
+        .order("created_at", { ascending: false })
+        .limit(50)
+    : { data: null };
+  const nameOf = (userId: string) =>
+    profiles?.find((profile) => profile.id === userId)?.display_name ?? "抜けた人";
+  const reports: ReportItem[] =
+    reportRows?.map((report) => ({
+      id: report.id,
+      reportedUserId: report.reported_user,
+      reportedName: nameOf(report.reported_user),
+      reporterName: nameOf(report.reporter),
+      reason: report.reason,
+      createdAt: report.created_at,
+      isStillMember: memberIds.includes(report.reported_user),
+    })) ?? [];
 
   return (
     // 色はホームにそろえています（生成りの背景・金の見出しと線）。
@@ -82,12 +100,16 @@ export default async function CommunityPage({
         communityId={community.id}
         name={community.name}
         iconUrl={community.icon_url}
-        canEdit={!isGuest}
       />
 
       <section>
         <h2 className="mb-2 text-sm font-bold text-kin">招待コード</h2>
-        <InviteCode code={community.invite_code} communityName={community.name} />
+        <InviteCode
+          code={community.invite_code}
+          communityName={community.name}
+          communityId={community.id}
+          canRegenerate={amOwner}
+        />
       </section>
 
       <section>
@@ -97,13 +119,14 @@ export default async function CommunityPage({
 
         <ul className="divide-y divide-kin/20 rounded-2xl border border-kin/30 bg-white px-4">
           {profiles?.map((profile) => (
-            <li key={profile.id}>
+            // 作成者には、行の右に「外す」を出します（自分の行には出しません）
+            <li key={profile.id} className="flex items-center gap-1">
               {/* ▼ 行ぜんたい（アイコン・名前）を押せるようにしています。
                   開く画面は、ホームでアイコンを押したときと同じご報告の一覧です。
                   ?back= で「戻る」を押したときの行き先をこの画面にします（前はホームへ飛ばされていました） */}
               <Link
                 href={`/members/${profile.id}?back=/communities/${community.id}`}
-                className="flex min-h-14 items-center gap-3 py-2"
+                className="flex min-h-14 min-w-0 flex-1 items-center gap-3 py-2"
               >
                 {/* アイコンは背景画像で置きます（読み込み失敗時に印が出ないため） */}
                 <span
@@ -123,16 +146,28 @@ export default async function CommunityPage({
                   </span>
                 ) : null}
               </Link>
+              {amOwner && profile.id !== user?.id ? (
+                <RemoveMemberButton
+                  communityId={community.id}
+                  userId={profile.id}
+                  name={profile.display_name ?? "名無し"}
+                />
+              ) : null}
             </li>
           ))}
         </ul>
       </section>
 
+      {amOwner && reports.length > 0 ? (
+        <ReportList communityId={community.id} reports={reports} />
+      ) : null}
+
       <CommunitySettings
         communityId={community.id}
         currentName={community.name}
-        isOwner={community.created_by === user?.id}
-        isGuest={isGuest}
+        // 作成者かどうかは、作った人の記録（created_by）ではなく参加の役割（role）で見ます。
+        // 作成者が抜けたときに、役割を引き継いだ人が作成者になるためです
+        isOwner={amOwner}
       />
     </main>
   );
