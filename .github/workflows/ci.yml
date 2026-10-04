@@ -24,8 +24,9 @@ jobs:
       - name: lint
         run: npm run lint
 
+      # PageProps などの型は Next.js が作るものです。ビルドの前なので、next typegen で先に作ってから確かめます
       - name: 型チェック
-        run: npx tsc --noEmit
+        run: npx next typegen && npx tsc --noEmit
 
       - name: テスト
         run: npm test
